@@ -30,8 +30,11 @@ class BuildApplication:
         self.runCommand(["uv", "venv", str(venv), "--python", "3.12", "--clear"])
         python = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 
-        self.runCommand(["uv", "pip", "install", "--python", str(python),
-                         "--reinstall", "pyinstaller>=6,<7", str(wheel)])
+        self.runCommand([
+            "uv", "pip", "install", "--python", str(python),
+            "--reinstall", "pyinstaller>=6,<7", str(wheel),
+        ])
+
         self.runCommand([
             str(python), "-m", "PyInstaller", "--noconfirm", "--clean",
             "--onefile", "--console", "--name", "nuwa-studio-mcp",
@@ -50,8 +53,14 @@ class BuildApplication:
         if not executable.is_file():
             raise RuntimeError("Studio executable was not generated.")
 
-        candidates = [shutil.which("makensis.exe"), r"C:\Program Files (x86)\NSIS\makensis.exe"]
-        makensis = next((str(item) for item in candidates if item and Path(item).is_file()), None)
+        candidates = [
+            shutil.which("makensis.exe"),
+            r"C:\Program Files (x86)\NSIS\makensis.exe",
+        ]
+        makensis = next(
+            (str(item) for item in candidates if item and Path(item).is_file()),
+            None,
+        )
 
         if not makensis:
             raise RuntimeError("NSIS is required to build NuwaStudioMCPSetup.exe.")

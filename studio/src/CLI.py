@@ -61,9 +61,8 @@ class StudioCLI:
         if organization and args.organization and organization["slug"] != args.organization:
             raise ValueError("Requested Organization differs from account Organization.")
 
-        if not any(host["path"] == args.host for host in current.get("hosts", [])):
-            if not args.create_host:
-                raise ValueError("New Hosts require explicit --create-host.")
+        if not any(host["path"] == args.host for host in current.get("hosts", [])) and not args.create_host:
+            raise ValueError("New Hosts require explicit --create-host.")
 
         work = address.claimWork(args.host, args.handle, args.organization)["work"]
         config.selectWork(work["id"])
@@ -71,6 +70,7 @@ class StudioCLI:
     @classmethod
     def run(cls) -> None:
         args = cls.createParser().parse_args()
+
         config = LocalConfig.load()
         credentials = OAuthCredentials(config)
 

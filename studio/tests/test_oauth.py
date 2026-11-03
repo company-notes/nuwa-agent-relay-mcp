@@ -1,6 +1,5 @@
 import json
 import threading
-import time
 import urllib.error
 import urllib.request
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -96,6 +95,7 @@ def test_browser_pkce_oauth_saves_private_tokens_and_refreshes(tmp_path, monkeyp
     credentials.login()
 
     assert callbacks == ["valid"]
+
     saved = json.loads(config.authPath().read_text(encoding="utf-8"))
     assert saved["access_token"] == "first-private-token"
     assert saved["refresh_token"] == "refresh-private-token"

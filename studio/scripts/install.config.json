@@ -1,0 +1,14 @@
+{
+  "serverName": "nuwa-agent-relay-studio",
+  "entrypoint": "nuwa-studio-mcp",
+  "distributionName": "nuwa-agent-relay-studio-mcp",
+  "binaryEnvVar": "NUWA_STUDIO_MCP_BINARY",
+  "envKeys": [
+    "NUWA_RELAY_URL",
+    "NUWA_ADDRESS_URL",
+    "NUWA_WORK_ADDRESS_ID",
+    "NUWA_MCP_HOME"
+  ],
+  "defaultEnvValues": {},
+  "envWarnings": {}
+}

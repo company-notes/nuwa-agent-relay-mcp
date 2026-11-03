@@ -1,3 +1,5 @@
+from urllib.parse import quote
+
 from fastmcp import FastMCP
 
 from .Client import RelayClient
@@ -152,5 +154,4 @@ class StudioMCP:
 
     @classmethod
     def encodeId(cls, value: str) -> str:
-        from urllib.parse import quote
         return quote(value, safe='')

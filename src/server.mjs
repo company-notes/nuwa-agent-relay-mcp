@@ -15,7 +15,10 @@ export function createMcpServer(client = new RelayClient()) {
 }
 
 // stdout belongs exclusively to MCP JSON-RPC; all status goes to stderr.
-void serveStdio(() => createMcpServer()).catch((error) => {
+try {
+  // MCP SDK v2 serveStdio owns the transport lifecycle and returns void.
+  serveStdio(() => createMcpServer());
+} catch (error) {
   process.stderr.write('Nuwa MCP server failed to start: ' + error.message + '\n');
   process.exitCode = 1;
-});
+}

@@ -14,6 +14,7 @@ def test_private_config_files_have_disk_key_conventions_and_work_selection(tmp_p
 
     assert selected.requireWork() == "work-owned"
     assert LocalConfig.load().requireWork() == "work-owned"
+
     raw = json.loads(LocalConfig.configPath().read_text())
     assert raw["work_address_id"] == "work-owned"
     assert raw["api_url"] == "https://agent-relay.company-notes.com"

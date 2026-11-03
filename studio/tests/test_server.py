@@ -1,4 +1,4 @@
-import pytest
+import asyncio
 from fastmcp import Client as MCPClient
 
 from src.Config import LocalConfig
@@ -18,24 +18,26 @@ class DummyRelayClient:
         return {"id": "message-1"}
 
 
-@pytest.mark.asyncio
-async def test_studio_fastmcp_exposes_independent_tools_and_routes_calls():
-    backend = DummyRelayClient()
-    server = StudioMCP(LocalConfig(workAddressID="test-work"), backend).createServer()
+def test_studio_fastmcp_exposes_independent_tools_and_routes_calls():
+    async def verify():
+        backend = DummyRelayClient()
+        server = StudioMCP(LocalConfig(workAddressID="test-work"), backend).createServer()
 
-    async with MCPClient(server) as client:
-        tools = await client.list_tools()
-        names = {tool.name for tool in tools}
+        async with MCPClient(server) as client:
+            tools = await client.list_tools()
+            names = {tool.name for tool in tools}
 
-        assert len(names) == 13
-        assert {"checkInbox", "sendMessage", "getReceipt", "acknowledgeRead"} <= names
+            assert len(names) == 13
+            assert {"checkInbox", "sendMessage", "getReceipt", "acknowledgeRead"} <= names
 
-        inbox = await client.call_tool("checkInbox", {})
-        assert not inbox.is_error
-        assert backend.calls == ["inbox"]
+            inbox = await client.call_tool("checkInbox", {})
+            assert not inbox.is_error
+            assert backend.calls == ["inbox"]
 
-        sent = await client.call_tool("sendMessage", {
-            "to": "org/host/work", "body": "test message",
-        })
-        assert not sent.is_error
-        assert backend.calls[-1] == ("sendMessage", "org/host/work", "test message")
+            sent = await client.call_tool("sendMessage", {
+                "to": "org/host/work", "body": "test message",
+            })
+            assert not sent.is_error
+            assert backend.calls[-1] == ("sendMessage", "org/host/work", "test message")
+
+    asyncio.run(verify())

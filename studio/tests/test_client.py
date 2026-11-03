@@ -28,8 +28,7 @@ def test_relay_client_reuses_one_work_scoped_http_path():
     assert all(request.url.params["work_address_id"] == "work-owned" for request in recorded)
     assert all(request.headers["authorization"] == "Bearer test-secret-oauth" for request in recorded)
     assert recorded[2].url.params["refresh"] == "archive"
-    assert recorded[3].url.path.endswith("/handoff%2F1/accept")
-    assert recorded[1].json if False else True
+    assert "/handoff%2F1/accept" in str(recorded[3].url)
 
 
 def test_address_client_does_not_add_work_query():

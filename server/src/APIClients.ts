@@ -87,8 +87,13 @@ export class RelayAPIClient extends HTTPAPIClient {
     super(env.RELAY_API_URL, authorization, requester);
   }
 
-  call(method: 'GET' | 'POST' | 'DELETE', path: string, workAddressID: string,
-    body?: Record<string, unknown>, query?: Record<string, string>): Promise<unknown> {
+  call(
+    method: 'GET' | 'POST' | 'DELETE',
+    path: string,
+    workAddressID: string,
+    body?: Record<string, unknown>,
+    query?: Record<string, string>,
+  ): Promise<unknown> {
     return this.request(method, path, { workAddressID, body, query });
   }
 }

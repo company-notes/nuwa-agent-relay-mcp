@@ -18,11 +18,17 @@ export abstract class MCPToolSet {
     this.server.registerTool(name, { description, inputSchema }, async (parameters) => {
       try {
         const value = await action(parameters);
-        return { content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] };
-      } catch (error) {
-        const text = error instanceof Error ? error.message : 'Unknown service failure.';
 
-        return { isError: true, content: [{ type: 'text' as const, text }] };
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }],
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown service failure.';
+
+        return {
+          isError: true,
+          content: [{ type: 'text' as const, text: message }],
+        };
       }
     });
   }
@@ -72,23 +78,40 @@ export class AddressTools extends MCPToolSet {
 }
 
 export class RelayTools extends MCPToolSet {
+  private readonly schemas = {
+    workAddressID: z.string().min(1).max(128),
+    messageID: z.string().min(1).max(128),
+    threadID: z.string().min(1).max(128),
+    body: z.string().min(1).max(100000),
+    to: z.string().min(1).max(255),
+    subject: z.string().min(1).max(255),
+    artifactLinks: z.array(z.url()).max(20).optional(),
+  };
+
   constructor(server: McpServer, private readonly client: RelayAPIClient) {
     super(server);
   }
 
   install(): void {
-    const workAddressID = z.string().min(1).max(128);
-    const messageID = z.string().min(1).max(128);
-    const threadID = z.string().min(1).max(128);
-    const body = z.string().min(1).max(100000);
-    const to = z.string().min(1).max(255);
-    const subject = z.string().min(1).max(255);
-    const artifactLinks = z.array(z.url()).max(20).optional();
+    this.registerMailboxTools();
+    this.registerInboxTools();
+    this.registerMessageTools();
+    this.registerHandoffTools();
+    this.registerReceiptTools();
+    this.registerWakeTools();
+  }
+
+  private registerMailboxTools(): void {
+    const { workAddressID } = this.schemas;
 
     this.register('relayProvisionHostMailbox',
       'Create or reuse a managed MailTrigger Host mailbox.',
       { workAddressID },
       (value) => this.client.call('POST', '/v1/hosts/provision', value.workAddressID as string));
+  }
+
+  private registerInboxTools(): void {
+    const { workAddressID, threadID, messageID } = this.schemas;
 
     this.register('relayInbox',
       'List D1 messages for the specified Work; not proof of MailTrigger arrival.',
@@ -100,12 +123,44 @@ export class RelayTools extends MCPToolSet {
       { workAddressID },
       (value) => this.client.call('GET', '/v1/host-inbox', value.workAddressID as string));
 
+    this.register('relayThreadHistory',
+      'Read the conversation history for a participating Work.',
+      { workAddressID, threadID },
+      (value) => this.client.call(
+        'GET', '/v1/threads/' + encodeURIComponent(value.threadID as string),
+        value.workAddressID as string,
+      ));
+
+    this.register('relayMessage',
+      'Read an authorized individual message without marking it read.',
+      { workAddressID, messageID },
+      (value) => this.client.call(
+        'GET', '/v1/messages/' + encodeURIComponent(value.messageID as string),
+        value.workAddressID as string,
+      ));
+  }
+
+  private registerMessageTools(): void {
+    const { workAddressID, to, body, subject, artifactLinks, threadID } = this.schemas;
+
     this.register('relaySendMessage',
       'Send a message to a Work address. External MailTrigger send side effect.',
       { workAddressID, to, body, subject: subject.optional(), artifactLinks },
       ({ workAddressID, ...input }) => this.client.call(
         'POST', '/v1/messages', workAddressID as string, input,
       ));
+
+    this.register('relayReplyThread',
+      'Reply to a Thread as the specified Work.',
+      { workAddressID, threadID, body, artifactLinks },
+      ({ workAddressID, threadID, ...input }) => this.client.call(
+        'POST', '/v1/threads/' + encodeURIComponent(threadID as string) + '/messages',
+        workAddressID as string, input,
+      ));
+  }
+
+  private registerHandoffTools(): void {
+    const { workAddressID, to, subject, body, artifactLinks, messageID } = this.schemas;
 
     this.register('relaySendHandoff',
       'Send a Host-level handoff. External MailTrigger send side effect.',
@@ -129,30 +184,10 @@ export class RelayTools extends MCPToolSet {
         'POST', '/v1/handoffs/' + encodeURIComponent(messageID as string) + '/reply',
         workAddressID as string, input,
       ));
+  }
 
-    this.register('relayThreadHistory',
-      'Read the conversation history for a participating Work.',
-      { workAddressID, threadID },
-      (value) => this.client.call(
-        'GET', '/v1/threads/' + encodeURIComponent(value.threadID as string),
-        value.workAddressID as string,
-      ));
-
-    this.register('relayReplyThread',
-      'Reply to a Thread as the specified Work.',
-      { workAddressID, threadID, body, artifactLinks },
-      ({ workAddressID, threadID, ...input }) => this.client.call(
-        'POST', '/v1/threads/' + encodeURIComponent(threadID as string) + '/messages',
-        workAddressID as string, input,
-      ));
-
-    this.register('relayMessage',
-      'Read an authorized individual message without marking it read.',
-      { workAddressID, messageID },
-      (value) => this.client.call(
-        'GET', '/v1/messages/' + encodeURIComponent(value.messageID as string),
-        value.workAddressID as string,
-      ));
+  private registerReceiptTools(): void {
+    const { workAddressID, messageID } = this.schemas;
 
     this.register('relayReceipt',
       'Read submission, independently confirmed MailTrigger arrival and explicit Agent read receipts.',
@@ -170,6 +205,10 @@ export class RelayTools extends MCPToolSet {
         'POST', '/v1/messages/' + encodeURIComponent(value.messageID as string) + '/read',
         value.workAddressID as string,
       ));
+  }
+
+  private registerWakeTools(): void {
+    const { workAddressID } = this.schemas;
 
     this.register('relayWakeEvents',
       'Read wake delivery and retry status for one authorized Work.',

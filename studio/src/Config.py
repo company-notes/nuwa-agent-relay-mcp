@@ -54,8 +54,9 @@ class LocalConfig:
         path = cls.configPath()
         data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
         config = cls(
-            apiURL=os.environ.get("NUWA_RELAY_URL", data.get("api_url", cls.apiURL)),
-            addressURL=os.environ.get("NUWA_ADDRESS_URL", data.get("address_url", cls.addressURL)),
+            apiURL=cls.validateOrigin(os.environ.get("NUWA_RELAY_URL", data.get("api_url", cls.apiURL))),
+            addressURL=cls.validateOrigin(os.environ.get("NUWA_ADDRESS_URL",
+                                                   data.get("address_url", cls.addressURL))),
             workAddressID=os.environ.get("NUWA_WORK_ADDRESS_ID", data.get("work_address_id")),
         )
         cls.validateOrigin(config.apiURL)
@@ -74,10 +75,9 @@ class LocalConfig:
         temporary = path.with_name(path.name + "." + secrets.token_hex(6) + ".tmp")
 
         try:
-            with temporary.open("x", encoding="utf-8") as stream:
-                if os.name != "nt":
-                    temporary.chmod(0o600)
+            descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
 
+            with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
                 json.dump(data, stream, indent=2, ensure_ascii=False)
                 stream.write("\n")
 

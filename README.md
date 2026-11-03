@@ -85,7 +85,7 @@ nuwa-studio-mcp logout
 
 建立新的 Host 或 Organization 需額外使用 \`--create-host\`／\`--create-organization\`，避免 AI 或安裝指令無意建立永久資源。命令 \`install\`／\`uninstall\` 使用 \`mcp_install\` 的官方 JSON manifest，而不是在 CLI 中手刻 Claude/Cursor 的設定格式。支援的 MCP Client 由目前所安裝的 \`mcp_install\` 版本決定。
 
-Studio Credential 儲存於 Windows \`%APPDATA%\nuwa-agent-relay-mcp\auth.json\`，以及 macOS/Linux \`~/.config/nuwa-agent-relay-mcp/auth.json\`。設定 \`config.json\` 使用 snake_case，對應的 runtime 變數／方法仍使用 CamelCase/專案指定的 acronym 大小寫。Token 不會寫入 Git 或 MCP Client 的普通 config。登出不等於撤銷 Agent Address 上的遠端 OAuth Grant。
+Studio Credential 儲存於 Windows \`%APPDATA%\nuwa-agent-relay-mcp\auth.json\`，以及 macOS/Linux \`~/.config/nuwa-agent-relay-mcp/auth.json\`。設定 \`config.json\` 使用 snake_case，對應的 runtime 變數／方法仍使用 CamelCase/專案指定的 acronym 大小寫。Token 不會寫入 Git 或 MCP Client 的普通 config；mcp_install 的安裝 manifest 也**不會轉存 NUWA_ACCESS_TOKEN**，只讀取本機登入資料。登出不等於撤銷 Agent Address 上的遠端 OAuth Grant。
 
 ### 本機 Studio 的 Tools
 

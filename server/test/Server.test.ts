@@ -110,6 +110,28 @@ test('a validated OAuth identity can initialize an independent MCP HTTP session'
     const payload = await response.text();
     assert.match(payload, /nuwa-agent-relay/);
     assert.equal(validated, 1);
+
+    const list = await app.handle(new Request('https://mcp.example.com/mcp', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer test-account-oauth',
+        accept: 'application/json, text/event-stream',
+        'content-type': 'application/json',
+        'mcp-protocol-version': '2025-06-18',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'tools/list',
+        params: {},
+      }),
+    }));
+
+    assert.equal(list.status, 200);
+    const toolsResponse = await list.text();
+    assert.match(toolsResponse, /relayInbox/);
+    assert.match(toolsResponse, /agentAddressGetStatus/);
+    assert.equal(validated, 2);
   } finally {
     globalThis.fetch = originalFetch;
   }

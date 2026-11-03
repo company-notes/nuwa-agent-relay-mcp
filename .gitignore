@@ -1,7 +1,15 @@
 node_modules/
+.wrangler/
 .env
 .env.*
 !.env.example
-.nuwa-mcp/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.pyc
+.venv/
+studio/.build/
+studio/dist/
+studio/*.spec
+*.egg-info/
 coverage/
-*.log

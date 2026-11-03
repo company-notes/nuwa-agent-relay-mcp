@@ -1,25 +1,39 @@
 # Nuwa Agent Relay MCP
 
-依照 [CODE_PRINCIPLES.md](CODE_PRINCIPLES.md)（本 Repository 直接保存使用者提供的完整版本）與原始 ReleaseBot 的架構，明確分為兩個**獨立的 MCP 入口**：
+Nuwa Agent Relay MCP connects AI agents through the Nuwa Agent Relay API and Agent Address identity service. The repository provides **two independent MCP adapters**: a remote Server MCP for OAuth-enabled clients and a local Studio MCP for desktop applications.
 
-| | Server MCP（遠端） | Studio MCP（本機） |
+| | Server MCP | Studio MCP |
 | --- | --- | --- |
-| 程式目錄 | [server/](server/) | [studio/](studio/) |
-| 技術 | TypeScript / 官方 MCP SDK v2 / Cloudflare Workers | Python 3.12 / FastMCP 4 / mcp_install 0.1 |
-| MCP Transport | Streamable HTTP（/mcp） | stdio |
-| OAuth | 使用 MCP Client 自行與 Agent Address OAuth 登入；Worker 轉送並驗證 Bearer | 本機瀏覽器 OAuth + PKCE；憑證保存在使用者私有目錄 |
-| Work Identity | 每個 Tool 明確帶不可變的 workAddressID（同原版 Server 設計） | setup 時選擇 Work，所有 Tool 自動使用該 ID |
-| 安裝 | Cloudflare Worker；不需在 Agent 機器安裝 | mcp_install 自動註冊到桌面 MCP Client |
-| 外部 API | Agent Address + Nuwa Relay（Relay 再與 MailTrigger 溝通） | Agent Address + Nuwa Relay |
-| 本地檔案存取 | 無 | Studio 可協助使用者先生成本地檔案連結（例如 FFL），Relay 只傳連結 |
+| Location | [`server/`](server/) | [`studio/`](studio/) |
+| Runtime | TypeScript, MCP SDK v2, Cloudflare Workers | Python 3.12, FastMCP 4 |
+| Transport | Streamable HTTP at `/mcp` | Local stdio |
+| Authentication | MCP client signs in through Agent Address OAuth | Browser-based OAuth with PKCE |
+| Work identity | Explicit `workAddressID` per tool call | One selected Work in local configuration |
+| Setup | Deploy a Worker | Install with `mcp_install` |
 
-兩個 MCP 都是**既有 REST API 的 Adapter**，不持有自己的郵件或身分資料庫，不複製 Relay 的業務邏輯。Server 以一個共用 HTTP 客戶端類別服務 Agent Address 與 Relay；Studio 也使用一個共用 Python HTTP 客戶端基底類別。兩個 Transport 各自封裝自己的 SDK 需求，不把 Node stdio Server 和 FastMCP 混在一起。
+Both adapters call the existing Agent Address and Relay REST APIs. The Relay API remains responsible for message storage, routing, delivery, handoffs, and receipts.
 
-## Server MCP — Cloudflare
+## Server MCP (Cloudflare Workers)
 
-Node 26 LTS（26.13.0 以上）：
+The remote MCP endpoint is the deployed Worker's `/mcp` path. Use the URL returned by Cloudflare after deployment; no custom hostname is configured by default.
 
-~~~powershell
+The Worker provides these endpoints:
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /health` | Service health check |
+| `GET /.well-known/oauth-protected-resource/mcp` | OAuth protected-resource metadata (RFC 9728) |
+| `POST /mcp` | MCP Streamable HTTP requests |
+
+An OAuth-capable MCP client can discover Agent Address through the protected-resource metadata and complete sign-in. The Worker validates the Bearer token with Agent Address for each MCP request; it does not maintain a local account or token database.
+
+Each remote Relay tool takes an **immutable `workAddressID`**. This prevents different MCP sessions from implicitly sharing a selected Work. Use `agentAddressGetStatus` to inspect your account and `agentAddressClaimWork` when you need to register a Work identity.
+
+### Build and test
+
+Requires Node.js 26.13 or later in the 26.x release line.
+
+~~~bash
 npm ci
 npm run check
 npm test
@@ -27,91 +41,139 @@ npm run build
 npm run audit:check
 ~~~
 
-Server Worker 使用 [wrangler.jsonc](wrangler.jsonc) 配置，不包含任何可提交的 Secret：
+`npm run build` performs a Wrangler dry run. It does **not** publish the Worker.
 
-- \`RELAY_API_URL=https://agent-relay.company-notes.com\`
-- \`ADDRESS_API_URL=https://address.company-notes.com\`
-- \`GET /health\`：Worker 健康狀態
-- \`GET /.well-known/oauth-protected-resource/mcp\`：RFC 9728 metadata，指向 Agent Address OAuth 授權伺服器
-- \`POST /mcp\`：遠端 MCP Streamable HTTP Transport，先驗證 Bearer Token 才建立 MCP session
+For local development:
 
-首次連接遠端 MCP 的 Client，會經由 OAuth Protected Resource metadata 引導至 **Agent Address** 完成登入；MCP Worker 不會自行保存使用者密碼或 OAuth Token，亦不會要求你複製 Bearer Token 到 MCP 設定。
+~~~bash
+npm run dev
+~~~
 
-遠端 OAuth Tools：\`agentAddressGetStatus\`、\`agentAddressClaimWork\`、\`agentAddressRenameWork\`、\`agentAddressReleaseWork\`、\`agentAddressResolve\`。
+### Deploy
 
-遠端 Relay Tools：\`relayProvisionHostMailbox\`、\`relayInbox\`、\`relayHostInbox\`、\`relaySendMessage\`、\`relaySendHandoff\`、\`relayAcceptHandoff\`、\`relayReplyHandoff\`、\`relayThreadHistory\`、\`relayReplyThread\`、\`relayMessage\`、\`relayReceipt\`、\`relayAcknowledgeRead\`、\`relayWakeEvents\`。
+The default [`wrangler.jsonc`](wrangler.jsonc) points to these API origins:
 
-**部署：** 使用 GitHub Actions 中的手動 \`Deploy Server MCP\` 工作流程（需要此 Repository 的 Cloudflare API Token／Account ID Secrets），或具備授權者在本機執行 \`npm run deploy\`。部署輸出的 Workers URL 才是 MCP 客戶端的實際 URL，勿假設某個自訂網域已配置。CI 平常只做 \`wrangler deploy --dry-run\`，PR 合併不會暗中發布正式 Worker。
+~~~text
+RELAY_API_URL=https://agent-relay.company-notes.com
+ADDRESS_API_URL=https://address.company-notes.com
+~~~
 
-## Studio MCP — FastMCP + mcp_install
+Update the origins for your environment if you are running your own API services. This MCP Worker does not need its own message database.
 
-本機 Studio 不需要 Node.js；依照原始 \`releasebot_mcp/mcp/\` 的 Python 分層，使用：
+For GitHub Actions deployment, configure these repository secrets:
 
-- \`Config.py\`：設定與唯一 Work Identity（本機 JSON 設定）
-- \`Auth.py\`：Agent Address OAuth PKCE 登入、Token Refresh
-- \`Client.py\`：共用 HTTP client 與專責 Agent Address／Relay client
-- \`Server.py\`：只負責 FastMCP Tool 定義與本機 stdio
-- \`Installer.py\`：只負責透過 \`mcp_install\` 安裝／移除
-- \`CLI.py\`：命令解析，不實作 Transport 或 API 業務邏輯
+| Secret | Description |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | A scoped Cloudflare API token permitted to deploy Workers |
+| `CLOUDFLARE_ACCOUNT_ID` | Your Cloudflare account ID |
 
-在 Windows PowerShell：
+Run **Actions → Deploy Server MCP → Run workflow** on the intended branch. The workflow runs validation before publishing and uses the `production` GitHub environment. Ordinary pull requests and pushes do not trigger production deployment.
 
-~~~powershell
-# 安裝 Python 3.12 與 uv 或 pip
-python -m pip install -e .\studio
+You can also deploy from your own machine after configuring Cloudflare credentials:
 
-# 用瀏覽器登入 Agent Address（不用手動輸入 Token）
+~~~bash
+npm run deploy
+~~~
+
+After deployment, configure your remote MCP client with the resulting URL plus `/mcp`.
+
+### Remote tools
+
+Agent Address tools: `agentAddressGetStatus`, `agentAddressClaimWork`, `agentAddressRenameWork`, `agentAddressReleaseWork`, `agentAddressResolve`.
+
+Relay tools: `relayProvisionHostMailbox`, `relayInbox`, `relayHostInbox`, `relaySendMessage`, `relaySendHandoff`, `relayAcceptHandoff`, `relayReplyHandoff`, `relayThreadHistory`, `relayReplyThread`, `relayMessage`, `relayReceipt`, `relayAcknowledgeRead`, `relayWakeEvents`.
+
+Work creation, identity release, mailbox provisioning, and message delivery can have persistent effects. Confirm the intended target before invoking these tools.
+
+## Studio MCP (Python FastMCP)
+
+The Studio adapter runs locally over stdio. It uses FastMCP to expose tools and `mcp_install` to register the server with compatible desktop MCP clients. It does not require Node.js or a separate Cloudflare Worker.
+
+Install Python 3.12 and run these commands from the repository root:
+
+~~~bash
+python -m pip install -e "./studio"
+
 nuwa-studio-mcp login
 nuwa-studio-mcp status
+nuwa-studio-mcp identity --work-id YOUR_ACTIVE_WORK_UUID
 
-# 指定既有的 Work UUID，不會建立新 Host/Work
-nuwa-studio-mcp identity --work-id <WorkUUID>
-
-# 或在已有的 Host 下建立新的 Work
-nuwa-studio-mcp identity --host mypc --handle coder
-
-# 自動產生桌面 MCP 設定，先預覽後安裝
 nuwa-studio-mcp install --print
 nuwa-studio-mcp install
+~~~
 
-# 不透過 Client，也可直接執行 stdio MCP（不會有普通文字輸出）
+The `login` command opens your browser for Agent Address OAuth authorization. The `identity` command selects an existing active Work without creating a Host or Organization.
+
+To create a new Work under an existing Host instead:
+
+~~~bash
+nuwa-studio-mcp identity --host my-computer --handle coding-agent
+~~~
+
+Creating a new Host requires `--create-host`; creating a new Organization requires `--organization YOUR_ORG --create-organization`. These actions create persistent identities.
+
+If your MCP client does not support automatic registration, configure its stdio command to launch:
+
+~~~text
 nuwa-studio-mcp run
+~~~
 
-# 解除安裝 MCP Client 註冊；OAuth Token 仍保留
+To remove a desktop registration or clear locally saved OAuth credentials:
+
+~~~bash
 nuwa-studio-mcp uninstall
-# 若要刪掉本機 OAuth Token：
 nuwa-studio-mcp logout
 ~~~
 
-建立新的 Host 或 Organization 需額外使用 \`--create-host\`／\`--create-organization\`，避免 AI 或安裝指令無意建立永久資源。命令 \`install\`／\`uninstall\` 使用 \`mcp_install\` 的官方 JSON manifest，而不是在 CLI 中手刻 Claude/Cursor 的設定格式。支援的 MCP Client 由目前所安裝的 \`mcp_install\` 版本決定。
+Uninstalling the local MCP registration or logging out does not delete remote Agent Address identities or revoke remote OAuth grants.
 
-Studio Credential 儲存於 Windows \`%APPDATA%\nuwa-agent-relay-mcp\auth.json\`，以及 macOS/Linux \`~/.config/nuwa-agent-relay-mcp/auth.json\`。設定 \`config.json\` 使用 snake_case，對應的 runtime 變數／方法仍使用 CamelCase/專案指定的 acronym 大小寫。Token 不會寫入 Git 或 MCP Client 的普通 config；mcp_install 的安裝 manifest 也**不會轉存 NUWA_ACCESS_TOKEN**，只讀取本機登入資料。登出不等於撤銷 Agent Address 上的遠端 OAuth Grant。
+### Local configuration
 
-### 本機 Studio 的 Tools
+By default, Studio stores its configuration and OAuth credentials in a private user directory:
 
-\`checkInbox\`、\`checkHostInbox\`、\`getMessage\`、\`getThreadHistory\`、\`sendMessage\`、\`sendHandoff\`、\`acceptHandoff\`、\`replyHandoff\`、\`replyThread\`、\`getReceipt\`、\`acknowledgeRead\`、\`getWakeEvents\`、\`provisionHostMailbox\`。
+| OS | Directory |
+| --- | --- |
+| Windows | `%APPDATA%\nuwa-agent-relay-mcp\` |
+| macOS / Linux | `~/.config/nuwa-agent-relay-mcp/` |
 
-所有 Tool 由 FastMCP 直接根據 Python 函式簽章產生 Schema；不需要手刻相同的 JSON Schema。工具不提供建立／刪除 Host、Organization 的權限，這類持久化資源只能經由明確的 CLI 初始化步驟處理。
+You can override the directory with the absolute path environment variable `NUWA_MCP_HOME`. Keep each Studio installation's selected Work and credentials isolated. Never commit access tokens or local credential files to source control.
 
-\`studio/Build.py\` 與 \`studio/scripts/Installer.nsi\` 用於**選用**的 Windows PyInstaller + NSIS 發布；普通使用者可直接透過 \`mcp_install\` 配置本機 MCP，不必先建 EXE。
+The Studio tools include `checkInbox`, `checkHostInbox`, `getMessage`, `getThreadHistory`, `sendMessage`, `sendHandoff`, `acceptHandoff`, `replyHandoff`, `replyThread`, `getReceipt`, `acknowledgeRead`, `getWakeEvents`, and `provisionHostMailbox`.
 
-## MailTrigger 與收件行為
+### Optional Windows installer
 
-MCP 不會因 MailTrigger 的郵件網域卡關而無法啟動。登入、讀取已有的 D1 Inbox/Thread、查詢 OAuth 地址，均可獨立使用。但寄送訊息、建立 Mailbox 仍依賴已設定的 MailTrigger 服務；這些 Tool 會產生真實外部副作用。
+The [`studio/Build.py`](studio/Build.py) script can build a Python wheel, a standalone executable, and a Windows installer through PyInstaller and NSIS. This optional packaging workflow requires `uv` and the relevant build tools.
 
-\`relayReceipt\`／\`getReceipt\` 會區分「寄送 API 已接受」、「MailTrigger Archive/Webhook 確認收件」與「Agent 明確已讀」。只有已確認收件才會進入 Relay 的 Wake 機制，MCP 不自行實作重試。
+~~~bash
+cd studio
+python Build.py
+~~~
 
-## 開發驗證
+For most users, the Python package and `mcp_install` are sufficient.
 
-~~~powershell
+## Messages, handoffs, and receipts
+
+- **Messages** are ordinary agent-to-agent communication. Sending a message is a real external action.
+- **Handoffs** transfer work and may require the recipient to accept the request explicitly.
+- **Receipts** distinguish an accepted send request, independently confirmed delivery, and an explicit read acknowledgment. Sending, delivery, and reading are not interchangeable states.
+- **Inbox reads** do not automatically acknowledge messages as read.
+
+## Development and tests
+
+Remote Server MCP:
+
+~~~bash
 npm ci
 npm run check
 npm test
 npm run build
-npm run audit:check
+~~~
 
-python -m pip install -e '.\studio[dev]'
+Local Studio MCP:
+
+~~~bash
+python -m pip install -e "./studio[dev]"
 pytest -q studio/tests
 ~~~
 
-CI 使用獨立 Jobs 測試 **TypeScript Worker OAuth／MCP** 與 **Python Studio FastMCP／mcp_install**。所有工作遵守 [CODE_PRINCIPLES.md](CODE_PRINCIPLES.md)：封裝、共用程式、單向依賴、早退出、明確例外、命名規則和清晰的責任邊界。
+GitHub Actions validates the Server MCP, Linux Studio MCP, and Windows Studio MCP independently. Integration tests use controlled backends and do not send production messages.

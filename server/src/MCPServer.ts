@@ -18,8 +18,8 @@ export class NuwaMCPServer {
       instructions: 'Agent Address is the OAuth identity provider. ' +
         'Call agentAddressGetStatus and agentAddressClaimWork to obtain an owned immutable ' +
         'workAddressID before using Relay tools. The remote MCP forwards the same OAuth ' +
-        'Bearer identity to Agent Address and Nuwa Relay; it never asks for a MailTrigger ' +
-        'API Token. Listing Inbox is not a MailTrigger delivery receipt and does not ' +
+        'Bearer identity to Agent Address and Nuwa Relay; it does not require ' +
+        'separate delivery provider credentials. Listing Inbox is not a delivery receipt and does not ' +
         'mark a message read. When transferring files, provide explicit HTTPS artifact ' +
         'links; Relay only transports references.',
     });

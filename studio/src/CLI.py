@@ -76,12 +76,12 @@ class StudioCLI:
 
         if args.command == "login":
             credentials.login()
-            print("登入成功。")
+            print("Signed in successfully.")
             return
 
         if args.command == "logout":
             credentials.logout()
-            print("本機憑證已清除。遠端 OAuth Grant 未撤銷。")
+            print("Local credentials removed. Remote OAuth grants remain active.")
             return
 
         if args.command == "status":
@@ -90,7 +90,7 @@ class StudioCLI:
 
         if args.command == "identity":
             cls.selectIdentity(args, config, AddressClient(config.addressURL, credentials))
-            print("Work Identity 已保存。")
+            print("Work identity saved.")
             return
 
         if args.command in ("install", "uninstall"):

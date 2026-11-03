@@ -18,7 +18,7 @@ class StudioMCP:
 
         @server.tool()
         def checkInbox():
-            """Read D1 messages addressed to this Studio's selected Work."""
+            """Read messages addressed to the selected Work without marking them read."""
             return client.inbox()
 
         @server.tool()
@@ -39,7 +39,7 @@ class StudioMCP:
         @server.tool()
         def sendMessage(to: str, body: str, subject: str | None = None,
                         artifactLinks: list[str] | None = None):
-            """Send a Work message with an actual MailTrigger side effect."""
+            """Send a Work message to the recipient. This is a real external action."""
             return client.sendMessage(to, body, subject, artifactLinks)
 
         @server.tool()
@@ -67,7 +67,7 @@ class StudioMCP:
 
         @server.tool()
         def getReceipt(messageID: str, refreshArchive: bool = False):
-            """Inspect distinct submission, MailTrigger arrival and Agent read receipts."""
+            """Inspect submission, confirmed delivery, and explicit read receipts."""
             return client.receipt(messageID, refreshArchive)
 
         @server.tool()

@@ -9,7 +9,7 @@
   },
   "scripts": {
     "check": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test server/test/*.test.ts",
+    "test": "node --import tsx --test server/test/*.test.ts",
     "build": "wrangler deploy --dry-run",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
@@ -22,6 +22,7 @@
   "devDependencies": {
     "@types/node": "^24.10.0",
     "typescript": "^5.9.3",
-    "wrangler": "^4.38.0"
+    "wrangler": "^4.38.0",
+    "tsx": "^4.20.0"
   }
 }

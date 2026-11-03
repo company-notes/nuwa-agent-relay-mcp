@@ -37,6 +37,9 @@ export class RelayClient {
     }
 
     const url = new URL(path, origin);
+    if (url.origin !== origin) {
+      throw new Error('API request cannot escape the configured service origin.');
+    }
 
     for (const [key, value] of Object.entries(query)) {
       if (value !== undefined && value !== null) {

@@ -1,14 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const entry = fileURLToPath(new URL('../src/server.mjs', import.meta.url));
 
 test('real MCP stdio initialize and tools/list expose 14 Relay tools without leaking logs', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'nuwa-mcp-stdio-'));
+  const childEnv = {
+    ...process.env,
+    NUWA_ACCESS_TOKEN: 'test-not-used',
+    NUWA_MCP_HOME: home,
+  };
+  delete childEnv.NUWA_WORK_ID;
   const child = spawn(process.execPath, [entry], {
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env, NUWA_ACCESS_TOKEN: 'test-not-used' },
+    env: childEnv,
   });
   let output = '';
   let stderr = '';
@@ -69,6 +79,21 @@ test('real MCP stdio initialize and tools/list expose 14 Relay tools without lea
     assert.equal(listed.result.tools.length, 14);
     assert.ok(listed.result.tools.some((tool) => tool.name === 'relay_send_message'));
     assert.ok(listed.result.tools.some((tool) => tool.name === 'relay_receipt'));
+
+    // SDK must refuse malformed inputs before the tool can send anything.
+    const malformed = await ask('tools/call', {
+      name: 'relay_send_message',
+      arguments: { to: 'org/host/work', body: '' },
+    });
+    assert.ok(malformed.error || malformed.result?.isError, JSON.stringify(malformed));
+
+    // A valid read tool is still guarded by an explicitly selected Work ID.
+    const noWork = await ask('tools/call', {
+      name: 'relay_inbox',
+      arguments: {},
+    });
+    assert.equal(noWork.result?.isError, true, JSON.stringify(noWork));
+    assert.match(noWork.result.content[0].text, /Work ID selected/);
     assert.ok(!stderr.includes('test-not-used'));
   } finally {
     if (!stopped) {
@@ -76,5 +101,6 @@ test('real MCP stdio initialize and tools/list expose 14 Relay tools without lea
       child.kill();
     }
     child.stdin.destroy();
+    await rm(home, { recursive: true, force: true });
   }
 });

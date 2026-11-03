@@ -15,10 +15,7 @@ export function createMcpServer(client = new RelayClient()) {
 }
 
 // stdout belongs exclusively to MCP JSON-RPC; all status goes to stderr.
-if (process.argv[1] && import.meta.url === new URL('file://' +
-    process.argv[1].replace(/\\/g, '/')).href) {
-  void serveStdio(() => createMcpServer()).catch((error) => {
-    process.stderr.write('Nuwa MCP server failed to start: ' + error.message + '\n');
-    process.exitCode = 1;
-  });
-}
+void serveStdio(() => createMcpServer()).catch((error) => {
+  process.stderr.write('Nuwa MCP server failed to start: ' + error.message + '\n');
+  process.exitCode = 1;
+});

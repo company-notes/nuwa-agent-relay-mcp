@@ -199,7 +199,7 @@ export async function login() {
     const registration = await oauthPost(origin, '/register', {
       client_name: 'Nuwa Agent Relay MCP (local stdio)',
       redirect_uris: [listener.redirectURI],
-      grant_types: ['authorization_code', 'refresh_token'],
+      grant_types: ['authorization_code'],
       response_types: ['code'],
       token_endpoint_auth_method: 'none',
     }, 'json');

@@ -1,8 +1,11 @@
 import * as z from 'zod/v4';
+import { activeWorkId } from './settings.mjs';
+import { readIdentity } from './storage.mjs';
 
 const uuid = z.string().min(1).max(128).describe('Opaque UUID/ID returned by Nuwa Relay.');
 const body = z.string().min(1).max(100_000);
-const artifacts = z.array(z.url().startsWith('https://')).max(20).optional();
+const artifacts = z.array(z.url().refine((url) => url.startsWith('https://'),
+  'Artifact links must use HTTPS.')).max(20).optional();
 const workRecipient = z.string().min(1).max(255).describe(
   'Agent Address Work (e.g. org/host/work or @host/work).',
 );
@@ -36,18 +39,17 @@ export function registerRelayTools(server, client) {
     'Show the Agent Address OAuth Organization and selected active Work identity. Read-only.',
     z.object({}),
     async () => {
-      const status = await client.relay('/v1/inbox'); // Validates the selected Work authorization.
-      const identity = await client.identityStatus(
-        (await import('./settings.mjs')).activeWorkId(
-          await (await import('./storage.mjs')).readIdentity(),
-        ),
-      );
+      const identity = await client.identityStatus(activeWorkId(await readIdentity()));
+
+      if (!identity?.work?.id || !identity?.organization?.id) {
+        throw new Error('Selected Work is not active or not owned by the signed-in account.');
+      }
 
       return {
         organization: identity.organization,
         work: identity.work,
         host: identity.hosts?.find((h) => h.id === identity.work?.parentAddressId),
-        inboxCount: Array.isArray(status) ? status.length : null,
+
       };
     });
 

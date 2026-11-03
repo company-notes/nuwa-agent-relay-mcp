@@ -1,7 +1,8 @@
-"""Persistent Studio MCP settings and private OAuth credential storage."""
+"""Studio configuration and private on-disk OAuth credentials."""
 
 import json
 import os
+import secrets
 from dataclasses import dataclass, replace
 from pathlib import Path
 from urllib.parse import urlparse
@@ -18,12 +19,12 @@ class LocalConfig:
         override = os.environ.get("NUWA_MCP_HOME")
 
         if override:
-            path = Path(override).expanduser()
+            directory = Path(override).expanduser()
 
-            if not path.is_absolute():
-                raise ValueError("NUWA_MCP_HOME must be an absolute directory.")
+            if not directory.is_absolute():
+                raise ValueError("NUWA_MCP_HOME must be an absolute path.")
 
-            return path
+            return directory
 
         if os.name == "nt":
             return Path(os.environ["APPDATA"]) / "nuwa-agent-relay-mcp"
@@ -51,12 +52,7 @@ class LocalConfig:
     @classmethod
     def load(cls) -> "LocalConfig":
         path = cls.configPath()
-
-        if path.exists():
-            data = json.loads(path.read_text(encoding="utf-8"))
-        else:
-            data = {}
-
+        data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
         config = cls(
             apiURL=os.environ.get("NUWA_RELAY_URL", data.get("api_url", cls.apiURL)),
             addressURL=os.environ.get("NUWA_ADDRESS_URL", data.get("address_url", cls.addressURL)),
@@ -75,7 +71,7 @@ class LocalConfig:
         if os.name != "nt":
             directory.chmod(0o700)
 
-        temporary = path.with_suffix(".tmp")
+        temporary = path.with_name(path.name + "." + secrets.token_hex(6) + ".tmp")
 
         try:
             with temporary.open("x", encoding="utf-8") as stream:
@@ -101,7 +97,7 @@ class LocalConfig:
 
     def selectWork(self, workAddressID: str) -> "LocalConfig":
         if not workAddressID or len(workAddressID) > 128 or "/" in workAddressID:
-            raise ValueError("Select an immutable Agent Address Work ID, not an address path.")
+            raise ValueError("Use an immutable Work ID, not a name/address.")
 
         updated = replace(self, workAddressID=workAddressID)
         updated.save()
@@ -110,6 +106,6 @@ class LocalConfig:
 
     def requireWork(self) -> str:
         if not self.workAddressID:
-            raise ValueError("No Work selected. Run 'nuwa-studio-mcp identity --work-id ...' first.")
+            raise ValueError("No Work selected. Run nuwa-studio-mcp identity first.")
 
         return self.workAddressID

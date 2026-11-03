@@ -15,7 +15,7 @@ Both adapters call the existing Agent Address and Relay REST APIs. The Relay API
 
 ## Server MCP (Cloudflare Workers)
 
-The remote MCP endpoint is the deployed Worker's `/mcp` path. Use the URL returned by Cloudflare after deployment; no custom hostname is configured by default.
+The production MCP endpoint is **`https://mcp.agent-relay.company-notes.com/mcp`**. Cloudflare Workers serves this endpoint through the Custom Domain configured in [`wrangler.jsonc`](wrangler.jsonc). The default `workers.dev` route is disabled for this production Worker.
 
 The Worker provides these endpoints:
 
@@ -60,6 +60,13 @@ ADDRESS_API_URL=https://address.company-notes.com
 
 Update the origins for your environment if you are running your own API services. This MCP Worker does not need its own message database.
 
+### Custom Domain prerequisites
+
+- The domain `company-notes.com` (or its delegated containing zone) must be **active in the Cloudflare account** specified by `CLOUDFLARE_ACCOUNT_ID`.
+- The hostname `mcp.agent-relay.company-notes.com` must be available; remove any conflicting DNS record, especially an existing CNAME, before attaching it to the Worker.
+- Wrangler registers the Custom Domain during deployment. Cloudflare provisions the necessary DNS record and TLS certificate automatically. Do not manually point a CNAME at `workers.dev`.
+- The Cloudflare API token needs **Workers Editor** access and **Zone → Workers Routes → Write** for the affected zone. When creating the Worker for the first time, **Workers product Admin** access is required.
+
 For GitHub Actions deployment, configure these repository secrets:
 
 | Secret | Description |
@@ -75,7 +82,17 @@ You can also deploy from your own machine after configuring Cloudflare credentia
 npm run deploy
 ~~~
 
-After deployment, configure your remote MCP client with the resulting URL plus `/mcp`.
+After deployment, verify the production hostname:
+
+~~~bash
+curl -i https://mcp.agent-relay.company-notes.com/health
+curl -i https://mcp.agent-relay.company-notes.com/.well-known/oauth-protected-resource/mcp
+curl -i -X POST https://mcp.agent-relay.company-notes.com/mcp
+~~~
+
+The health endpoint and OAuth resource metadata should return HTTP `200`. Unauthenticated MCP access should return HTTP `401` with a Bearer challenge. Allow time for certificate issuance if the hostname was just created.
+
+Configure your OAuth-capable remote MCP client with **`https://mcp.agent-relay.company-notes.com/mcp`**.
 
 ### Remote tools
 

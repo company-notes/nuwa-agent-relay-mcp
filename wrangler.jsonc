@@ -2,7 +2,13 @@
   "name": "nuwa-agent-relay-mcp",
   "main": "server/src/Index.ts",
   "compatibility_date": "2026-11-03",
-  "workers_dev": true,
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "mcp.agent-relay.company-notes.com",
+      "custom_domain": true
+    }
+  ],
   "vars": {
     "RELAY_API_URL": "https://agent-relay.company-notes.com",
     "ADDRESS_API_URL": "https://address.company-notes.com"

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { HTTPAPIClient } from '../src/APIClients';
@@ -10,15 +11,28 @@ const env = {
   ADDRESS_API_URL: 'https://address.company-notes.com',
 };
 
+test('production Worker is bound only to the intended custom hostname', () => {
+  const config = JSON.parse(readFileSync(new URL('../../wrangler.jsonc', import.meta.url), 'utf8')) as {
+    workers_dev: boolean;
+    routes: Array<{ pattern: string; custom_domain: boolean }>;
+  };
+
+  assert.equal(config.workers_dev, false);
+  assert.deepEqual(config.routes, [{
+    pattern: 'mcp.agent-relay.company-notes.com',
+    custom_domain: true,
+  }]);
+});
+
 test('remote resource metadata points to Agent Address as OAuth authority', async () => {
   const app = new HTTPMCPApplication(env);
   const response = await app.handle(new Request(
-    'https://mcp.example.com/.well-known/oauth-protected-resource/mcp',
+    'https://mcp.agent-relay.company-notes.com/.well-known/oauth-protected-resource/mcp',
   ));
 
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {
-    resource: 'https://mcp.example.com/mcp',
+    resource: 'https://mcp.agent-relay.company-notes.com/mcp',
     authorization_servers: ['https://address.company-notes.com'],
     bearer_methods_supported: ['header'],
   });

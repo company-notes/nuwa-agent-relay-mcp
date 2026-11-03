@@ -1,108 +1,117 @@
 # Nuwa Agent Relay MCP
 
-這是獨立於 `nuwa-agent-relay-api` 的 **本機 stdio MCP Server**，使用官方 MCP TypeScript SDK v2（2026-07-28 protocol），讓 Claude Desktop、Cursor、VS Code 等 MCP Client 能以 **Agent Address OAuth Account + 指定 Work Identity** 操作 [Nuwa Relay API](https://github.com/company-notes/nuwa-agent-relay-api)。
+依照 [CODE_PRINCIPLES.md](CODE_PRINCIPLES.md)（本 Repository 直接保存使用者提供的完整版本）與原始 ReleaseBot 的架構，明確分為兩個**獨立的 MCP 入口**：
 
-**不用等 MailTrigger 的真實收信驗證完成，就能先測試 MCP 連線、工具列表、身分查詢與 D1 收件匣。** 但寄送、Handoff、Mailbox Provision 仍會呼叫真正的 Relay/MailTrigger，因此會受目前 MailTrigger 環境設定影響。
-
-## 環境
-
-- Node.js **26 LTS**（至少 26.13.0）；使用 `.nvmrc`。
-- 能使用瀏覽器登入 Agent Address 的帳號。
-- 有一個 Agent Address Organization，以及要用的 Host / Work Identity。
-- MCP Client 支援 stdio 模式；**本專案不提供遠端 HTTP MCP 服務**。
-
-```powershell
-git clone https://github.com/company-notes/nuwa-agent-relay-mcp.git
-cd nuwa-agent-relay-mcp
-nvm use 26
-npm ci
-
-# 瀏覽器 OAuth + PKCE 登入；Windows 上請自行開啟印出的網址
-npm run login
-
-# 列出 Organization 和可用 Host（不會顯示 Token）
-npm run status
-
-# 建立新的 Work 到已存在的 Host，不需事先建立 MailTrigger 信箱
-npm run identity -- --host mypc --handle coder
-
-# 若是新的 Host，明確允許建立永久資源
-# npm run identity -- --host my-new-host --handle coder --create-host
-
-# 如果已有合法的 Work UUID，直接選取，不建立新資源
-# npm run identity -- --work-id <WorkUUID>
-```
-
-以上 `identity` 會儲存 **唯一被 MCP Server 使用的 Work UUID**；與 `nuwa-agent-relay-api` 測試工具 `.relay-smoke` 分開。建立 Work 或新 Host 是永久 Agent Address 資源，**不會因登出刪除**。如果帳號完全沒有 Organization，建立時需要明確使用 `--organization <slug> --create-organization`（如果也需要新 Host，再加 `--create-host`）。
-
-如果只想驗證 MCP 可以啟動，執行 `npm start` 後程式會等待 MCP Client 的 stdin 訊息，**沒有輸出屬正常**。使用 Client 連入後才會收到 JSON-RPC 回應。
-
-## Windows MCP Client 設定（Claude Desktop / Cursor 類似）
-
-將下方設定放入 MCP Client 的 `mcpServers` 區段。請把路徑替換成你實際 clone 的絕對路徑（JSON 必須使用雙反斜線）：
-
-```json
-{
-  "mcpServers": {
-    "nuwa-agent-relay": {
-      "command": "node",
-      "args": [
-        "C:\\path\\to\\nuwa-agent-relay-mcp\\src\\server.mjs"
-      ]
-    }
-  }
-}
-```
-
-若 MCP Client 啟動時找不到 Node，將 `command` 改成 **Node 26 的 node.exe 絕對路徑**；用 PowerShell 的 `where.exe node` 查詢。MCP Client 不需要手動填入 OAuth Token（登入後儲存在本機使用者目錄）。
-
-部署給容器或無瀏覽器的 CI 時，可讓 MCP Client 設定環境變數 `NUWA_ACCESS_TOKEN` 和 `NUWA_WORK_ID`，這時不用本機 OAuth 登入；但不得把 Token 放進可提交的 MCP 設定檔。**Relay 目前只接受 Agent Address OAuth Access Token，不能用 `addr_` 身分 Token 或 MailTrigger API Token。**
-
-## MCP Tools（14 個）
-
-| MCP Tool | 對應 API | 備註 |
+| | Server MCP（遠端） | Studio MCP（本機） |
 | --- | --- | --- |
-| `relay_identity` | Agent Address `GET /v1/account/status` | 顯示被選取的 Work |
-| `relay_inbox` | Relay `GET /v1/inbox` | D1 收件匣，不等於 MailTrigger 收件證據 |
-| `relay_host_inbox` | Relay `GET /v1/host-inbox` | 未接受的 Host Handoff |
-| `relay_get_message` | `GET /v1/messages/:id` | 僅 Thread 參與者可讀 |
-| `relay_thread_history` | `GET /v1/threads/:id` | 參與者歷史訊息 |
-| `relay_send_message` | `POST /v1/messages` | Work → Work；會真的寄送 |
-| `relay_send_handoff` | `POST /v1/handoffs` | Work → Host；會真的寄送 |
-| `relay_reply_thread` | `POST /v1/threads/:id/messages` | 在 Thread 回覆 |
-| `relay_accept_handoff` | `POST /v1/handoffs/:id/accept` | 真的接受 Handoff |
-| `relay_reply_handoff` | `POST /v1/handoffs/:id/reply` | 對已接受的 Handoff 回覆 |
-| `relay_receipt` | `GET /v1/messages/:id/receipt` | submitted、receivedAt、readBy 分開；可選 Archive 核對 |
-| `relay_acknowledge_read` | `POST /v1/messages/:id/read` | 收件 Work 明確確認已讀 |
-| `relay_wake_events` | `GET /v1/wake-events` | 查看 Wake 投遞狀態 |
-| `relay_provision_host_mailbox` | `POST /v1/hosts/provision` | 建立/恢復 MailTrigger Mailbox，需網域權限 |
+| 程式目錄 | [server/](server/) | [studio/](studio/) |
+| 技術 | TypeScript / 官方 MCP SDK v2 / Cloudflare Workers | Python 3.12 / FastMCP 4 / mcp_install 0.1 |
+| MCP Transport | Streamable HTTP（/mcp） | stdio |
+| OAuth | 使用 MCP Client 自行與 Agent Address OAuth 登入；Worker 轉送並驗證 Bearer | 本機瀏覽器 OAuth + PKCE；憑證保存在使用者私有目錄 |
+| Work Identity | 每個 Tool 明確帶不可變的 workAddressID（同原版 Server 設計） | setup 時選擇 Work，所有 Tool 自動使用該 ID |
+| 安裝 | Cloudflare Worker；不需在 Agent 機器安裝 | mcp_install 自動註冊到桌面 MCP Client |
+| 外部 API | Agent Address + Nuwa Relay（Relay 再與 MailTrigger 溝通） | Agent Address + Nuwa Relay |
+| 本地檔案存取 | 無 | Studio 可協助使用者先生成本地檔案連結（例如 FFL），Relay 只傳連結 |
 
-讀取資料不會自動標記已讀；標記已讀必須明確呼叫 `relay_acknowledge_read`。**有副作用的 Tools**（例如寄送、Handoff、Mailbox Provision）都會實際呼叫生產 API，應在 MCP Client 設定人工核准或工具權限。MCP Server 不會自行替你建立 Mailbox、寄送訊息或撤銷資源。
+兩個 MCP 都是**既有 REST API 的 Adapter**，不持有自己的郵件或身分資料庫，不複製 Relay 的業務邏輯。Server 以一個共用 HTTP 客戶端類別服務 Agent Address 與 Relay；Studio 也使用一個共用 Python HTTP 客戶端基底類別。兩個 Transport 各自封裝自己的 SDK 需求，不把 Node stdio Server 和 FastMCP 混在一起。
 
-### 測試步驟
+## Server MCP — Cloudflare
 
-先在 MCP Client 使用 `relay_identity`，確認組織與 Work ID；再呼叫 `relay_inbox`。需要測試寄送時，確定 A、B 都有 MailTrigger Mailbox 才呼叫 `relay_send_message`，之後由另一個 Work 查詢 Inbox 或 Handoff。真實 MailTrigger 收件證據與 OAuth 已讀回條是不同功能，不應混為一談。
+Node 26 LTS（26.13.0 以上）：
 
-`relay_receipt` 可傳 `refreshArchive: true` 讓 Relay 主動查詢指定訊息的 MailTrigger Archive（有兩分鐘查詢節流），適合排查收信卡關；如果 MailTrigger 未實際收件，`receivedAt` 應仍為 `null`。
-
-## Credential 與安全界線
-
-- 瀏覽器登入使用 OAuth Authorization Code + PKCE S256、隨機 State、綁在 `127.0.0.1` 的臨時 Port。
-- Token 存在使用者本機設定目錄：Windows `%APPDATA%\\nuwa-agent-relay-mcp\\auth.json`；macOS/Linux `~/.config/nuwa-agent-relay-mcp/auth.json`，可用 `NUWA_MCP_HOME` 覆蓋為絕對路徑。
-- 選取的 Work 存在同一資料夾 `identity.json`，不含 OAuth Token。Unix 目錄／檔案權限分別限制為 0700／0600；Windows 依使用者資料目錄的 ACL 控制。
-- 所有請求要求 HTTPS；禁止轉址；Access Token 只出現在 Authorization Header，不出現在 URL、輸出或 Git。
-- Token 到期時使用 Refresh Token 更新。Refresh Token 過期或被撤銷時重新執行 `npm run login`。
-- `npm run logout` 只刪除本機登入檔，不會撤銷遠端 OAuth Grant，也不會刪除 Work Identity。
-- **本專案不提供任意 HTTP 請求／任意刪除端點**，工具僅呼叫固定的 Relay API；所有 Relay 操作受選取 Work 的 OAuth 授權限制。
-
-## 驗證與開發
-
-```powershell
+~~~powershell
 npm ci
+npm run check
 npm test
+npm run build
 npm run audit:check
-```
+~~~
 
-CI 在 Node 26 上使用精確 `package-lock.json`、執行 PKCE／Callback 防偽、OAuth 401 Refresh、Work ID 隔離、工具路由及真實 MCP stdio 協定初始化測試。測試以假 REST Backend 運行，不需要正式 OAuth 憑證或 MailTrigger 網域。
+Server Worker 使用 [wrangler.jsonc](wrangler.jsonc) 配置，不包含任何可提交的 Secret：
 
-專案刻意只提供 **本機 MCP Adapter**：Agent Address 管理人類帳號與 Work 身分，Relay 管理訊息／Handoff 和 MailTrigger 呼叫，MCP 專心將這些能力暴露給 MCP Client，不另建資料庫或郵件排程。
+- \`RELAY_API_URL=https://agent-relay.company-notes.com\`
+- \`ADDRESS_API_URL=https://address.company-notes.com\`
+- \`GET /health\`：Worker 健康狀態
+- \`GET /.well-known/oauth-protected-resource/mcp\`：RFC 9728 metadata，指向 Agent Address OAuth 授權伺服器
+- \`POST /mcp\`：遠端 MCP Streamable HTTP Transport，先驗證 Bearer Token 才建立 MCP session
+
+首次連接遠端 MCP 的 Client，會經由 OAuth Protected Resource metadata 引導至 **Agent Address** 完成登入；MCP Worker 不會自行保存使用者密碼或 OAuth Token，亦不會要求你複製 Bearer Token 到 MCP 設定。
+
+遠端 OAuth Tools：\`agentAddressGetStatus\`、\`agentAddressClaimWork\`、\`agentAddressRenameWork\`、\`agentAddressReleaseWork\`、\`agentAddressResolve\`。
+
+遠端 Relay Tools：\`relayProvisionHostMailbox\`、\`relayInbox\`、\`relayHostInbox\`、\`relaySendMessage\`、\`relaySendHandoff\`、\`relayAcceptHandoff\`、\`relayReplyHandoff\`、\`relayThreadHistory\`、\`relayReplyThread\`、\`relayMessage\`、\`relayReceipt\`、\`relayAcknowledgeRead\`、\`relayWakeEvents\`。
+
+**部署：** 使用 GitHub Actions 中的手動 \`Deploy Server MCP\` 工作流程（需要此 Repository 的 Cloudflare API Token／Account ID Secrets），或具備授權者在本機執行 \`npm run deploy\`。部署輸出的 Workers URL 才是 MCP 客戶端的實際 URL，勿假設某個自訂網域已配置。CI 平常只做 \`wrangler deploy --dry-run\`，PR 合併不會暗中發布正式 Worker。
+
+## Studio MCP — FastMCP + mcp_install
+
+本機 Studio 不需要 Node.js；依照原始 \`releasebot_mcp/mcp/\` 的 Python 分層，使用：
+
+- \`Config.py\`：設定與唯一 Work Identity（本機 JSON 設定）
+- \`Auth.py\`：Agent Address OAuth PKCE 登入、Token Refresh
+- \`Client.py\`：共用 HTTP client 與專責 Agent Address／Relay client
+- \`Server.py\`：只負責 FastMCP Tool 定義與本機 stdio
+- \`Installer.py\`：只負責透過 \`mcp_install\` 安裝／移除
+- \`CLI.py\`：命令解析，不實作 Transport 或 API 業務邏輯
+
+在 Windows PowerShell：
+
+~~~powershell
+# 安裝 Python 3.12 與 uv 或 pip
+python -m pip install -e .\studio
+
+# 用瀏覽器登入 Agent Address（不用手動輸入 Token）
+nuwa-studio-mcp login
+nuwa-studio-mcp status
+
+# 指定既有的 Work UUID，不會建立新 Host/Work
+nuwa-studio-mcp identity --work-id <WorkUUID>
+
+# 或在已有的 Host 下建立新的 Work
+nuwa-studio-mcp identity --host mypc --handle coder
+
+# 自動產生桌面 MCP 設定，先預覽後安裝
+nuwa-studio-mcp install --print
+nuwa-studio-mcp install
+
+# 不透過 Client，也可直接執行 stdio MCP（不會有普通文字輸出）
+nuwa-studio-mcp run
+
+# 解除安裝 MCP Client 註冊；OAuth Token 仍保留
+nuwa-studio-mcp uninstall
+# 若要刪掉本機 OAuth Token：
+nuwa-studio-mcp logout
+~~~
+
+建立新的 Host 或 Organization 需額外使用 \`--create-host\`／\`--create-organization\`，避免 AI 或安裝指令無意建立永久資源。命令 \`install\`／\`uninstall\` 使用 \`mcp_install\` 的官方 JSON manifest，而不是在 CLI 中手刻 Claude/Cursor 的設定格式。支援的 MCP Client 由目前所安裝的 \`mcp_install\` 版本決定。
+
+Studio Credential 儲存於 Windows \`%APPDATA%\nuwa-agent-relay-mcp\auth.json\`，以及 macOS/Linux \`~/.config/nuwa-agent-relay-mcp/auth.json\`。設定 \`config.json\` 使用 snake_case，對應的 runtime 變數／方法仍使用 CamelCase/專案指定的 acronym 大小寫。Token 不會寫入 Git 或 MCP Client 的普通 config。登出不等於撤銷 Agent Address 上的遠端 OAuth Grant。
+
+### 本機 Studio 的 Tools
+
+\`checkInbox\`、\`checkHostInbox\`、\`getMessage\`、\`getThreadHistory\`、\`sendMessage\`、\`sendHandoff\`、\`acceptHandoff\`、\`replyHandoff\`、\`replyThread\`、\`getReceipt\`、\`acknowledgeRead\`、\`getWakeEvents\`、\`provisionHostMailbox\`。
+
+所有 Tool 由 FastMCP 直接根據 Python 函式簽章產生 Schema；不需要手刻相同的 JSON Schema。工具不提供建立／刪除 Host、Organization 的權限，這類持久化資源只能經由明確的 CLI 初始化步驟處理。
+
+\`studio/Build.py\` 與 \`studio/scripts/Installer.nsi\` 用於**選用**的 Windows PyInstaller + NSIS 發布；普通使用者可直接透過 \`mcp_install\` 配置本機 MCP，不必先建 EXE。
+
+## MailTrigger 與收件行為
+
+MCP 不會因 MailTrigger 的郵件網域卡關而無法啟動。登入、讀取已有的 D1 Inbox/Thread、查詢 OAuth 地址，均可獨立使用。但寄送訊息、建立 Mailbox 仍依賴已設定的 MailTrigger 服務；這些 Tool 會產生真實外部副作用。
+
+\`relayReceipt\`／\`getReceipt\` 會區分「寄送 API 已接受」、「MailTrigger Archive/Webhook 確認收件」與「Agent 明確已讀」。只有已確認收件才會進入 Relay 的 Wake 機制，MCP 不自行實作重試。
+
+## 開發驗證
+
+~~~powershell
+npm ci
+npm run check
+npm test
+npm run build
+npm run audit:check
+
+python -m pip install -e '.\studio[dev]'
+pytest -q studio/tests
+~~~
+
+CI 使用獨立 Jobs 測試 **TypeScript Worker OAuth／MCP** 與 **Python Studio FastMCP／mcp_install**。所有工作遵守 [CODE_PRINCIPLES.md](CODE_PRINCIPLES.md)：封裝、共用程式、單向依賴、早退出、明確例外、命名規則和清晰的責任邊界。

@@ -1,19 +1,15 @@
 {
   "name": "@company-notes/nuwa-agent-relay-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Local stdio MCP server for Nuwa Agent Relay using Agent Address OAuth",
+  "description": "Nuwa remote Streamable HTTP MCP Worker; local Studio FastMCP lives in studio/",
   "type": "module",
-  "engines": {
-    "node": ">=26.13.0 <27"
-  },
+  "engines": { "node": ">=26.13.0 <27" },
   "scripts": {
-    "start": "node src/server.mjs",
-    "login": "node src/cli.mjs login",
-    "status": "node src/cli.mjs status",
-    "identity": "node src/cli.mjs identity",
-    "logout": "node src/cli.mjs logout",
+    "start": "echo 'Remote MCP runs on Cloudflare Workers. See README.md.'",
+    "check": "node --check src/Index.mjs && node --check src/HTTPClient.mjs && node --check src/ResourceServer.mjs && node --check src/Tools.mjs",
     "test": "node --test test/*.test.mjs",
+    "deploy": "npx --yes wrangler@4.38.0 deploy --config .wrangler.deploy.jsonc",
     "audit:check": "npm audit --audit-level=high"
   },
   "dependencies": {

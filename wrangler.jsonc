@@ -1,0 +1,12 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "nuwa-agent-relay-mcp",
+  "main": "src/Index.mjs",
+  "compatibility_date": "2026-10-27",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "vars": {
+    "ADDRESS_API_URL": "https://address.company-notes.com",
+    "RELAY_API_URL": "https://agent-relay.company-notes.com"
+  }
+}

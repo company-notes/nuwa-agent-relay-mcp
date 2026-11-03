@@ -42,6 +42,8 @@ jobs:
         run: ruff check studio/src --select E4,E7,E9,F
       - name: Python Studio tests
         run: pytest -q studio/tests
+      - name: Preview mcp_install desktop registration
+        run: nuwa-studio-mcp install --print
 
   studio-windows:
     runs-on: windows-latest
@@ -57,3 +59,5 @@ jobs:
         run: python -m pytest -q studio/tests
       - name: Verify installed Studio CLI entrypoint
         run: nuwa-studio-mcp --version
+      - name: Preview desktop registration on Windows
+        run: nuwa-studio-mcp install --print

@@ -147,7 +147,7 @@ class OAuthCredentials:
                 "code_challenge_method": "S256",
             })
 
-            print("請在瀏覽器登入 Agent Address：")
+            print("Sign in to Agent Address using your browser:")
             print(authorizeURL)
             webbrowser.open(authorizeURL)
 

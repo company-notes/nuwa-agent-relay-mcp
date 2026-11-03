@@ -105,7 +105,7 @@ export class RelayTools extends MCPToolSet {
     const { workAddressID } = this.schemas;
 
     this.register('relayProvisionHostMailbox',
-      'Create or reuse a managed MailTrigger Host mailbox.',
+      'Create or reuse a managed Host mailbox.',
       { workAddressID },
       (value) => this.client.call('POST', '/v1/hosts/provision', value.workAddressID as string));
   }
@@ -114,7 +114,7 @@ export class RelayTools extends MCPToolSet {
     const { workAddressID, threadID, messageID } = this.schemas;
 
     this.register('relayInbox',
-      'List D1 messages for the specified Work; not proof of MailTrigger arrival.',
+      'List messages for the specified Work without marking them as read.',
       { workAddressID },
       (value) => this.client.call('GET', '/v1/inbox', value.workAddressID as string));
 
@@ -144,7 +144,7 @@ export class RelayTools extends MCPToolSet {
     const { workAddressID, to, body, subject, artifactLinks, threadID } = this.schemas;
 
     this.register('relaySendMessage',
-      'Send a message to a Work address. External MailTrigger send side effect.',
+      'Send a message to a Work address. This operation sends a real message.',
       { workAddressID, to, body, subject: subject.optional(), artifactLinks },
       ({ workAddressID, ...input }) => this.client.call(
         'POST', '/v1/messages', workAddressID as string, input,
@@ -163,7 +163,7 @@ export class RelayTools extends MCPToolSet {
     const { workAddressID, to, subject, body, artifactLinks, messageID } = this.schemas;
 
     this.register('relaySendHandoff',
-      'Send a Host-level handoff. External MailTrigger send side effect.',
+      'Send a Host-level handoff. This operation sends a real request.',
       { workAddressID, to, subject, body, artifactLinks },
       ({ workAddressID, ...input }) => this.client.call(
         'POST', '/v1/handoffs', workAddressID as string, input,
@@ -190,7 +190,7 @@ export class RelayTools extends MCPToolSet {
     const { workAddressID, messageID } = this.schemas;
 
     this.register('relayReceipt',
-      'Read submission, independently confirmed MailTrigger arrival and explicit Agent read receipts.',
+      'Read submission, independently confirmed delivery and explicit Agent read receipts.',
       { workAddressID, messageID, refreshArchive: z.boolean().optional() },
       (value) => this.client.call(
         'GET', '/v1/messages/' + encodeURIComponent(value.messageID as string) + '/receipt',

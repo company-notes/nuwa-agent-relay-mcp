@@ -116,8 +116,11 @@ class OAuthCredentials:
 
     def login(self) -> None:
         verifier = secrets.token_urlsafe(32)
-        challenge = urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
+        challenge = urlsafe_b64encode(
+            hashlib.sha256(verifier.encode()).digest()
+        ).decode().rstrip("=")
         state = secrets.token_urlsafe(24)
+
         callback = self._callbackServer(state)
         timer = Timer(180, callback.shutdown)
 
@@ -143,9 +146,11 @@ class OAuthCredentials:
                 "code_challenge": challenge,
                 "code_challenge_method": "S256",
             })
+
             print("請在瀏覽器登入 Agent Address：")
             print(authorizeURL)
             webbrowser.open(authorizeURL)
+
             timer.start()
             callback.serve_forever(poll_interval=0.2)
 
@@ -159,6 +164,7 @@ class OAuthCredentials:
                 "code": callback.authorizationCode,
                 "code_verifier": verifier,
             })
+
             self.config.writePrivate(self.config.authPath(), {
                 "origin": self.config.addressURL,
                 "client_id": clientID,

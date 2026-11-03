@@ -39,12 +39,19 @@ class LocalConfig:
     def authPath(cls) -> Path:
         return cls.configDir() / "auth.json"
 
-    @staticmethod
-    def validateOrigin(value: str) -> str:
+    @classmethod
+    def validateOrigin(cls, value: str) -> str:
         parsed = urlparse(value)
 
-        if (parsed.scheme != "https" or not parsed.netloc or parsed.path not in ("", "/")
-                or parsed.query or parsed.fragment or parsed.username or parsed.password):
+        if (
+            parsed.scheme != "https"
+            or not parsed.netloc
+            or parsed.path not in ("", "/")
+            or parsed.query
+            or parsed.fragment
+            or parsed.username
+            or parsed.password
+        ):
             raise ValueError("Service URL must be a clean HTTPS origin.")
 
         return value.rstrip("/")
@@ -53,16 +60,16 @@ class LocalConfig:
     def load(cls) -> "LocalConfig":
         path = cls.configPath()
         data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-        config = cls(
-            apiURL=cls.validateOrigin(os.environ.get("NUWA_RELAY_URL", data.get("api_url", cls.apiURL))),
-            addressURL=cls.validateOrigin(os.environ.get("NUWA_ADDRESS_URL",
-                                                   data.get("address_url", cls.addressURL))),
-            workAddressID=os.environ.get("NUWA_WORK_ADDRESS_ID", data.get("work_address_id")),
-        )
-        cls.validateOrigin(config.apiURL)
-        cls.validateOrigin(config.addressURL)
 
-        return config
+        apiURL = os.environ.get("NUWA_RELAY_URL", data.get("api_url", cls.apiURL))
+        addressURL = os.environ.get("NUWA_ADDRESS_URL", data.get("address_url", cls.addressURL))
+        workAddressID = os.environ.get("NUWA_WORK_ADDRESS_ID", data.get("work_address_id"))
+
+        return cls(
+            apiURL=cls.validateOrigin(apiURL),
+            addressURL=cls.validateOrigin(addressURL),
+            workAddressID=workAddressID,
+        )
 
     @classmethod
     def writePrivate(cls, path: Path, data: dict) -> None:

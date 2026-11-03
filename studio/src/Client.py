@@ -28,9 +28,11 @@ class HTTPAPIClient:
 
         with httpx.Client(timeout=20, follow_redirects=False, transport=self.transport) as client:
             response = client.request(
-                method, self.apiURL + path,
+                method,
+                self.apiURL + path,
                 headers={"Authorization": f"Bearer {self.credentials.accessToken()}"},
-                params=parameters, json=body,
+                params=parameters,
+                json=body,
             )
             response.raise_for_status()
             payload = response.json()
@@ -83,25 +85,42 @@ class RelayClient(HTTPAPIClient):
 
         return self.call("POST", "/v1/messages", body=payload)
 
-    def sendHandoff(self, to: str, subject: str, body: str,
-                    artifactLinks: list[str] | None = None):
-        return self.call("POST", "/v1/handoffs", body={
-            "to": to, "subject": subject, "body": body, "artifactLinks": artifactLinks or [],
-        })
+    def sendHandoff(
+        self,
+        to: str,
+        subject: str,
+        body: str,
+        artifactLinks: list[str] | None = None,
+    ):
+        payload = {
+            "to": to,
+            "subject": subject,
+            "body": body,
+            "artifactLinks": artifactLinks or [],
+        }
+
+        return self.call("POST", "/v1/handoffs", body=payload)
 
     def acceptHandoff(self, messageID: str):
         return self.call("POST", f"/v1/handoffs/{quote(messageID, safe='')}/accept")
 
     def replyHandoff(self, messageID: str, body: str, artifactLinks: list[str] | None = None):
-        return self.call("POST", f"/v1/handoffs/{quote(messageID, safe='')}/reply",
-                         body={"body": body, "artifactLinks": artifactLinks or []})
+        return self.call(
+            "POST",
+            f"/v1/handoffs/{quote(messageID, safe='')}/reply",
+            body={"body": body, "artifactLinks": artifactLinks or []},
+        )
 
     def replyThread(self, threadID: str, body: str, artifactLinks: list[str] | None = None):
-        return self.call("POST", f"/v1/threads/{quote(threadID, safe='')}/messages",
-                         body={"body": body, "artifactLinks": artifactLinks or []})
+        return self.call(
+            "POST",
+            f"/v1/threads/{quote(threadID, safe='')}/messages",
+            body={"body": body, "artifactLinks": artifactLinks or []},
+        )
 
     def receipt(self, messageID: str, refreshArchive: bool = False):
         query = {"refresh": "archive"} if refreshArchive else None
+
         return self.call("GET", f"/v1/messages/{quote(messageID, safe='')}/receipt", query=query)
 
     def acknowledgeRead(self, messageID: str):

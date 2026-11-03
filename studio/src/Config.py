@@ -1,0 +1,115 @@
+"""Persistent Studio MCP settings and private OAuth credential storage."""
+
+import json
+import os
+from dataclasses import dataclass, replace
+from pathlib import Path
+from urllib.parse import urlparse
+
+
+@dataclass(frozen=True)
+class LocalConfig:
+    apiURL: str = "https://agent-relay.company-notes.com"
+    addressURL: str = "https://address.company-notes.com"
+    workAddressID: str | None = None
+
+    @classmethod
+    def configDir(cls) -> Path:
+        override = os.environ.get("NUWA_MCP_HOME")
+
+        if override:
+            path = Path(override).expanduser()
+
+            if not path.is_absolute():
+                raise ValueError("NUWA_MCP_HOME must be an absolute directory.")
+
+            return path
+
+        if os.name == "nt":
+            return Path(os.environ["APPDATA"]) / "nuwa-agent-relay-mcp"
+
+        return Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "nuwa-agent-relay-mcp"
+
+    @classmethod
+    def configPath(cls) -> Path:
+        return cls.configDir() / "config.json"
+
+    @classmethod
+    def authPath(cls) -> Path:
+        return cls.configDir() / "auth.json"
+
+    @staticmethod
+    def validateOrigin(value: str) -> str:
+        parsed = urlparse(value)
+
+        if (parsed.scheme != "https" or not parsed.netloc or parsed.path not in ("", "/")
+                or parsed.query or parsed.fragment or parsed.username or parsed.password):
+            raise ValueError("Service URL must be a clean HTTPS origin.")
+
+        return value.rstrip("/")
+
+    @classmethod
+    def load(cls) -> "LocalConfig":
+        path = cls.configPath()
+
+        if path.exists():
+            data = json.loads(path.read_text(encoding="utf-8"))
+        else:
+            data = {}
+
+        config = cls(
+            apiURL=os.environ.get("NUWA_RELAY_URL", data.get("api_url", cls.apiURL)),
+            addressURL=os.environ.get("NUWA_ADDRESS_URL", data.get("address_url", cls.addressURL)),
+            workAddressID=os.environ.get("NUWA_WORK_ADDRESS_ID", data.get("work_address_id")),
+        )
+        cls.validateOrigin(config.apiURL)
+        cls.validateOrigin(config.addressURL)
+
+        return config
+
+    @classmethod
+    def writePrivate(cls, path: Path, data: dict) -> None:
+        directory = cls.configDir()
+        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+
+        if os.name != "nt":
+            directory.chmod(0o700)
+
+        temporary = path.with_suffix(".tmp")
+
+        try:
+            with temporary.open("x", encoding="utf-8") as stream:
+                if os.name != "nt":
+                    temporary.chmod(0o600)
+
+                json.dump(data, stream, indent=2, ensure_ascii=False)
+                stream.write("\n")
+
+            temporary.replace(path)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+        if os.name != "nt":
+            path.chmod(0o600)
+
+    def save(self) -> None:
+        self.writePrivate(self.configPath(), {
+            "api_url": self.validateOrigin(self.apiURL),
+            "address_url": self.validateOrigin(self.addressURL),
+            "work_address_id": self.workAddressID,
+        })
+
+    def selectWork(self, workAddressID: str) -> "LocalConfig":
+        if not workAddressID or len(workAddressID) > 128 or "/" in workAddressID:
+            raise ValueError("Select an immutable Agent Address Work ID, not an address path.")
+
+        updated = replace(self, workAddressID=workAddressID)
+        updated.save()
+
+        return updated
+
+    def requireWork(self) -> str:
+        if not self.workAddressID:
+            raise ValueError("No Work selected. Run 'nuwa-studio-mcp identity --work-id ...' first.")
+
+        return self.workAddressID

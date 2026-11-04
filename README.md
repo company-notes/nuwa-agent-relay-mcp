@@ -74,7 +74,9 @@ For GitHub Actions deployment, configure these repository secrets:
 | `CLOUDFLARE_API_TOKEN` | A scoped Cloudflare API token permitted to deploy Workers |
 | `CLOUDFLARE_ACCOUNT_ID` | Your Cloudflare account ID |
 
-Run **Actions → Deploy Server MCP → Run workflow** on the intended branch. The workflow runs validation before publishing and uses the `production` GitHub environment. Ordinary pull requests and pushes do not trigger production deployment.
+Every push to **`main`** automatically starts **Actions → Verify Server and Studio MCP**. Once the Server, Linux Studio, and Windows Studio checks all pass, the same workflow deploys the Cloudflare Worker to **`mcp.agent-relay.company-notes.com`** using the `production` GitHub environment. Pull requests run the checks but never deploy.
+
+The deployment job is serialized with other MCP production deployments and does not require a separate enablement variable. To redeploy the current `main` commit manually, use **Actions → Verify Server and Studio MCP → Run workflow** with branch `main`. If the GitHub `production` environment requires approval, its protection rules still apply to automatic deployments.
 
 You can also deploy from your own machine after configuring Cloudflare credentials:
 

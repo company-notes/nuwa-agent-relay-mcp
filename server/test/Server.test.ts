@@ -230,3 +230,68 @@ test('sendToAgent MCP tool sends one Work-scoped message via Relay without claim
     globalThis.fetch = originalFetch;
   }
 });
+
+test('remote MCP Wake registration is OAuth and Work-scoped and forwards callback URL exactly', async () => {
+  const originalFetch = globalThis.fetch;
+  const relayCalls: Array<{ url: URL; body: unknown; authorization: string | null }> = [];
+  const callbackURL = 'https://agent-wake.example.com/wake';
+
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(String(input));
+
+    if (url.origin === env.ADDRESS_API_URL) {
+      return Response.json({ ok: true, data: { organization: { id: 'org-1' } } });
+    }
+
+    relayCalls.push({
+      url,
+      body: JSON.parse(String(init?.body)),
+      authorization: new Headers(init?.headers).get('authorization'),
+    });
+
+    return Response.json({ ok: true, data: {
+      workAddressId: 'work-b',
+      callbackUrl: callbackURL,
+      signingSecret: 'private-one-time-secret',
+    } }, { status: 201 });
+  };
+
+  try {
+    const app = new HTTPMCPApplication(env);
+    const response = await app.handle(new Request('https://mcp.example.com/mcp', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer oauth-b',
+        accept: 'application/json, text/event-stream',
+        'content-type': 'application/json',
+        'mcp-protocol-version': '2025-06-18',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 10,
+        method: 'tools/call',
+        params: {
+          name: 'relayRegisterWake',
+          arguments: { workAddressID: 'work-b', callbackURL },
+        },
+      }),
+    }));
+
+    assert.equal(response.status, 200);
+    const result = await response.json() as {
+      result: { isError?: boolean; content: Array<{ text: string }> };
+    };
+
+    assert.equal(result.result.isError, undefined);
+    assert.equal(JSON.parse(result.result.content[0].text).signingSecret,
+      'private-one-time-secret');
+    assert.equal(relayCalls.length, 1);
+    assert.equal(relayCalls[0].url.origin, env.RELAY_API_URL);
+    assert.equal(relayCalls[0].url.pathname, '/v1/wake-subscription');
+    assert.equal(relayCalls[0].url.searchParams.get('work_address_id'), 'work-b');
+    assert.equal(relayCalls[0].authorization, 'Bearer oauth-b');
+    assert.deepEqual(relayCalls[0].body, { callbackUrl: callbackURL });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

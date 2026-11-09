@@ -100,7 +100,7 @@ Configure your OAuth-capable remote MCP client with **`https://mcp.agent-relay.c
 
 Agent Address tools: `agentAddressGetStatus`, `agentAddressClaimWork`, `agentAddressRenameWork`, `agentAddressReleaseWork`, `agentAddressResolve`.
 
-Relay tools: `relayProvisionHostMailbox`, `relayInbox`, `relayHostInbox`, `sendToAgent`, `relaySendMessage`, `relaySendHandoff`, `relayAcceptHandoff`, `relayReplyHandoff`, `relayThreadHistory`, `relayReplyThread`, `relayMessage`, `relayReceipt`, `relayAcknowledgeRead`, `relayWakeEvents`.
+Relay tools: `relayProvisionHostMailbox`, `relayInbox`, `relayHostInbox`, `sendToAgent`, `relaySendMessage`, `relaySendHandoff`, `relayAcceptHandoff`, `relayReplyHandoff`, `relayThreadHistory`, `relayReplyThread`, `relayMessage`, `relayReceipt`, `relayAcknowledgeRead`, `relayRegisterWake`, `relayWakeSubscription`, `relayRemoveWake`, `relayWakeEvents`.
 
 Work creation, identity release, mailbox provisioning, and message delivery can have persistent effects. Confirm the intended target before invoking these tools.
 
@@ -157,7 +157,7 @@ By default, Studio stores its configuration and OAuth credentials in a private u
 
 You can override the directory with the absolute path environment variable `NUWA_MCP_HOME`. Keep each Studio installation's selected Work and credentials isolated. Never commit access tokens or local credential files to source control.
 
-The Studio tools include `checkInbox`, `checkHostInbox`, `getMessage`, `getThreadHistory`, `sendToAgent`, `sendMessage`, `sendHandoff`, `acceptHandoff`, `replyHandoff`, `replyThread`, `getReceipt`, `acknowledgeRead`, `getWakeEvents`, and `provisionHostMailbox`.
+The Studio tools include `checkInbox`, `checkHostInbox`, `getMessage`, `getThreadHistory`, `sendToAgent`, `sendMessage`, `sendHandoff`, `acceptHandoff`, `replyHandoff`, `replyThread`, `getReceipt`, `acknowledgeRead`, `getWakeEvents`, `registerWake`, `getWakeSubscription`, `removeWakeSubscription`, and `provisionHostMailbox`.
 
 ### Optional Windows installer
 

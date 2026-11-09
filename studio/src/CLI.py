@@ -1,12 +1,15 @@
 """Studio command-line entrypoint for OAuth, identity, install and stdio."""
 
 import argparse
+import json
+import logging
 
 from .Auth import OAuthCredentials
-from .Client import AddressClient
+from .Client import AddressClient, RelayClient
 from .Config import LocalConfig
 from .Installer import StudioInstaller
 from .Server import StudioMCP
+from .WakeReceiver import WakeReceiver, WakeSubscription
 
 
 class StudioCLI:
@@ -31,6 +34,32 @@ class StudioCLI:
             command = commands.add_parser(name)
             command.add_argument("--overwrite", action="store_true")
             command.add_argument("--print", dest="printOnly", action="store_true")
+
+        send = commands.add_parser("send-to-agent",
+                                   help="Send a real message as the selected Work.")
+        send.add_argument("--to", required=True)
+        send.add_argument("--message", required=True)
+        send.add_argument("--subject")
+        send.add_argument("--artifact-url", action="append", dest="artifactLinks")
+
+        thread = commands.add_parser("thread", help="Read an authorized conversation.")
+        thread.add_argument("--thread-id", required=True)
+
+        receipt = commands.add_parser("receipt", help="Read one message's delivery evidence.")
+        receipt.add_argument("--message-id", required=True)
+
+        commands.add_parser("provision", help="Provision the selected Host mailbox.")
+
+        wake = commands.add_parser("wake", help="Manage and run an Agent Wake receiver.")
+        wakeCommands = wake.add_subparsers(dest="wakeCommand", required=True)
+
+        wakeRegister = wakeCommands.add_parser("register")
+        wakeRegister.add_argument("callbackURL",
+                                  help="Public HTTPS URL of this machine's /wake listener.")
+        wakeCommands.add_parser("status")
+        wakeCommands.add_parser("unregister")
+        wakeListen = wakeCommands.add_parser("listen")
+        wakeListen.add_argument("--port", type=int, default=8765)
 
         return parser
 
@@ -97,7 +126,39 @@ class StudioCLI:
             StudioInstaller.run(args.command == "uninstall", args.overwrite, args.printOnly)
             return
 
-        StudioMCP(config).run()
+        if args.command == "run":
+            StudioMCP(config).run()
+            return
+
+        relay = RelayClient(config, credentials)
+
+        if args.command == "send-to-agent":
+            result = relay.sendMessage(args.to, args.message, args.subject, args.artifactLinks)
+        elif args.command == "thread":
+            result = relay.threadHistory(args.thread_id)
+        elif args.command == "receipt":
+            result = relay.receipt(args.message_id)
+        elif args.command == "provision":
+            result = relay.provisionHostMailbox()
+        elif args.command == "wake":
+            subscription = WakeSubscription(config, relay)
+
+            if args.wakeCommand == "register":
+                result = subscription.register(args.callbackURL)
+            elif args.wakeCommand == "status":
+                result = subscription.status()
+            elif args.wakeCommand == "unregister":
+                result = subscription.remove()
+            elif args.wakeCommand == "listen":
+                logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+                WakeReceiver(config, relay).serve(args.port)
+                return
+            else:
+                raise ValueError("Unsupported Wake command.")
+        else:
+            raise ValueError("Unsupported Studio command.")
+
+        print(json.dumps(result, indent=2, ensure_ascii=False))
 
 
 def main() -> None:

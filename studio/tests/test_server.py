@@ -27,8 +27,8 @@ def test_studio_fastmcp_exposes_independent_tools_and_routes_calls():
             tools = await client.list_tools()
             names = {tool.name for tool in tools}
 
-            assert len(names) == 13
-            assert {"checkInbox", "sendMessage", "getReceipt", "acknowledgeRead"} <= names
+            assert len(names) == 14
+            assert {"checkInbox", "sendMessage", "sendToAgent", "getReceipt", "acknowledgeRead"} <= names
 
             inbox = await client.call_tool("checkInbox", {})
             assert not inbox.is_error
@@ -39,5 +39,13 @@ def test_studio_fastmcp_exposes_independent_tools_and_routes_calls():
             })
             assert not sent.is_error
             assert backend.calls[-1] == ("sendMessage", "org/host/work", "test message")
+
+            agentMessage = await client.call_tool("sendToAgent", {
+                "to": "@beta/reviewer",
+                "message": "Review the latest deployment",
+                "subject": "Review",
+            })
+            assert not agentMessage.is_error
+            assert backend.calls[-1] == ("sendMessage", "@beta/reviewer", "Review the latest deployment")
 
     asyncio.run(verify())

@@ -146,6 +146,8 @@ test('a validated OAuth identity can initialize an independent MCP HTTP session'
     const toolsResponse = await list.text();
     assert.match(toolsResponse, /relayInbox/);
     assert.match(toolsResponse, /sendToAgent/);
+    assert.match(toolsResponse, /relayRegisterWake/);
+    assert.match(toolsResponse, /relayRemoveWake/);
     assert.match(toolsResponse, /agentAddressGetStatus/);
     assert.equal(validated, 2);
   } finally {

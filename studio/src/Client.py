@@ -129,5 +129,14 @@ class RelayClient(HTTPAPIClient):
     def wakeEvents(self):
         return self.call("GET", "/v1/wake-events")
 
+    def registerWake(self, callbackURL: str):
+        return self.call("POST", "/v1/wake-subscription", body={"callbackUrl": callbackURL})
+
+    def wakeSubscription(self):
+        return self.call("GET", "/v1/wake-subscription")
+
+    def removeWake(self):
+        return self.call("DELETE", "/v1/wake-subscription")
+
     def provisionHostMailbox(self):
         return self.call("POST", "/v1/hosts/provision")

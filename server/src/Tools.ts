@@ -226,6 +226,25 @@ export class RelayTools extends MCPToolSet {
   private registerWakeTools(): void {
     const { workAddressID } = this.schemas;
 
+    this.register('relayRegisterWake',
+      'Register an HTTPS Wake callback for this Work. Returns a private HMAC signing secret ' +
+      'exactly once; save it securely in the receiver. Rotating it invalidates the previous key.',
+      { workAddressID, callbackURL: z.url() },
+      (value) => this.client.call('POST', '/v1/wake-subscription',
+        value.workAddressID as string, { callbackUrl: value.callbackURL }));
+
+    this.register('relayWakeSubscription',
+      'Inspect this Work Wake subscription without retrieving the signing secret.',
+      { workAddressID },
+      (value) => this.client.call('GET', '/v1/wake-subscription',
+        value.workAddressID as string));
+
+    this.register('relayRemoveWake',
+      'Remove this Work Wake subscription and cancel pending notifications.',
+      { workAddressID },
+      (value) => this.client.call('DELETE', '/v1/wake-subscription',
+        value.workAddressID as string));
+
     this.register('relayWakeEvents',
       'Read wake delivery and retry status for one authorized Work.',
       { workAddressID },

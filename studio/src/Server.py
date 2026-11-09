@@ -5,6 +5,7 @@ from fastmcp import FastMCP
 from .Auth import OAuthCredentials
 from .Client import RelayClient
 from .Config import LocalConfig
+from .WakeReceiver import WakeSubscription
 
 
 class StudioMCP:
@@ -15,6 +16,7 @@ class StudioMCP:
     def createServer(self) -> FastMCP:
         server = FastMCP("Nuwa Agent Relay Studio")
         client = self.client
+        wakeSubscription = WakeSubscription(self.config, client)
 
         @server.tool()
         def checkInbox():
@@ -88,6 +90,21 @@ class StudioMCP:
         def getWakeEvents():
             """Read Wake event delivery and retry status."""
             return client.wakeEvents()
+
+        @server.tool()
+        def registerWake(callbackURL: str):
+            """Register a signed HTTPS Wake callback and save its secret privately in Studio."""
+            return wakeSubscription.register(callbackURL)
+
+        @server.tool()
+        def getWakeSubscription():
+            """Read this Work's Wake subscription, without exposing its signing secret."""
+            return wakeSubscription.status()
+
+        @server.tool()
+        def removeWakeSubscription():
+            """Remove this Work's Wake callback and the local signing key."""
+            return wakeSubscription.remove()
 
         @server.tool()
         def provisionHostMailbox():

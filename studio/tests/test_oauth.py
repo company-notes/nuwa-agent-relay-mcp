@@ -15,6 +15,7 @@ def test_browser_pkce_oauth_saves_private_tokens_and_refreshes(tmp_path, monkeyp
     monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path))
     config = LocalConfig.load()
     callbacks = []
+    callbackFinished = threading.Event()
     calls = []
 
     class OAuthResponse:
@@ -85,6 +86,7 @@ def test_browser_pkce_oauth_saves_private_tokens_and_refreshes(tmp_path, monkeyp
                 assert response.status == 200
 
             callbacks.append("valid")
+            callbackFinished.set()
 
         threading.Thread(target=visitCallback, daemon=True).start()
         return True
@@ -94,6 +96,9 @@ def test_browser_pkce_oauth_saves_private_tokens_and_refreshes(tmp_path, monkeyp
     credentials = OAuthCredentials(config)
     credentials.login()
 
+    # Regression: the OAuth server can stop before the browser callback
+    # thread records completion. Never race its asynchronous assertions.
+    assert callbackFinished.wait(timeout=5), "OAuth browser callback did not complete"
     assert callbacks == ["valid"]
 
     saved = json.loads(config.authPath().read_text(encoding="utf-8"))

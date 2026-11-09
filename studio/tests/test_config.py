@@ -47,3 +47,16 @@ def test_installer_uses_project_manifest():
     assert payload["entrypoint"] == "nuwa-studio-mcp"
     assert payload["binaryEnvVar"] == "NUWA_STUDIO_MCP_BINARY"
     assert payload["serverName"] == "nuwa-agent-relay-studio"
+
+def test_cli_exposes_real_local_wake_receiver_setup_commands():
+    """Local Studio must register and listen for signed Wake without a Bot platform."""
+    from src.CLI import StudioCLI
+
+    parser = StudioCLI.createParser()
+    helpText = parser.format_help()
+
+    assert "wake" in helpText, "Studio CLI must expose Wake setup and local receiver"
+    assert "send-to-agent" in helpText, "A Work should send without requiring an AI GUI"
+    assert "thread" in helpText, "The sender must be able to inspect the echo reply"
+    assert "round-trip" in helpText, "The sender needs one-command Echo round-trip acceptance"
+

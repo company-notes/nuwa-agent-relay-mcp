@@ -40,6 +40,14 @@ class LocalConfig:
         return cls.configDir() / "auth.json"
 
     @classmethod
+    def wakePath(cls) -> Path:
+        return cls.configDir() / "wake.json"
+
+    @classmethod
+    def wakeInboxPath(cls) -> Path:
+        return cls.configDir() / "wake-inbox.sqlite3"
+
+    @classmethod
     def validateOrigin(cls, value: str) -> str:
         parsed = urlparse(value)
 

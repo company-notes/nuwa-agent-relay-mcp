@@ -31,8 +31,9 @@ def test_studio_fastmcp_exposes_independent_tools_and_routes_calls():
             tools = await client.list_tools()
             names = {tool.name for tool in tools}
 
-            assert len(names) == 14
-            assert {"checkInbox", "sendMessage", "sendToAgent", "getReceipt", "acknowledgeRead"} <= names
+            assert len(names) == 17
+            assert {"checkInbox", "sendMessage", "sendToAgent", "getReceipt", "acknowledgeRead",
+                    "registerWake", "getWakeSubscription", "removeWakeSubscription"} <= names
 
             inbox = await client.call_tool("checkInbox", {})
             assert not inbox.is_error

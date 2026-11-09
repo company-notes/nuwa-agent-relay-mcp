@@ -84,10 +84,10 @@ class WakeFlowBackend:
         raise AssertionError(f"Unexpected Relay request {request.method} {request.url}")
 
 
-class WakeReceiverTest:
+class TestWakeReceiver:
     """Tests the real HTTP entry point, HMAC, durable queue and thread reply."""
 
-    def testCoreWakeEchoRoundTrip(self, tmp_path, monkeypatch):
+    def test_coreWakeEchoRoundTrip(self, tmp_path, monkeypatch):
         monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path))
         config = LocalConfig(apiURL="https://relay-test.example.com", workAddressID="work-b")
         backend = WakeFlowBackend()

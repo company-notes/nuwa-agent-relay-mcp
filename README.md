@@ -245,3 +245,11 @@ the receiving Agent. A receiver must separately register a Wake subscription
 and run a trusted adapter for GrokBot/OpenMausBot to process and reply.
 The production Relay's inbound receipt configuration must also be enabled
 before MailTrigger delivery can trigger an automatic Wake.
+
+## Local signed Wake Echo test
+
+A runnable HTTP Wake receiver and fixed-text Echo reply handler are included
+in Studio. See [Local Wake Echo round-trip](docs/LocalWakeEcho.md) for the
+Windows PowerShell A → B → Echo → A workflow, configuration, limitations,
+and a credential-free offline test. The receiver persists notifications
+locally, authenticates HMAC signatures and never executes message content.

@@ -8,11 +8,11 @@ import hashlib
 import hmac
 import json
 import logging
+import os
 import re
 import sqlite3
 import time
 from contextlib import closing
-from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Event, Thread
 from urllib.parse import urlparse
@@ -105,7 +105,7 @@ class WakeInbox:
         self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
 
-        if __import__("os").name != "nt":
+        if os.name != "nt":
             self.path.parent.chmod(0o700)
 
         with closing(sqlite3.connect(self.path, timeout=5)) as db:

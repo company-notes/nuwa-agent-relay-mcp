@@ -8,6 +8,7 @@ from .Auth import OAuthCredentials
 from .Client import AddressClient, RelayClient
 from .Config import LocalConfig
 from .Installer import StudioInstaller
+from .LocalSmoke import LocalEchoRoundTrip
 from .Server import StudioMCP
 from .WakeReceiver import WakeReceiver, WakeSubscription
 
@@ -49,6 +50,11 @@ class StudioCLI:
         receipt.add_argument("--message-id", required=True)
 
         commands.add_parser("provision", help="Provision the selected Host mailbox.")
+
+        roundTrip = commands.add_parser("round-trip",
+                                        help="Send once and verify B's signed Wake Echo reply.")
+        roundTrip.add_argument("--to", required=True)
+        roundTrip.add_argument("--timeout", type=float, default=45.0)
 
         wake = commands.add_parser("wake", help="Manage and run an Agent Wake receiver.")
         wakeCommands = wake.add_subparsers(dest="wakeCommand", required=True)
@@ -140,6 +146,8 @@ class StudioCLI:
             result = relay.receipt(args.message_id)
         elif args.command == "provision":
             result = relay.provisionHostMailbox()
+        elif args.command == "round-trip":
+            result = LocalEchoRoundTrip(relay, config.requireWork()).run(args.to, args.timeout)
         elif args.command == "wake":
             subscription = WakeSubscription(config, relay)
 

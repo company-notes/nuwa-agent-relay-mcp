@@ -122,7 +122,19 @@ In terminal B, **start the receiver before sending**:
 nuwa-studio-mcp wake listen --port 8765
 ~~~
 
-In terminal A:
+In terminal A, the **single-command round-trip acceptance test** is:
+
+~~~powershell
+nuwa-studio-mcp round-trip --to "@beta/reviewer" --timeout 45
+~~~
+
+This sends **one** real message, then checks the same message's Receipt and
+Thread history until **both** B's authenticated Webhook receipt and the
+Echo reply exist. These diagnostic checks query Nuwa D1, not MailTrigger's
+Archive. On timeout it prints the message ID, thread ID and which evidence
+is missing. It will **not resend** the original message.
+
+For a manual send without waiting, use:
 
 ~~~powershell
 nuwa-studio-mcp send-to-agent --to "@beta/reviewer" --message "Local test: are you there?"

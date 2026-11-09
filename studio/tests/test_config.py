@@ -58,4 +58,5 @@ def test_cli_exposes_real_local_wake_receiver_setup_commands():
     assert "wake" in helpText, "Studio CLI must expose Wake setup and local receiver"
     assert "send-to-agent" in helpText, "A Work should send without requiring an AI GUI"
     assert "thread" in helpText, "The sender must be able to inspect the echo reply"
+    assert "round-trip" in helpText, "The sender needs one-command Echo round-trip acceptance"
 

@@ -100,7 +100,7 @@ Configure your OAuth-capable remote MCP client with **`https://mcp.agent-relay.c
 
 Agent Address tools: `agentAddressGetStatus`, `agentAddressClaimWork`, `agentAddressRenameWork`, `agentAddressReleaseWork`, `agentAddressResolve`.
 
-Relay tools: `relayProvisionHostMailbox`, `relayInbox`, `relayHostInbox`, `relaySendMessage`, `relaySendHandoff`, `relayAcceptHandoff`, `relayReplyHandoff`, `relayThreadHistory`, `relayReplyThread`, `relayMessage`, `relayReceipt`, `relayAcknowledgeRead`, `relayWakeEvents`.
+Relay tools: `relayProvisionHostMailbox`, `relayInbox`, `relayHostInbox`, `sendToAgent`, `relaySendMessage`, `relaySendHandoff`, `relayAcceptHandoff`, `relayReplyHandoff`, `relayThreadHistory`, `relayReplyThread`, `relayMessage`, `relayReceipt`, `relayAcknowledgeRead`, `relayWakeEvents`.
 
 Work creation, identity release, mailbox provisioning, and message delivery can have persistent effects. Confirm the intended target before invoking these tools.
 
@@ -157,7 +157,7 @@ By default, Studio stores its configuration and OAuth credentials in a private u
 
 You can override the directory with the absolute path environment variable `NUWA_MCP_HOME`. Keep each Studio installation's selected Work and credentials isolated. Never commit access tokens or local credential files to source control.
 
-The Studio tools include `checkInbox`, `checkHostInbox`, `getMessage`, `getThreadHistory`, `sendMessage`, `sendHandoff`, `acceptHandoff`, `replyHandoff`, `replyThread`, `getReceipt`, `acknowledgeRead`, `getWakeEvents`, and `provisionHostMailbox`.
+The Studio tools include `checkInbox`, `checkHostInbox`, `getMessage`, `getThreadHistory`, `sendToAgent`, `sendMessage`, `sendHandoff`, `acceptHandoff`, `replyHandoff`, `replyThread`, `getReceipt`, `acknowledgeRead`, `getWakeEvents`, and `provisionHostMailbox`.
 
 ### Optional Windows installer
 
@@ -196,3 +196,52 @@ pytest -q studio/tests
 ~~~
 
 GitHub Actions validates the Server MCP, Linux Studio MCP, and Windows Studio MCP independently. Integration tests use controlled backends and do not send production messages.
+
+## `sendToAgent`: asynchronous Agent-to-Agent communication
+
+Both MCP adapters expose `sendToAgent`. It is the agent-facing name for
+the **existing Work message** operation, not a new transport:
+
+```text
+sendToAgent → Relay POST /v1/messages → MailTrigger → recipient mailbox
+```
+
+The tool expects `to` (the other Work's Agent Address), `message` (the
+content to send), optional `subject`, and optional HTTPS `artifactLinks`.
+The remote Server MCP also requires an explicit `workAddressID`; the
+local Studio MCP uses its configured, selected Work.
+
+Example tool arguments for **Studio**:
+
+```json
+{
+  "to": "@beta/reviewer",
+  "message": "Please review the latest deployment.",
+  "subject": "Review request"
+}
+```
+
+For **Remote MCP**, use the same arguments plus
+`"workAddressID": "<sender-work-uuid>"`.
+
+A successful tool call forwards the Relay API's `id`, `threadId`, and
+`messageId` fields; it **does not** mean the recipient mailbox has confirmed
+receipt, the recipient Agent has been woken, or any task is complete. Use
+`getReceipt` (Studio) or `relayReceipt` (Remote) to check delivery evidence.
+Use `replyThread` (Studio) or `relayReplyThread` (Remote) with the
+`threadId` to answer a conversation asynchronously.
+
+Both Work identities need to be active and their respective Hosts need
+provisioned MailTrigger mailboxes. Distinct Studio Agent installations must
+use distinct `NUWA_MCP_HOME` configurations when representing different
+Works; otherwise they share an identity.
+
+Existing `sendMessage` (Studio) and `relaySendMessage` (Remote) are retained
+for currently installed MCP consumers. All three paths use the same Relay
+message API call, with no duplicate message storage or new provider settings.
+
+**Wake is independent:** this tool does not register a Wake callback or run
+the receiving Agent. A receiver must separately register a Wake subscription
+and run a trusted adapter for GrokBot/OpenMausBot to process and reply.
+The production Relay's inbound receipt configuration must also be enabled
+before MailTrigger delivery can trigger an automatic Wake.

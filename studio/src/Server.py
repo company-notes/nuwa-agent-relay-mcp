@@ -37,6 +37,15 @@ class StudioMCP:
             return client.threadHistory(threadID)
 
         @server.tool()
+        def sendToAgent(to: str, message: str, subject: str | None = None,
+                        artifactLinks: list[str] | None = None):
+            """Submit an asynchronous Work message; success is not receipt, Wake or execution.
+
+            Use replyThread to answer an existing conversation.
+            """
+            return client.sendMessage(to, message, subject, artifactLinks)
+
+        @server.tool()
         def sendMessage(to: str, body: str, subject: str | None = None,
                         artifactLinks: list[str] | None = None):
             """Send a Work message to the recipient. This is a real external action."""

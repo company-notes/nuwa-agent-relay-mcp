@@ -140,14 +140,30 @@ export class RelayTools extends MCPToolSet {
       ));
   }
 
+  private sendWorkMessage(
+    workAddressID: string,
+    input: Record<string, unknown>,
+  ): Promise<unknown> {
+    return this.client.call('POST', '/v1/messages', workAddressID, input);
+  }
+
   private registerMessageTools(): void {
     const { workAddressID, to, body, subject, artifactLinks, threadID } = this.schemas;
+
+    this.register('sendToAgent',
+      'Send an asynchronous message to another Work identity. A successful API response ' +
+      'confirms submission only: recipient arrival, Wake, execution and reply are separate. ' +
+      'Use relayReplyThread to respond in an existing conversation.',
+      { workAddressID, to, message: body, subject: subject.optional(), artifactLinks },
+      ({ workAddressID, message, ...input }) => this.sendWorkMessage(
+        workAddressID as string, { ...input, body: message },
+      ));
 
     this.register('relaySendMessage',
       'Send a message to a Work address. This operation sends a real message.',
       { workAddressID, to, body, subject: subject.optional(), artifactLinks },
-      ({ workAddressID, ...input }) => this.client.call(
-        'POST', '/v1/messages', workAddressID as string, input,
+      ({ workAddressID, ...input }) => this.sendWorkMessage(
+        workAddressID as string, input,
       ));
 
     this.register('relayReplyThread',

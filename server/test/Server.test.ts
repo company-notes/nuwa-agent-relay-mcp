@@ -145,8 +145,85 @@ test('a validated OAuth identity can initialize an independent MCP HTTP session'
     assert.equal(list.status, 200);
     const toolsResponse = await list.text();
     assert.match(toolsResponse, /relayInbox/);
+    assert.match(toolsResponse, /sendToAgent/);
     assert.match(toolsResponse, /agentAddressGetStatus/);
     assert.equal(validated, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('sendToAgent MCP tool sends one Work-scoped message via Relay without claiming Agent delivery', async () => {
+  const app = new HTTPMCPApplication(env);
+  const originalFetch = globalThis.fetch;
+  const requests: Array<{ url: URL; method: string; body: unknown }> = [];
+  const expected = {
+    id: 'msg-123',
+    threadId: 'thread-456',
+    messageId: 'msg-123',
+  };
+
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(String(input));
+    const method = init?.method || 'GET';
+
+    if (url.origin === env.ADDRESS_API_URL) {
+      assert.equal(url.pathname, '/v1/account/status');
+      assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer sender-oauth');
+
+      return Response.json({ ok: true, data: { organization: { id: 'org-1' } } });
+    }
+
+    assert.equal(url.origin, env.RELAY_API_URL);
+    requests.push({ url, method, body: JSON.parse(String(init?.body)) });
+    assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer sender-oauth');
+
+    return Response.json({ ok: true, data: expected }, { status: 201 });
+  };
+
+  try {
+    const response = await app.handle(new Request('https://mcp.agent-relay.company-notes.com/mcp', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer sender-oauth',
+        accept: 'application/json, text/event-stream',
+        'content-type': 'application/json',
+        'mcp-protocol-version': '2025-06-18',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 3,
+        method: 'tools/call',
+        params: {
+          name: 'sendToAgent',
+          arguments: {
+            workAddressID: 'work-a',
+            to: '@beta/reviewer',
+            message: 'Please review the latest deployment.',
+            subject: 'Review request',
+            artifactLinks: ['https://files.example.com/report'],
+          },
+        },
+      }),
+    }));
+
+    assert.equal(response.status, 200);
+    const payload = await response.json() as {
+      result: { isError?: boolean; content: Array<{ text: string }> };
+    };
+
+    assert.equal(payload.result.isError, undefined);
+    assert.deepEqual(JSON.parse(payload.result.content[0].text), expected);
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].method, 'POST');
+    assert.equal(requests[0].url.pathname, '/v1/messages');
+    assert.equal(requests[0].url.searchParams.get('work_address_id'), 'work-a');
+    assert.deepEqual(requests[0].body, {
+      to: '@beta/reviewer',
+      body: 'Please review the latest deployment.',
+      subject: 'Review request',
+      artifactLinks: ['https://files.example.com/report'],
+    });
   } finally {
     globalThis.fetch = originalFetch;
   }

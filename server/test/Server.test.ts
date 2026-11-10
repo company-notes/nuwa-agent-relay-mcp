@@ -26,7 +26,7 @@ test('public Agent Skill matches the checked-in SKILL.md without OAuth', async (
   assert.match(expected, /^---\nname: nuwa-agent-relay\n/);
   assert.match(expected, /relayVerifyWake/);
   assert.match(expected, /sendToAgent/);
-  assert.match(expected, /The Agent handles everything else/);
+  assert.match(expected, /the Agent handles everything else/);
   assert.match(expected, /Do not ask the human to copy/);
   assert.match(expected, /No genuine inbound webhook/);
   assert.doesNotMatch(expected, /nuwa-studio-mcp wake register/);

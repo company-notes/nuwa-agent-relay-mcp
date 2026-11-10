@@ -55,22 +55,36 @@ export class HTTPMCPApplication {
 
     // One isolated stateless MCP transport per request: no credentials or
     // session state may be reused between distinct OAuth principals.
-    const transport = new WebStandardStreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-      enableJsonResponse: true,
-    });
-    const server = new NuwaMCPServer(this.env, result).createServer();
+    let stage = 'create_transport';
 
     try {
+      const transport = new WebStandardStreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+        enableJsonResponse: true,
+      });
+
+      stage = 'register_tools';
+      const server = new NuwaMCPServer(this.env, result).createServer();
+
+      stage = 'connect_transport';
       await server.connect(transport);
+
+      stage = 'handle_mcp_request';
       return await transport.handleRequest(request);
     } catch (error) {
-      // Stage and exception type are enough to differentiate OAuth vs MCP failures.
-      // Never emit credentials, request bodies, callback URLs or secret paths.
+      // Report only the lifecycle stage and error type: never log OAuth headers,
+      // tool arguments, callback URLs, request bodies or credential-bearing exceptions.
+      const requestID = crypto.randomUUID();
       console.error('mcp.request_failed', {
+        stage,
+        requestID,
         errorType: error instanceof Error ? error.name : 'unknown',
       });
-      return Response.json({ error: 'mcp_internal_error' }, { status: 500 });
+
+      return Response.json(
+        { error: 'mcp_internal_error', requestID },
+        { status: 500 },
+      );
     }
   }
 }

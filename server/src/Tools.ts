@@ -151,8 +151,9 @@ export class RelayTools extends MCPToolSet {
     const { workAddressID, to, body, subject, artifactLinks, threadID } = this.schemas;
 
     this.register('sendToAgent',
-      'Send an asynchronous message to another Work identity. A successful API response ' +
-      'confirms submission only: recipient arrival, Wake, execution and reply are separate. ' +
+      'Normal Agent-to-Agent sending tool. With the recipient already enrolled, MailTrigger ' +
+      'delivery and its verified Wake webhook happen automatically; no manual CLI or separate ' +
+      'smoke-test tool is required. Success confirms submission, not recipient execution. ' +
       'Use relayReplyThread to respond in an existing conversation.',
       { workAddressID, to, message: body, subject: subject.optional(), artifactLinks },
       ({ workAddressID, message, ...input }) => this.sendWorkMessage(
@@ -230,8 +231,10 @@ export class RelayTools extends MCPToolSet {
       'Begin a Work-scoped HTTPS Wake registration. POST a one-time challenge to the target ' +
       'using authMode hmac, bearer (GrokBot) or capability (OpenMausBot URL); this does NOT ' +
       'activate the callback until relayVerifyWake proves the receiving Agent got the challenge. ' +
-      'Bearer tokens and secret callback paths are credentials: use secure host credential input, ' +
-      'never paste them in a chat. A callback POST may trigger a paid Agent run.',
+      'The Agent should create/read its own webhook via authorized provider tooling and submit ' +
+      'its callback and credential directly, without asking the human to copy them. Never echo ' +
+      'secrets in chat; host MCP tool traces may still show arguments. A callback POST may ' +
+      'trigger a paid Agent run.',
       {
         workAddressID,
         callbackURL: z.url(),
@@ -246,8 +249,9 @@ export class RelayTools extends MCPToolSet {
         }));
 
     this.register('relayVerifyWake',
-      'Confirm a pending Wake registration after THIS Work received the one-time challenge ' +
-      'from its configured webhook. Do not confirm unsolicited webhook events.',
+      'Called by the webhook-triggered receiving Agent, authenticated as THIS Work, using ' +
+      'the one-time challenge actually delivered to its webhook. Do not ask the human to ' +
+      'read or copy the challenge. Never confirm unsolicited or other-Work events.',
       { workAddressID, verificationID: z.string().uuid(), challenge: z.string().min(1).max(128) },
       (value) => this.client.call('POST', '/v1/wake-subscription/verification',
         value.workAddressID as string, {

@@ -15,13 +15,13 @@ Both adapters call the existing Agent Address and Relay REST APIs. The Relay API
 
 ## Guided Agent Skill
 
-Users can paste the public, read-only Agent Skill URL into a compatible agent and ask it to install the skill and guide onboarding:
+Users paste the public Skill URL into a compatible Agent. **The Agent handles the setup**: installing/connecting MCP with consent, selecting its Work, configuring its own webhook through supported provider tools, registering and verifying Wake, and reporting a simple ready/not-ready state. The human does not copy bearer tokens, callback URLs or challenge IDs, and does not execute CLI commands for normal onboarding:
 
 ~~~text
 https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md
 ~~~
 
-The skill guides OAuth MCP connection, Work selection, explicit-consent MailTrigger provisioning, and **verified two-stage Wake registration** for a public GrokBot Bearer webhook or a local OpenMausBot capability URL through an approved tunnel. Agents without an inbound webhook can use MCP for manual send/read; automatic wake is not supported for those runtimes yet. The Relay validates public HTTPS targets and requires an inbound challenge confirmed through the same Work OAuth identity; no `WAKE_ALLOWED_HOSTS` operator approval is required. New registrations require a configured Relay `WAKE_CREDENTIALS_KEY` encryption secret. The Skill file is published on the public MCP Worker because this source repository is private; access to the Skill does not require OAuth.
+With user approval, the Skill guides OAuth MCP connection, Work selection, MailTrigger provisioning, and **self-managed two-stage Wake registration** for a public GrokBot Bearer webhook or a local OpenMausBot capability URL through an approved Tunnel. A provider that cannot grant Agent access to create/read its own Webhook or run MCP during Automation is clearly reported as a provider limitation, not silently replaced with CLI instructions. Agents without an inbound webhook can use MCP for manual send/read; automatic wake is not supported for those runtimes yet. The Relay validates public HTTPS targets and requires an inbound challenge confirmed through the same Work OAuth identity; no `WAKE_ALLOWED_HOSTS` operator approval is required. New registrations require a configured Relay `WAKE_CREDENTIALS_KEY` encryption secret. After onboarding, Agent A normally needs only **`sendToAgent`** to contact Agent B; Relay and MailTrigger deliver and trigger B's verified webhook automatically. Delivery receipts, Wake events and Thread History are diagnostics for Agents and maintainers, not user-facing commands. The Skill file is published on the public MCP Worker because this source repository is private; access to the Skill does not require OAuth.
 
 ## Server MCP (Cloudflare Workers)
 
@@ -167,7 +167,7 @@ By default, Studio stores its configuration and OAuth credentials in a private u
 
 You can override the directory with the absolute path environment variable `NUWA_MCP_HOME`. Keep each Studio installation's selected Work and credentials isolated. Never commit access tokens or local credential files to source control.
 
-The Studio tools include `checkInbox`, `checkHostInbox`, `getMessage`, `getThreadHistory`, `sendToAgent`, `sendMessage`, `sendHandoff`, `acceptHandoff`, `replyHandoff`, `replyThread`, `getReceipt`, `acknowledgeRead`, `getWakeEvents`, `registerWake`, `getWakeSubscription`, `removeWakeSubscription`, and `provisionHostMailbox`.
+The Studio tools include `verifyWake` for receiving-Agent proof of a pending subscription, in addition to `checkInbox`, `checkHostInbox`, `getMessage`, `getThreadHistory`, `sendToAgent`, `sendMessage`, `sendHandoff`, `acceptHandoff`, `replyHandoff`, `replyThread`, `getReceipt`, `acknowledgeRead`, `getWakeEvents`, `registerWake`, `getWakeSubscription`, `removeWakeSubscription`, and `provisionHostMailbox`.
 
 ### Optional Windows installer
 

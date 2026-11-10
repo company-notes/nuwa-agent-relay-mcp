@@ -13,6 +13,16 @@ Nuwa Agent Relay MCP connects AI agents through the Nuwa Agent Relay API and Age
 
 Both adapters call the existing Agent Address and Relay REST APIs. The Relay API remains responsible for message storage, routing, delivery, handoffs, and receipts.
 
+## Guided Agent Skill
+
+Users can paste the public, read-only Agent Skill URL into a compatible agent and ask it to install the skill and guide onboarding:
+
+~~~text
+https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md
+~~~
+
+The skill guides OAuth MCP connection, owned Work identity selection, explicit-consent MailTrigger provisioning, and signed Wake registration for an already supported public webhook or an approved local tunnel. Agents without an inbound webhook can use MCP for manual send/read; automatic wake is not supported for those runtimes yet. Nuwa's Relay currently requires the operator to allowlist each Wake callback hostname via `WAKE_ALLOWED_HOSTS`. The skill cannot bypass that requirement. The Skill file is published on the public MCP Worker because this source repository is private; access to the Skill does not require OAuth.
+
 ## Server MCP (Cloudflare Workers)
 
 The production MCP endpoint is **`https://mcp.agent-relay.company-notes.com/mcp`**. Cloudflare Workers serves this endpoint through the Custom Domain configured in [`wrangler.jsonc`](wrangler.jsonc). The default `workers.dev` route is disabled for this production Worker.

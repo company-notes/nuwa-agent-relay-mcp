@@ -60,9 +60,16 @@ export class HTTPAPIClient {
         ...(options.body ? { 'content-type': 'application/json' } : {}),
       },
       body: options.body ? JSON.stringify(options.body) : undefined,
-      redirect: 'error',
+      redirect: 'manual',
       signal: AbortSignal.timeout(20000),
     });
+
+    // Workers does not implement redirect: 'error'. Manual mode keeps OAuth
+    // credentials from being forwarded to a redirect destination; fail closed
+    // before parsing a potentially empty or non-JSON redirect body.
+    if (response.status >= 300 && response.status < 400) {
+      throw new APIError(response.status, 'unexpected_redirect', 'Backend API redirected unexpectedly.');
+    }
 
     const payload = await response.json() as {
       ok: boolean;

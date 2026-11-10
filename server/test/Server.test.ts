@@ -575,7 +575,8 @@ test('regression: cross-Worker OAuth and Tool calls must use service bindings in
     assert.equal(message.status, 200);
     assert.match(await message.text(), /message-1/);
 
-    assert.equal(oauthCalls, 3);
+    // Three OAuth guards plus the explicit agentAddressGetStatus Tool call.
+    assert.equal(oauthCalls, 4);
     assert.equal(relayCalls, 1);
     assert.equal(addressCalls, 0);
   } finally {

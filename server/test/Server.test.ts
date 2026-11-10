@@ -495,3 +495,92 @@ test('regression: authenticated GrokBot upstream fetch exception must log only i
     console.error = original;
   }
 });
+
+test('regression: cross-Worker OAuth and Tool calls must use service bindings instead of public fetch', async () => {
+  const originalFetch = globalThis.fetch;
+  let oauthCalls = 0;
+  let addressCalls = 0;
+  let relayCalls = 0;
+
+  const boundEnv = {
+    ...env,
+    ADDRESS_WORKER: {
+      async fetch(input: RequestInfo | URL, init?: RequestInit) {
+        const url = new URL(String(input));
+        assert.equal(url.origin, env.ADDRESS_API_URL);
+        assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer GrokBot-oauth');
+
+        if (url.pathname === '/v1/account/status') {
+          oauthCalls += 1;
+          return Response.json({ ok: true, data: { organization: { id: 'org-1' } } });
+        }
+
+        addressCalls += 1;
+        return Response.json({ ok: true, data: { work: { id: 'work-b' } } });
+      },
+    },
+    RELAY_WORKER: {
+      async fetch(input: RequestInfo | URL, init?: RequestInit) {
+        const url = new URL(String(input));
+        assert.equal(url.origin, env.RELAY_API_URL);
+        assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer GrokBot-oauth');
+        relayCalls += 1;
+        return Response.json({ ok: true, data: { id: 'message-1', threadId: 'thread-1' } });
+      },
+    },
+  };
+
+  globalThis.fetch = async () => {
+    throw new TypeError('Public worker-to-worker fetch must never be used');
+  };
+
+  try {
+    const app = new HTTPMCPApplication(boundEnv);
+
+    async function callMCP(method: string, params: Record<string, unknown>) {
+      return app.handle(new Request('https://mcp.agent-relay.company-notes.com/mcp', {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer GrokBot-oauth',
+          accept: 'application/json, text/event-stream',
+          'content-type': 'application/json',
+          'mcp-protocol-version': '2025-06-18',
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 10, method, params }),
+      }));
+    }
+
+    const listing = await callMCP('tools/list', {});
+    assert.equal(listing.status, 200);
+    assert.match(await listing.text(), /sendToAgent/);
+
+    const address = await callMCP('tools/call', {
+      name: 'agentAddressGetStatus', arguments: {},
+    });
+    assert.equal(address.status, 200);
+    assert.match(await address.text(), /org-1/);
+
+    const message = await callMCP('tools/call', {
+      name: 'sendToAgent',
+      arguments: { workAddressID: 'work-a', to: '@beta/reviewer', message: 'Hello B' },
+    });
+    assert.equal(message.status, 200);
+    assert.match(await message.text(), /message-1/);
+
+    assert.equal(oauthCalls, 3);
+    assert.equal(relayCalls, 1);
+    assert.equal(addressCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('production MCP declares same-account Agent Address and Relay service bindings', () => {
+  const config = JSON.parse(readFileSync(new URL('../../wrangler.jsonc', import.meta.url), 'utf8')) as {
+    services?: Array<{ binding: string; service: string }>;
+  };
+  assert.deepEqual(config.services, [
+    { binding: 'ADDRESS_WORKER', service: 'agent-address' },
+    { binding: 'RELAY_WORKER', service: 'nuwa-agent-relay-api' },
+  ]);
+});

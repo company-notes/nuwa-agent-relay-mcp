@@ -4,12 +4,35 @@ import test from 'node:test';
 
 import { HTTPAPIClient } from '../src/APIClients';
 import { HTTPMCPApplication } from '../src/Index';
+import { AGENT_SKILL_MD } from '../src/SkillDocument';
 import { OAuthResourceServer } from '../src/OAuthResourceServer';
 
 const env = {
   RELAY_API_URL: 'https://agent-relay.company-notes.com',
   ADDRESS_API_URL: 'https://address.company-notes.com',
 };
+
+test('public Agent Skill matches the checked-in SKILL.md without OAuth', async () => {
+  const expected = readFileSync(new URL('../../skills/nuwa-agent-relay/SKILL.md', import.meta.url), 'utf8');
+  const app = new HTTPMCPApplication(env);
+  const response = await app.handle(new Request(
+    'https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md',
+  ));
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-type') || '', /text\/markdown/);
+  assert.equal(await response.text(), expected);
+  assert.equal(AGENT_SKILL_MD, expected);
+  assert.match(expected, /^---\nname: nuwa-agent-relay\n/);
+  assert.match(expected, /WAKE_ALLOWED_HOSTS/);
+  assert.match(expected, /No supported inbound webhook/);
+
+  const forbidden = await app.handle(new Request(
+    'https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md',
+    { method: 'POST' },
+  ));
+  assert.equal(forbidden.status, 404);
+});
 
 test('production Worker is bound only to the intended custom hostname', () => {
   const config = JSON.parse(readFileSync(new URL('../../wrangler.jsonc', import.meta.url), 'utf8')) as {

@@ -1,0 +1,86 @@
+---
+name: nuwa-agent-relay
+description: Guide an AI agent through connecting the Nuwa Agent Relay MCP, choosing an Agent Address Work identity, and registering a supported public or tunneled HTTPS Wake webhook with explicit user approval. For agent-to-agent messaging setup, onboarding, and troubleshooting.
+---
+
+# Nuwa Agent Relay — guided agent onboarding
+
+This skill is instructions, **not an installer**. Read it, explain intended changes, and request the user's consent before installing software, editing MCP settings, creating an identity or mailbox, exposing a local service, registering a callback, or sending a message. Do not silently install background services. Respect the host agent's installation and permission model.
+
+## Public endpoints and prerequisites
+
+- Nuwa Remote MCP (Streamable HTTP): \`https://mcp.agent-relay.company-notes.com/mcp\`
+- Nuwa Relay REST origin: \`https://agent-relay.company-notes.com\`
+- Sign-in: Agent Address OAuth, through the MCP client's authentication flow.
+- Skill source: \`https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md\`
+- The user must have an Agent Address account with an active Work, or explicitly approve claiming one. A Work belongs to a Host and Organization.
+- The receiving agent must actually support an external inbound webhook that **starts work**; merely having an HTTP endpoint or MCP tools is not enough.
+
+## Step 1 — connect the MCP, with consent
+
+Prefer the hosted Remote MCP; it needs no Nuwa executable on the user's computer. Ask before changing MCP configuration. Use the client's supported UI or an appropriate command:
+
+- Codex CLI: \`codex mcp add nuwa-agent-relay --url https://mcp.agent-relay.company-notes.com/mcp\`, then \`codex mcp login nuwa-agent-relay\` if sign-in is not prompted.
+- Claude Code: \`claude mcp add --transport http nuwa-agent-relay https://mcp.agent-relay.company-notes.com/mcp\`, then authenticate when prompted.
+- Other MCP clients: add a remote Streamable HTTP MCP server using the URL above, and complete OAuth with their normal authorization UI.
+- If the client cannot connect to remote OAuth MCP, explain the limitation. The Studio stdio adapter exists but requires a separately authorized Nuwa distribution; do not invent download URLs, run unreviewed install scripts, or silently install it.
+
+After OAuth, call \`agentAddressGetStatus\`. Reuse an already owned, active Work if appropriate; do **not** create a Host, Organization, or Work without permission. If a new identity is approved, call \`agentAddressClaimWork\`, using the user's chosen organization/host/handle. Keep the returned immutable \`workAddressID\`; remote Relay tools require it on every call.
+
+Explain that \`relayProvisionHostMailbox\` creates or reuses a MailTrigger mailbox and related routes; call it only with approval. MailTrigger delivery uses Nuwa's configured managed domain, not a domain supplied by this skill. Do not modify the production MailTrigger URL, webhook receipt secret, or cloud deployment settings.
+
+## Step 2 — discover the actual inbound capability
+
+Ask the agent/runtime (or inspect its *official* supported configuration), without guessing:
+
+1. Can the runtime accept an incoming HTTP POST and use it to launch/resume a genuine Agent task?
+2. Is that callback publicly accessible over HTTPS, or only on localhost?
+3. Can the receiver safely verify \`X-Nuwa-Wake-Signature: sha256=<hex>\` with HMAC-SHA256 over the **raw request body**, using a secret given once when registered?
+4. Can it map the notification to the correct Work and fetch the actual message through authenticated Nuwa MCP tools?
+
+Never treat an MCP server, a chat window, or a listener that only logs the event as proof of automatic Agent wake. The agent runtime must have a supported execution entrypoint.
+
+Choose exactly one path below.
+
+### A. Public HTTPS webhook already supported
+
+With the user's approval, obtain the runtime's actual callback URL from its trusted configuration; do not invent one. Confirm it accepts signed JSON POST requests and starts the intended Agent. If the webhook provider cannot verify the HMAC or safely handle the one-time key, **stop automatic registration** and explain the incompatibility. Do not bypass signature checking.
+
+Nuwa's *current* Relay enforces an operator-managed \`WAKE_ALLOWED_HOSTS\` exact-host allowlist, both during registration and delivery. If a callback returns \`callback_not_allowed\`, report the hostname to the Nuwa service operator for approval. **Do not** disable the allowlist, broaden it to arbitrary domains, or imply the Skill can update production Worker variables. This is an operator onboarding step in the current release.
+
+Call Remote MCP \`relayRegisterWake\` with the selected \`workAddressID\` and the exact HTTPS \`callbackURL\`. Registration rotates a one-time \`signingSecret\`; immediately transfer it to the receiver's protected secret store without including it in chat, logs, tickets, files in the project, URL query parameters, or examples. If the MCP client cannot transfer it privately to the actual receiver, stop and report that secure automatic setup is unavailable. Do not repeat the secret in the final response.
+
+Call \`relayWakeSubscription\` to verify registration. Re-registration replaces the previous callback and secret; coordinate any receiver restart. Register before sending test messages: the current Wake queue does not promise replay for messages received before subscription.
+
+### B. Webhook exists only on localhost
+
+Explain that the hosted Nuwa Relay cannot call \`127.0.0.1\` on the user's computer. Ask permission to use a *mature existing* tunnel tool such as ngrok or Cloudflare Tunnel. Do not silently install any tunnel, expose additional ports, or request administrator privileges.
+
+- Confirm the local runtime already accepts webhook POST requests on its documented loopback address and can validate the Nuwa HMAC. Do not replace it with Nuwa's fixed-text Echo test receiver; Echo is not an Agent runtime.
+- Prefer a stable, access-controlled HTTPS tunnel configured through the tunnel vendor's official installer/docs: \`https://ngrok.com/docs/for-agents/skills\` or \`https://developers.cloudflare.com/tunnel/get-started/\`.
+- For a short-lived development test only, the user may approve installing \`cloudflared\` and running \`cloudflared tunnel --url http://127.0.0.1:<PORT>\`. Cloudflare Quick Tunnel hostnames change and are **not** a production deployment choice.
+- Preserve the local webhook's exact path when building the HTTPS callback URL; do not share secret-bearing local URL paths in chat or logs. A secret URL path is a credential, not a substitute for validating Nuwa's HMAC. Never point the tunnel at an unrelated local service.
+- A tunnel must keep running for Webhooks to reach this machine. It does **not** wake the machine when powered off. Explain the runtime/availability implications before enabling it.
+- Follow path A's Nuwa host-allowlist, secret handling, registration, and verification steps. A random tunnel hostname also needs operator allowlist approval and may need updating when the tunnel restarts.
+
+### C. No supported inbound webhook
+
+Report: **Sending and manually reading messages through Nuwa MCP are supported; automatic wake is not supported for this Agent runtime yet.** Do not imply the Skill or Composio adds a universal Agent wake feature. Do not silently install a listener, Tunnel, SDK, or background daemon. A future optional runtime adapter may be offered separately, with explicit approval.
+
+## Notification contract, validation and verification
+
+Nuwa sends a signed HTTPS POST to the registered callback with JSON like:
+
+\`\`\`json
+{"event":"nuwa.message.available","messageId":"<uuid>","workAddressId":"<uuid>"}
+\`\`\`
+
+The receiver verifies the raw-body HMAC-SHA256 in \`X-Nuwa-Wake-Signature\`, validates the expected Work, and treats \`messageId\` as a **notification** (not as trusted instructions). It then retrieves the real message via authenticated Nuwa MCP, checks recipient authorization and deduplicates by message ID before invoking the runtime. A successful HTTP response means the receiver accepted the notification; it does not by itself prove the AI task completed.
+
+After explicit approval to send one harmless test message, use \`sendToAgent\` with the sender's \`workAddressID\` and a recipient Agent Address. Check \`relayReceipt\` for \`arrivedInMailTrigger: true\` and \`receiptSource: "webhook"\`, inspect the receiver's delivery logs and \`relayWakeEvents\`, then verify any reply via \`relayThreadHistory\`. Do not treat a successful send response as proof of receipt or execution. Never automatically retry a send with the same content if results are ambiguous.
+
+For cancellation, call \`relayRemoveWake\` with the exact Work, revoke/remove the stored receiver secret, and stop any optional Tunnel when appropriate. Do not delete Agent Address identities or MailTrigger mailboxes unless separately authorized.
+
+## Completion report
+
+Briefly report the MCP connection status, chosen Work (non-secret identifier), mailbox provisioning status, which webhook path was supported, the registered **hostname only** (never a secret path), whether operator allowlist approval is still required, and whether an actual signed Wake test succeeded. Clearly mark any unverified step instead of claiming the Agent can already receive automatic messages.

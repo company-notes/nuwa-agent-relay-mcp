@@ -2,6 +2,7 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 
 import type { Env } from './Env';
 import { NuwaMCPServer } from './MCPServer';
+import { AGENT_SKILL_MD } from './SkillDocument';
 import { OAuthResourceServer } from './OAuthResourceServer';
 
 export class HTTPMCPApplication {
@@ -12,6 +13,17 @@ export class HTTPMCPApplication {
 
     if (url.pathname === '/health' && request.method === 'GET') {
       return Response.json({ ok: true, data: { service: 'nuwa-agent-relay-mcp' } });
+    }
+
+    if (url.pathname === '/skills/nuwa-agent-relay/SKILL.md' &&
+      request.method === 'GET') {
+      return new Response(AGENT_SKILL_MD, {
+        headers: {
+          'content-type': 'text/markdown; charset=utf-8',
+          'cache-control': 'public, max-age=300',
+          'x-content-type-options': 'nosniff',
+        },
+      });
     }
 
     const oauth = new OAuthResourceServer(this.env);

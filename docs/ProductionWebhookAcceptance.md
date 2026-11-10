@@ -1,59 +1,56 @@
-# Production GrokBot / OpenMausBot verified Wake acceptance
+# Production Webhook Onboarding — Agent-Driven Acceptance
 
-This uses the **production Nuwa Relay and production MailTrigger**. No local Relay Worker, D1, Django MailTrigger, or new messaging broker is needed.
+This document describes the **product experience**, not a manual diagnostic script. Nuwa's official production Relay and MailTrigger handle every message; the user should not need to operate a local Relay, inspect Work IDs, manually register a callback or run CLI commands.
 
-## Operator readiness (once)
+## What the human does
 
-- The Relay must have `MAILTRIGGER_RECEIPT_URL=https://agent-relay.company-notes.com/v1/mailtrigger/receipt` and its existing private `MAILTRIGGER_INBOUND_KEY`; `goodsfind.info` must be verified as `MAILTRIGGER_MANAGED_DOMAIN`. Do **not** replace the live `MAILTRIGGER_API_URL`.
-- The Relay also requires a new, dedicated Cloudflare Worker secret `WAKE_CREDENTIALS_KEY`, holding **64 hexadecimal characters (32 random bytes)**. Generate with `python -c "import secrets; print(secrets.token_hex(32))"`, and put it in GitHub Actions → Secrets for the Relay API repository. Never paste the secret in chat, source control, shell history or logs. GitHub deploy will apply it with `wrangler secret put`.
-- The D1 migration `0004_verified_wake.sql` must have run before the new Worker deploy. The GitHub Actions workflow performs this before deployment. No `WAKE_ALLOWED_HOSTS` variable is needed.
-- The remote MCP Worker and public Skill URL must be at the companion updated version.
+1. Give the receiving Agent the [Nuwa Skill](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md) and ask it to install and configure Nuwa.
+2. Approve the Agent Address OAuth connection and any necessary identity, mailbox, Webhook Automation or Tunnel permissions. **The Agent itself** creates/reads its webhook, fills `relayRegisterWake` and completes `relayVerifyWake`. The human should not see or transfer URLs, bearer tokens or one-time challenges.
+3. Ask a different, Nuwa-connected Agent A to send a message to the receiving Agent B. **Agent A calls `sendToAgent`**. No special smoke-test commands.
+4. If B is configured to respond to the message, the reply arrives through the same Nuwa conversation. The Agents may inspect Relay Receipt, Wake events and Thread History with MCP as needed; those are not steps for the human.
 
-## B: GrokBot / Cursor Automation (cloud Webhook)
+User-facing requests can be as short as:
 
-1. In the target Bot's owner conversation, install the Nuwa Skill and connect `https://mcp.agent-relay.company-notes.com/mcp`. Sign in and select one active B Work ID with `agentAddressGetStatus`. Explicitly approve `relayProvisionHostMailbox`.
-2. Ask the Bot to create a Webhook-triggered Automation that can call Nuwa MCP tools **in the triggered run**. Give its instructions the two branches `nuwa.wake.verification` → `relayVerifyWake`, and `nuwa.message.available` → `relayMessage`, process and `relayReplyThread`. Confirm this is a real runnable Automation, not simply a remembered prompt.
-3. Obtain the Automation's `POST to` URL and `key` via the platform's secure UI. If no safe way exists to pass the sender key to the MCP call, do not paste it into chat. Use an approved secret transfer mechanism.
-4. With approval, call `relayRegisterWake({workAddressID:B,callbackURL:"<actual HTTPS URL>",authMode:"bearer",bearerToken:<private sender key>})`. Nuwa will send a single verification POST with `Authorization: Bearer <key>`.
-5. The Automation extracts the event's `verificationId` and `challenge`, confirms with `relayVerifyWake` using B Work OAuth, and returns a non-secret status. `relayWakeSubscription` must show `enabled:true` and `pending:null`. A HTTP 200 from the Automation does not mean verification succeeded.
+> “Install this Skill, connect yourself to Nuwa, and set up automatic incoming messages. Ask for permissions only when necessary: https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md”
 
-## B: OpenMausBot desktop (local secret Webhook)
+> “Send a message to my GrokBot / OpenMausBot through Nuwa and ask for a reply.”
 
-1. Install Nuwa Skill in B's owner Bot chat; connect Nuwa MCP using B's own Work, approve provisioning.
-2. Create a Webhook Automation. The local product typically listens on `http://127.0.0.1:8800/hooks/<secret-path>`. A **real path is a secret**; rotate any path already shared.
-3. Start a trusted, user-approved Tunnel to **only** the dedicated webhook receiver, such as `cloudflared tunnel --url http://127.0.0.1:8800` for a **temporary** test or a stable ngrok / Cloudflare named Tunnel. Never expose OpenMausBot's main harness `8799`.
-4. Combine the actual Tunnel HTTPS origin with OpenMausBot's existing secret `/hooks/...` path. Do not expose full URL in chat. Confirm the Tunnel and local OpenMausBot app are running.
-5. Call `relayRegisterWake({workAddressID:B,callbackURL:<complete private HTTPS hook URL>,authMode:"capability"})` using an approved private tool input path. A challenge POST must reach OpenMausBot. Its Webhook Automation, not the HTTP response, must call `relayVerifyWake` with B Work OAuth to activate.
-6. For OpenMausBot **My Cloud**, use its already public HTTPS webhook directly; skip local Tunnel.
+## What the receiving Agent does
 
-## A → B → A: production check
+### GrokBot / Cursor Automation (public HTTPS)
 
-1. In a separate authenticated A Work, approve `relayProvisionHostMailbox` and call `sendToAgent` exactly once to B's actual Agent Address, using an innocuous unique marker such as "Nuwa production wake smoke test".
-2. Save the message and thread identifiers. Call `relayReceipt` on A's Work; require `submissionStatus:"sent"`, `arrivedInMailTrigger:true`, `receiptSource:"webhook"`.
-3. Inspect B's `relayWakeEvents` and the Bot's **real** Automation run history for `nuwa.message.available` with the same Message ID. A successful Wake POST alone proves only that the provider accepted the request.
-4. The B Agent retrieves the real message through `relayMessage` and replies using `relayReplyThread`. Check A's `relayThreadHistory` for that reply. This is the acceptance criterion for a real Agent execution.
-5. If timed out, inspect Receipt, Wake state, provider run log and reply separately; do not re-send the same original message blindly.
+The receiving Agent uses the provider's supported setup interface to create a Webhook-triggered Automation, with the same Nuwa MCP Work available during that Automation's actual webhook-triggered run. The provider supplies the callback and sender key. **The Agent passes them directly** to `relayRegisterWake` with `authMode: "bearer"` and uses the provider's Automation to handle the `nuwa.wake.verification` event with `relayVerifyWake`.
 
-MailTrigger only handles A→B email transport and B receipt; it does not call GrokBot/OpenMausBot directly and needs **no new feature** for these webhook adapters. Its existing recipient-side `NAR receipt` Webhook Route must be enabled. If the Work's MailTrigger mailbox or route cannot be provisioned on `goodsfind.info`, that is a separate provider-side issue to diagnose.
+The Automation also handles `nuwa.message.available`: read the authorized message with `relayMessage`, avoid duplicate processing and respond through `relayReplyThread`. A webhook POST accepted by the provider is not evidence that the model completed a run.
 
-### Studio MCP local CLI
+Do not ask the human to manually copy the Webhook URL or Bearer key. If the provider **does not expose** a supported way for the Agent to create an Automation or access the credential, tell the human which *single* authorization or feature is required. Never claim that Skill instructions can bypass a provider's permission model.
 
-Use your own configuration directory and B Work. Commands are:
+### OpenMausBot desktop (local capability webhook)
 
-```powershell
-$env:NUWA_RELAY_URL = "https://agent-relay.company-notes.com"
-nuwa-studio-mcp login
-nuwa-studio-mcp identity --work-id <B-WORK-UUID>
-nuwa-studio-mcp provision
+The receiving Agent creates or selects its own local Webhook Automation. After the human approves a trusted Tunnel, the Agent installs/configures/starts it through the vendor's official tools, exposing only the local webhook receiver on port 8800. It transforms its private localhost callback to a private HTTPS callback without asking the human to copy the secret path, then calls `relayRegisterWake` with `authMode: "capability"`.
 
-# For a private OpenMausBot URL, omit the positional URL to enter it without terminal echo.
-nuwa-studio-mcp wake register --auth-mode capability
-nuwa-studio-mcp wake status
+The OpenMausBot webhook-triggered run receives the verification event, calls `relayVerifyWake` for the same Work, and later handles message events using its authenticated Nuwa MCP. A stable, actively running Tunnel is needed for a local machine; hosted OpenMausBot with an existing public callback needs no Tunnel.
 
-# If your Agent receives the challenge and cannot call MCP itself,
-# the owner can verify using the private one-time challenge.
-nuwa-studio-mcp wake verify --verification-id <VERIFICATION-UUID>
-nuwa-studio-mcp wake status
-```
+If any previous real local hook URL has appeared in chat or logs, rotate it before reuse. Do not expose the broader OpenMausBot harness API.
 
-Do not type a secret capability URL directly into a command line, or a Bearer key into shell history. The CLI prompts privately when omitted. The existing `wake listen` is a fixed-text Echo test receiver and is **not** a GrokBot/OpenMausBot executor.
+### No native webhook
+
+Message sending and manual reading remain possible with MCP. Automatic Wake is not supported yet; do not silently install a new background agent listener.
+
+## The normal acceptance criterion
+
+The human asks A to send one real message. **One `sendToAgent` call** should cause one MailTrigger delivery and, after a genuine recipient Receipt, automatic dispatch to B's verified webhook. B's real Agent runtime fetches the message and, if asked, replies using its own Nuwa MCP.
+
+Submission, MailTrigger arrival, webhook acceptance, Agent execution and reply are distinct facts. Agent A may diagnose them **through its tools** if the reply does not arrive, without making the human run five commands or resend a message blindly.
+
+## One-time Nuwa service operator prerequisite
+
+Before enabling new registrations, the Relay API's Cloudflare Worker must have a stable 32-byte hex `WAKE_CREDENTIALS_KEY` secret for encrypted third-party webhook credentials. The API repository's GitHub Actions deployment applies the private secret. This is **an operator task once per service**, not something an end user or their Agent should manage.
+
+The production configuration retains the existing `MAILTRIGGER_RECEIPT_URL=https://agent-relay.company-notes.com/v1/mailtrigger/receipt`, `MAILTRIGGER_INBOUND_KEY`, `MAILTRIGGER_API_URL`, and verified `goodsfind.info` managed domain. No `WAKE_ALLOWED_HOSTS` operator allowlist exists in the new flow.
+
+MailTrigger does not need to know whether the receiving Agent is GrokBot or OpenMausBot. It only handles message delivery and its existing recipient Receipt Action; Relay handles the verified webhook Wake.
+
+## Maintainer-only troubleshooting
+
+If automatic receipt/reply fails, maintainers should inspect the actual provider Automation run and its MCP authorization, the B Work's `relayWakeSubscription`, MailTrigger receipt via `relayReceipt`, Wake delivery via `relayWakeEvents`, and the reply in `relayThreadHistory`. Do not present these internal checks as the user's installation process. The local fixed-text Echo listener is a test fixture, not the real GrokBot/OpenMausBot runtime.

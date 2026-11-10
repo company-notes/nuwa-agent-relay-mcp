@@ -31,9 +31,9 @@ def test_studio_fastmcp_exposes_independent_tools_and_routes_calls():
             tools = await client.list_tools()
             names = {tool.name for tool in tools}
 
-            assert len(names) == 17
+            assert len(names) == 18
             assert {"checkInbox", "sendMessage", "sendToAgent", "getReceipt", "acknowledgeRead",
-                    "registerWake", "getWakeSubscription", "removeWakeSubscription"} <= names
+                    "registerWake", "verifyWake", "getWakeSubscription", "removeWakeSubscription"} <= names
 
             inbox = await client.call_tool("checkInbox", {})
             assert not inbox.is_error
@@ -106,3 +106,61 @@ def test_studio_send_to_agent_reaches_relay_using_the_selected_work():
         "subject": "Review request",
         "artifactLinks": ["https://files.example.com/report"],
     }
+
+class DummyWakeClient(DummyRelayClient):
+    def registerWake(self, callbackURL, authMode="hmac", bearerToken=None):
+        self.calls.append(("registerWake", callbackURL, authMode, bearerToken))
+        return {
+            "status": "pending_verification",
+            "workAddressId": "work-b",
+            "verificationId": "5e1f1504-c00e-4434-b783-37b1ba2a0670",
+            "callbackHost": "api2.cursor.sh",
+            "challengeDelivered": True,
+        }
+
+    def verifyWake(self, verificationID, challenge):
+        self.calls.append(("verifyWake", verificationID, challenge))
+        return {"status": "active", "workAddressId": "work-b"}
+
+    def wakeSubscription(self):
+        return {"enabled": True, "callbackHost": "api2.cursor.sh",
+                "authMode": "bearer", "pending": None}
+
+
+def test_studio_mcp_agent_can_register_bearer_webhook_and_verify_without_cli():
+    """The same Skill workflow must work through Studio MCP Tools, not only Remote."""
+    async def verify():
+        backend = DummyWakeClient()
+        server = StudioMCP(LocalConfig(workAddressID="work-b"), backend).createServer()
+
+        async with MCPClient(server) as client:
+            callbackURL = "https://api2.cursor.sh/automations/webhook/agent-managed"
+            credential = "private-provider-generated-token"
+
+            pending = await client.call_tool("registerWake", {
+                "callbackURL": callbackURL,
+                "authMode": "bearer",
+                "bearerToken": credential,
+            })
+            assert not pending.is_error
+            assert "pending_verification" in str(pending)
+            assert credential not in str(pending)
+            assert callbackURL not in str(pending)
+
+            confirmed = await client.call_tool("verifyWake", {
+                "verificationID": "5e1f1504-c00e-4434-b783-37b1ba2a0670",
+                "challenge": "received-only-by-hook",
+            })
+            assert not confirmed.is_error
+            assert "active" in str(confirmed)
+
+            status = await client.call_tool("getWakeSubscription", {})
+            assert not status.is_error
+            assert "api2.cursor.sh" in str(status)
+            assert backend.calls == [
+                ("registerWake", callbackURL, "bearer", credential),
+                ("verifyWake", "5e1f1504-c00e-4434-b783-37b1ba2a0670",
+                 "received-only-by-hook"),
+            ]
+
+    asyncio.run(verify())

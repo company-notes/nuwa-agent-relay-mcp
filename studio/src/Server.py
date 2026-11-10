@@ -92,9 +92,20 @@ class StudioMCP:
             return client.wakeEvents()
 
         @server.tool()
-        def registerWake(callbackURL: str):
-            """Register a signed HTTPS Wake callback and save its secret privately in Studio."""
-            return wakeSubscription.register(callbackURL)
+        def registerWake(callbackURL: str, authMode: str = "hmac",
+                         bearerToken: str | None = None):
+            """Begin a verified Wake registration for this Work.
+
+            Agent-managed Webhook callbacks may use HMAC, bearer or capability auth.
+            Obtain provider credentials through approved tools rather than asking
+            the user to copy them; avoid exposing MCP arguments in chat.
+            """
+            return wakeSubscription.register(callbackURL, authMode, bearerToken)
+
+        @server.tool()
+        def verifyWake(verificationID: str, challenge: str):
+            """Activate a pending Wake after this Work's webhook received its challenge."""
+            return wakeSubscription.verify(verificationID, challenge)
 
         @server.tool()
         def getWakeSubscription():

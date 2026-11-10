@@ -3,6 +3,8 @@
 import argparse
 import json
 import logging
+import getpass
+import os
 
 from .Auth import OAuthCredentials
 from .Client import AddressClient, RelayClient
@@ -60,8 +62,17 @@ class StudioCLI:
         wakeCommands = wake.add_subparsers(dest="wakeCommand", required=True)
 
         wakeRegister = wakeCommands.add_parser("register")
-        wakeRegister.add_argument("callbackURL",
-                                  help="Public HTTPS URL of this machine's /wake listener.")
+        wakeRegister.add_argument("callbackURL", nargs="?",
+                                  help="Public HTTPS webhook; omit to enter privately.")
+        wakeRegister.add_argument("--auth-mode", choices=("hmac", "bearer", "capability"),
+                                  default="hmac")
+        wakeRegister.add_argument("--bearer-env",
+                                  help="Environment variable holding a private Bearer token.")
+        wakeVerify = wakeCommands.add_parser("verify")
+        wakeVerify.add_argument("--verification-id", required=True)
+        wakeVerify.add_argument("--challenge-env",
+                                help="Environment variable holding one-time challenge; "
+                                     "otherwise enter privately.")
         wakeCommands.add_parser("status")
         wakeCommands.add_parser("unregister")
         wakeListen = wakeCommands.add_parser("listen")
@@ -152,7 +163,20 @@ class StudioCLI:
             subscription = WakeSubscription(config, relay)
 
             if args.wakeCommand == "register":
-                result = subscription.register(args.callbackURL)
+                callbackURL = args.callbackURL or getpass.getpass("Webhook HTTPS URL: ")
+                bearerToken = None
+
+                if args.auth_mode == "bearer":
+                    bearerToken = (os.environ.get(args.bearer_env) if args.bearer_env else
+                                   getpass.getpass("Webhook Bearer token: "))
+
+                result = subscription.register(callbackURL, args.auth_mode, bearerToken)
+            elif args.wakeCommand == "verify":
+                challenge = (os.environ.get(args.challenge_env) if args.challenge_env else
+                             getpass.getpass("Challenge from Agent's Wake webhook: "))
+                if not challenge:
+                    raise ValueError("Wake verification challenge is required.")
+                result = subscription.verify(args.verification_id, challenge)
             elif args.wakeCommand == "status":
                 result = subscription.status()
             elif args.wakeCommand == "unregister":

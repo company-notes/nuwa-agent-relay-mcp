@@ -26,9 +26,10 @@ test('public Agent Skill matches the checked-in SKILL.md without OAuth', async (
   assert.match(expected, /^---\nname: nuwa-agent-relay\n/);
   assert.match(expected, /relayVerifyWake/);
   assert.match(expected, /sendToAgent/);
-  assert.match(expected, /the Agent handles everything else/);
-  assert.match(expected, /Do not ask the human to copy/);
-  assert.match(expected, /No genuine inbound webhook/);
+  assert.match(expected, /Trust and consent come first/);
+  assert.match(expected, /Do not hide configuration or actions from the user/);
+  assert.match(expected, /The user should not need to manually copy credentials/);
+  assert.match(expected, /No webhook/);
   assert.doesNotMatch(expected, /nuwa-studio-mcp wake register/);
   const forbidden = await app.handle(new Request(
     'https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md',
@@ -402,4 +403,41 @@ test('remote MCP forwards Bearer Wake registration and OAuth verification withou
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('OAuth upstream network errors become a controlled 502 rather than a 500', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => { throw new TypeError('failed to fetch'); };
+  try {
+    const app = new HTTPMCPApplication(env);
+    const result = await app.handle(new Request('https://mcp.example.com/mcp', {
+      method: 'POST',
+      headers: { authorization: 'Bearer sample', 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc:'2.0', id:1, method:'tools/list' }),
+    }));
+    assert.equal(result.status, 502);
+    assert.deepEqual(await result.json(), { error:'oauth_upstream_unavailable' });
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('MCP tools/list works with a valid OAuth token and returns registered tools', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json({ ok:true, data:{ organization:{id:'org-test'} } });
+  try {
+    const app = new HTTPMCPApplication(env);
+    const result = await app.handle(new Request('https://mcp.example.com/mcp', {
+      method: 'POST',
+      headers: {
+        authorization:'Bearer oauth-test',
+        accept:'application/json, text/event-stream',
+        'content-type':'application/json',
+        'mcp-protocol-version':'2025-06-18',
+      },
+      body: JSON.stringify({ jsonrpc:'2.0', id:7, method:'tools/list', params:{} }),
+    }));
+    assert.equal(result.status, 200);
+    const data = await result.json() as {result:{tools:Array<{name:string}>}};
+    assert.ok(data.result.tools.some(t => t.name === 'sendToAgent'));
+    assert.ok(data.result.tools.some(t => t.name === 'relayRegisterWake'));
+  } finally { globalThis.fetch = originalFetch; }
 });

@@ -12,5 +12,11 @@
   "vars": {
     "RELAY_API_URL": "https://agent-relay.company-notes.com",
     "ADDRESS_API_URL": "https://address.company-notes.com"
+  },
+  "observability": {
+    "enabled": true,
+    "traces": {
+      "enabled": true
+    }
   }
 }

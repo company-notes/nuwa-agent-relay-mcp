@@ -5,7 +5,7 @@ This document describes the **product experience**, not a manual diagnostic scri
 ## What the human does
 
 1. Give the receiving Agent the [Nuwa Skill](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md) and ask it to install and configure Nuwa.
-2. Approve the Agent Address OAuth connection and any necessary identity, mailbox, Webhook Automation or Tunnel permissions. **The Agent itself** creates/reads its webhook, fills `relayRegisterWake` and completes `relayVerifyWake`. The human should not see or transfer URLs, bearer tokens or one-time challenges.
+2. Approve the Agent Address OAuth connection and any necessary identity, mailbox, Webhook Automation or Tunnel permissions. **The Agent itself** creates/reads its webhook, fills `relayRegisterWake` and completes `relayVerifyWake`. The user should always see what connection, identity, Automation and public hostname were configured. Only credential values and secret URL path components are redacted. The Agent should obtain and transfer secrets through trusted tools rather than requiring them to be pasted in chat.
 3. Ask a different, Nuwa-connected Agent A to send a message to the receiving Agent B. **Agent A calls `sendToAgent`**. No special smoke-test commands.
 4. If B is configured to respond to the message, the reply arrives through the same Nuwa conversation. The Agents may inspect Relay Receipt, Wake events and Thread History with MCP as needed; those are not steps for the human.
 

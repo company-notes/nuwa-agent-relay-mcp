@@ -37,7 +37,17 @@ export class HTTPMCPApplication {
       return new Response('Not found', { status: 404 });
     }
 
-    const result = await oauth.authenticate(request);
+    let result: string | Response;
+
+    try {
+      result = await oauth.authenticate(request);
+    } catch (error) {
+      // Never log Bearer tokens, request bodies or upstream response payloads.
+      console.error('mcp.oauth_validation_failed', {
+        errorType: error instanceof Error ? error.name : 'unknown',
+      });
+      return Response.json({ error: 'oauth_upstream_unavailable' }, { status: 502 });
+    }
 
     if (result instanceof Response) {
       return result;
@@ -51,9 +61,17 @@ export class HTTPMCPApplication {
     });
     const server = new NuwaMCPServer(this.env, result).createServer();
 
-    await server.connect(transport);
-
-    return transport.handleRequest(request);
+    try {
+      await server.connect(transport);
+      return await transport.handleRequest(request);
+    } catch (error) {
+      // Stage and exception type are enough to differentiate OAuth vs MCP failures.
+      // Never emit credentials, request bodies, callback URLs or secret paths.
+      console.error('mcp.request_failed', {
+        errorType: error instanceof Error ? error.name : 'unknown',
+      });
+      return Response.json({ error: 'mcp_internal_error' }, { status: 500 });
+    }
   }
 }
 

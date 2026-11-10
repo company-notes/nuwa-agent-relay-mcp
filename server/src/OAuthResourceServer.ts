@@ -40,12 +40,19 @@ export class OAuthResourceServer {
     // The backend is the single source of truth for OAuth account validity.
     // No bearer token is cached across clients or MCP requests.
     const url = new URL('/v1/account/status', this.env.ADDRESS_API_URL);
-    const status = await this.requester(url, {
-      method: 'GET',
-      headers: { authorization },
-      redirect: 'error',
-      signal: AbortSignal.timeout(10000),
-    });
+    let status: Response;
+
+    try {
+      status = await this.requester(url, {
+        method: 'GET',
+        headers: { authorization },
+        redirect: 'error',
+        signal: AbortSignal.timeout(10000),
+      });
+    } catch {
+      // Unreachable identity provider must not surface as an unexplained MCP 500.
+      return Response.json({ error: 'oauth_upstream_unavailable' }, { status: 502 });
+    }
 
     if (status.status === 401 || status.status === 403) {
       return this.challenge(origin, true);

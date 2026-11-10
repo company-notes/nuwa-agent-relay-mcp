@@ -5,7 +5,7 @@ export class OAuthResourceServer {
 
   constructor(
     private readonly env: Env,
-    private readonly requester: typeof fetch = fetch,
+    private readonly requester: typeof fetch = (input, init) => env.ADDRESS_WORKER.fetch(input, init),
   ) {}
 
   metadata(origin: string): Record<string, unknown> {

@@ -3,6 +3,10 @@
   "main": "server/src/Index.ts",
   "compatibility_date": "2026-11-03",
   "workers_dev": false,
+  "services": [
+    { "binding": "ADDRESS_WORKER", "service": "agent-address" },
+    { "binding": "RELAY_WORKER", "service": "nuwa-agent-relay-api" }
+  ],
   "routes": [
     {
       "pattern": "mcp.agent-relay.company-notes.com",

@@ -115,7 +115,7 @@ test('shared HTTP client isolates bearer identity, REST origin and Work ID', asy
   assert.equal(seen[0].url.searchParams.get('work_address_id'), 'work-test');
 
   assert.equal(new Headers(seen[0].request.headers).get('authorization'), 'Bearer secret');
-  assert.equal(seen[0].request.redirect, 'error');
+  assert.equal(seen[0].request.redirect, 'manual');
   assert.equal(seen[0].url.href.includes('secret'), false);
 
   await assert.rejects(client.request('GET', '//evil.example/steal'), /relative/);

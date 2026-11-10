@@ -441,3 +441,57 @@ test('MCP tools/list works with a valid OAuth token and returns registered tools
     assert.ok(data.result.tools.some(t => t.name === 'relayRegisterWake'));
   } finally { globalThis.fetch = originalFetch; }
 });
+
+test('regression: authenticated GrokBot 502 must identify upstream HTTP failure without leaking secrets', async () => {
+  const entries: unknown[][] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => { entries.push(args); };
+
+  try {
+    const auth = new OAuthResourceServer(env, async (_input, init) => {
+      assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer private-oauth-token');
+      return Response.json({ error: 'upstream-private-body' }, { status: 500 });
+    });
+
+    const result = await auth.authenticate(new Request('https://mcp.example.com/mcp', {
+      headers: { authorization: 'Bearer private-oauth-token' },
+    }));
+
+    assert.ok(result instanceof Response);
+    assert.equal(result.status, 502);
+    assert.deepEqual(await result.json(), { error: 'oauth_upstream_unavailable' });
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0][0], 'mcp.oauth_upstream_failure');
+    assert.deepEqual(entries[0][1], { phase: 'http_response', status: 500 });
+    assert.equal(JSON.stringify(entries).includes('private-oauth-token'), false);
+    assert.equal(JSON.stringify(entries).includes('upstream-private-body'), false);
+  } finally {
+    console.error = original;
+  }
+});
+
+test('regression: authenticated GrokBot upstream fetch exception must log only its safe type', async () => {
+  const entries: unknown[][] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => { entries.push(args); };
+
+  try {
+    const auth = new OAuthResourceServer(env, async () => {
+      throw new TypeError('private-oauth-token must not enter Cloudflare logs');
+    });
+
+    const result = await auth.authenticate(new Request('https://mcp.example.com/mcp', {
+      headers: { authorization: 'Bearer private-oauth-token' },
+    }));
+
+    assert.ok(result instanceof Response);
+    assert.equal(result.status, 502);
+    assert.deepEqual(await result.json(), { error: 'oauth_upstream_unavailable' });
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0][0], 'mcp.oauth_upstream_failure');
+    assert.deepEqual(entries[0][1], { phase: 'fetch_exception', errorType: 'TypeError' });
+    assert.equal(JSON.stringify(entries).includes('private-oauth-token'), false);
+  } finally {
+    console.error = original;
+  }
+});

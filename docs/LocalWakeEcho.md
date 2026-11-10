@@ -1,5 +1,7 @@
 # Local A → B → Echo → A test (signed Wake, no Bot required)
 
+> **Verified Wake registration update:** Production Relay now uses pending-challenge registration. The Echo steps below document the pre-verification local test sequence and **cannot alone activate a new subscription**. For real GrokBot/OpenMausBot webhook onboarding use [Production Webhook Acceptance](ProductionWebhookAcceptance.md). Running the offline Echo tests below remains supported; do not present this historical local-only walkthrough as a production acceptance test. A verified HMAC subscription must already be active for Echo Wake delivery.
+
 This is a **real end-to-end test procedure** for the local Nuwa Relay Worker,
 the local MailTrigger stack, Studio MCP and the signed incoming Wake adapter.
 The fixed-text Echo handler is a deliberately simple test Bot; it **never

@@ -259,7 +259,7 @@ before MailTrigger delivery can trigger an automatic Wake.
 ## Local signed Wake Echo test
 
 A runnable HTTP Wake receiver and fixed-text Echo reply handler are included
-in Studio. See [Local Wake Echo round-trip](docs/LocalWakeEcho.md) for the
+in Studio. The local Echo walkthrough predates verification activation; use [Production Webhook Acceptance](docs/ProductionWebhookAcceptance.md) for the real GrokBot/OpenMausBot setup. See [Local Wake Echo round-trip](docs/LocalWakeEcho.md) for the
 Windows PowerShell A → B → Echo → A workflow, configuration, limitations,
 and a credential-free offline test. The receiver persists notifications
 locally, authenticates HMAC signatures and never executes message content.

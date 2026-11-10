@@ -34,35 +34,47 @@ class WakeSubscription:
     def validateCallbackURL(cls, callbackURL: str) -> str:
         parsed = urlparse(callbackURL)
 
-        if (parsed.scheme != "https" or not parsed.hostname or parsed.path != "/wake"
-                or parsed.username or parsed.password or parsed.query or parsed.fragment
-                or parsed.port not in (None, 443)):
-            raise ValueError("Wake callback must be a public HTTPS URL ending in /wake.")
+        if (parsed.scheme != "https" or not parsed.hostname or
+                parsed.username or parsed.password or parsed.query or parsed.fragment or
+                parsed.port not in (None, 443)):
+            raise ValueError("Wake callback must be a public HTTPS URL without URL credentials.")
 
         return callbackURL
 
-    def register(self, callbackURL: str) -> dict:
+    def register(self, callbackURL: str, authMode: str = "hmac",
+                 bearerToken: str | None = None) -> dict:
         callbackURL = self.validateCallbackURL(callbackURL)
         selectedWorkID = self.config.requireWork()
-        response = self.client.registerWake(callbackURL)
+        response = self.client.registerWake(callbackURL, authMode, bearerToken)
 
         if (response.get("workAddressId") != selectedWorkID or
-                response.get("callbackUrl") != callbackURL):
-            raise RuntimeError("Relay Wake subscription belongs to a different Work or callback.")
+                response.get("status") != "pending_verification"):
+            raise RuntimeError("Relay did not return a pending registration for this Work.")
 
-        signingSecret = response.get("signingSecret")
+        if authMode == "hmac":
+            signingSecret = response.get("signingSecret")
 
-        if not isinstance(signingSecret, str) or len(signingSecret) < 32:
-            raise RuntimeError("Relay did not return a valid Wake signing secret.")
+            if not isinstance(signingSecret, str) or len(signingSecret) < 32:
+                raise RuntimeError("Relay did not return a valid Wake signing secret.")
 
-        LocalConfig.writePrivate(self.config.wakePath(), {
-            "api_url": self.config.apiURL,
-            "work_address_id": selectedWorkID,
-            "callback_url": callbackURL,
-            "signing_secret": signingSecret,
-        })
+            LocalConfig.writePrivate(self.config.wakePath(), {
+                "api_url": self.config.apiURL,
+                "work_address_id": selectedWorkID,
+                "callback_host": urlparse(callbackURL).hostname,
+                "signing_secret": signingSecret,
+            })
 
-        return {"enabled": True, "workAddressID": selectedWorkID, "callbackURL": callbackURL}
+        return {
+            "status": "pending_verification",
+            "workAddressID": selectedWorkID,
+            "callbackHost": urlparse(callbackURL).hostname,
+            "authMode": authMode,
+            "verificationID": response["verificationId"],
+            "challengeDelivered": bool(response.get("challengeDelivered")),
+        }
+
+    def verify(self, verificationID: str, challenge: str) -> dict:
+        return self.client.verifyWake(verificationID, challenge)
 
     def load(self) -> dict:
         path = self.config.wakePath()
@@ -80,16 +92,18 @@ class WakeSubscription:
 
     def status(self) -> dict:
         response = self.client.wakeSubscription()
-        available = self.config.wakePath().exists()
+        detailsReady = False
 
-        if available:
+        if response.get("authMode") == "hmac" and self.config.wakePath().exists():
             details = self.load()
-            available = response.get("callbackUrl") == details["callback_url"]
+            detailsReady = response.get("callbackHost") == details.get("callback_host")
 
         return {
             "enabled": response.get("enabled", False),
-            "callbackURL": response.get("callbackUrl"),
-            "localSigningKeyReady": available,
+            "callbackHost": response.get("callbackHost"),
+            "authMode": response.get("authMode"),
+            "pending": response.get("pending"),
+            "localSigningKeyReady": detailsReady,
         }
 
     def remove(self) -> dict:

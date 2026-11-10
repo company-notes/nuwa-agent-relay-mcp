@@ -21,7 +21,7 @@ Users can paste the public, read-only Agent Skill URL into a compatible agent an
 https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md
 ~~~
 
-The skill guides OAuth MCP connection, owned Work identity selection, explicit-consent MailTrigger provisioning, and signed Wake registration for an already supported public webhook or an approved local tunnel. Agents without an inbound webhook can use MCP for manual send/read; automatic wake is not supported for those runtimes yet. Nuwa's Relay currently requires the operator to allowlist each Wake callback hostname via `WAKE_ALLOWED_HOSTS`. The skill cannot bypass that requirement. The Skill file is published on the public MCP Worker because this source repository is private; access to the Skill does not require OAuth.
+The skill guides OAuth MCP connection, Work selection, explicit-consent MailTrigger provisioning, and **verified two-stage Wake registration** for a public GrokBot Bearer webhook or a local OpenMausBot capability URL through an approved tunnel. Agents without an inbound webhook can use MCP for manual send/read; automatic wake is not supported for those runtimes yet. The Relay validates public HTTPS targets and requires an inbound challenge confirmed through the same Work OAuth identity; no `WAKE_ALLOWED_HOSTS` operator approval is required. New registrations require a configured Relay `WAKE_CREDENTIALS_KEY` encryption secret. The Skill file is published on the public MCP Worker because this source repository is private; access to the Skill does not require OAuth.
 
 ## Server MCP (Cloudflare Workers)
 
@@ -110,7 +110,7 @@ Configure your OAuth-capable remote MCP client with **`https://mcp.agent-relay.c
 
 Agent Address tools: `agentAddressGetStatus`, `agentAddressClaimWork`, `agentAddressRenameWork`, `agentAddressReleaseWork`, `agentAddressResolve`.
 
-Relay tools: `relayProvisionHostMailbox`, `relayInbox`, `relayHostInbox`, `sendToAgent`, `relaySendMessage`, `relaySendHandoff`, `relayAcceptHandoff`, `relayReplyHandoff`, `relayThreadHistory`, `relayReplyThread`, `relayMessage`, `relayReceipt`, `relayAcknowledgeRead`, `relayRegisterWake`, `relayWakeSubscription`, `relayRemoveWake`, `relayWakeEvents`.
+Relay tools: `relayProvisionHostMailbox`, `relayInbox`, `relayHostInbox`, `sendToAgent`, `relaySendMessage`, `relaySendHandoff`, `relayAcceptHandoff`, `relayReplyHandoff`, `relayThreadHistory`, `relayReplyThread`, `relayMessage`, `relayReceipt`, `relayAcknowledgeRead`, `relayRegisterWake`, `relayVerifyWake`, `relayWakeSubscription`, `relayRemoveWake`, `relayWakeEvents`.
 
 Work creation, identity release, mailbox provisioning, and message delivery can have persistent effects. Confirm the intended target before invoking these tools.
 
@@ -259,7 +259,7 @@ before MailTrigger delivery can trigger an automatic Wake.
 ## Local signed Wake Echo test
 
 A runnable HTTP Wake receiver and fixed-text Echo reply handler are included
-in Studio. See [Local Wake Echo round-trip](docs/LocalWakeEcho.md) for the
+in Studio. The local Echo walkthrough predates verification activation; use [Production Webhook Acceptance](docs/ProductionWebhookAcceptance.md) for the real GrokBot/OpenMausBot setup. See [Local Wake Echo round-trip](docs/LocalWakeEcho.md) for the
 Windows PowerShell A → B → Echo → A workflow, configuration, limitations,
 and a credential-free offline test. The receiver persists notifications
 locally, authenticates HMAC signatures and never executes message content.

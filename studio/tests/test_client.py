@@ -1,3 +1,5 @@
+import json
+
 import httpx
 import pytest
 
@@ -50,3 +52,31 @@ def test_missing_work_fails_before_any_network_request():
 
     with pytest.raises(ValueError, match="No Work"):
         client.inbox()
+
+
+def test_studio_wake_registration_and_challenge_forward_to_selected_work():
+    recorded = []
+
+    def backend(request):
+        recorded.append(request)
+        return httpx.Response(200, json={"ok": True, "data": {"status": "active"}})
+
+    client = RelayClient(LocalConfig(workAddressID="work-b"), FakeCredentials(),
+                         httpx.MockTransport(backend))
+    client.registerWake("https://api2.cursor.sh/automations/webhook/example",
+                        "bearer", "private-token-123456789")
+    client.verifyWake("verification-1", "challenge-1")
+
+    assert recorded[0].url.path == "/v1/wake-subscription"
+    assert recorded[0].url.params["work_address_id"] == "work-b"
+    assert recorded[1].url.path == "/v1/wake-subscription/verification"
+    assert recorded[1].url.params["work_address_id"] == "work-b"
+    assert json.loads(recorded[0].content) == {
+        "callbackUrl": "https://api2.cursor.sh/automations/webhook/example",
+        "authMode": "bearer",
+        "bearerToken": "private-token-123456789",
+    }
+    assert json.loads(recorded[1].content) == {
+        "verificationId": "verification-1",
+        "challenge": "challenge-1",
+    }

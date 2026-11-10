@@ -49,7 +49,10 @@ class WakeFlowBackend:
             assert request.content
             return httpx.Response(201, json={"ok": True, "data": {
                 "workAddressId": "work-b",
-                "callbackUrl": json.loads(request.content)["callbackUrl"],
+                "status": "pending_verification",
+                "verificationId": str(uuid4()),
+                "callbackHost": "wake-tunnel.example.com",
+                "challengeDelivered": False,
                 "signingSecret": self.signingSecret,
             }})
 
@@ -57,7 +60,9 @@ class WakeFlowBackend:
             return httpx.Response(200, json={"ok": True, "data": {
                 "workAddressId": "work-b",
                 "enabled": True,
-                "callbackUrl": "https://wake-tunnel.example.com/wake",
+                "callbackHost": "wake-tunnel.example.com",
+                "authMode": "hmac",
+                "pending": None,
             }})
 
         if request.method == "DELETE" and request.url.path == "/v1/wake-subscription":
@@ -95,7 +100,7 @@ class TestWakeReceiver:
         subscription = WakeSubscription(config, client)
         result = subscription.register("https://wake-tunnel.example.com/wake")
 
-        assert result["enabled"] is True
+        assert result["status"] == "pending_verification"
         assert "signingSecret" not in result
         assert subscription.status()["localSigningKeyReady"] is True
         assert config.wakePath().exists()

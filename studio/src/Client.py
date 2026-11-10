@@ -129,8 +129,18 @@ class RelayClient(HTTPAPIClient):
     def wakeEvents(self):
         return self.call("GET", "/v1/wake-events")
 
-    def registerWake(self, callbackURL: str):
-        return self.call("POST", "/v1/wake-subscription", body={"callbackUrl": callbackURL})
+    def registerWake(self, callbackURL: str, authMode: str = "hmac",
+                     bearerToken: str | None = None):
+        payload = {"callbackUrl": callbackURL, "authMode": authMode}
+
+        if bearerToken:
+            payload["bearerToken"] = bearerToken
+
+        return self.call("POST", "/v1/wake-subscription", body=payload)
+
+    def verifyWake(self, verificationID: str, challenge: str):
+        return self.call("POST", "/v1/wake-subscription/verification",
+                         body={"verificationId": verificationID, "challenge": challenge})
 
     def wakeSubscription(self):
         return self.call("GET", "/v1/wake-subscription")

@@ -227,11 +227,33 @@ export class RelayTools extends MCPToolSet {
     const { workAddressID } = this.schemas;
 
     this.register('relayRegisterWake',
-      'Register an HTTPS Wake callback for this Work. Returns a private HMAC signing secret ' +
-      'exactly once; save it securely in the receiver. Rotating it invalidates the previous key.',
-      { workAddressID, callbackURL: z.url() },
+      'Begin a Work-scoped HTTPS Wake registration. POST a one-time challenge to the target ' +
+      'using authMode hmac, bearer (GrokBot) or capability (OpenMausBot URL); this does NOT ' +
+      'activate the callback until relayVerifyWake proves the receiving Agent got the challenge. ' +
+      'Bearer tokens and secret callback paths are credentials: use secure host credential input, ' +
+      'never paste them in a chat. A callback POST may trigger a paid Agent run.',
+      {
+        workAddressID,
+        callbackURL: z.url(),
+        authMode: z.enum(['hmac', 'bearer', 'capability']).optional(),
+        bearerToken: z.string().min(12).max(2048).optional(),
+      },
       (value) => this.client.call('POST', '/v1/wake-subscription',
-        value.workAddressID as string, { callbackUrl: value.callbackURL }));
+        value.workAddressID as string, {
+          callbackUrl: value.callbackURL,
+          ...(value.authMode ? { authMode: value.authMode } : {}),
+          ...(value.bearerToken ? { bearerToken: value.bearerToken } : {}),
+        }));
+
+    this.register('relayVerifyWake',
+      'Confirm a pending Wake registration after THIS Work received the one-time challenge ' +
+      'from its configured webhook. Do not confirm unsolicited webhook events.',
+      { workAddressID, verificationID: z.string().uuid(), challenge: z.string().min(1).max(128) },
+      (value) => this.client.call('POST', '/v1/wake-subscription/verification',
+        value.workAddressID as string, {
+          verificationId: value.verificationID,
+          challenge: value.challenge,
+        }));
 
     this.register('relayWakeSubscription',
       'Inspect this Work Wake subscription without retrieving the signing secret.',

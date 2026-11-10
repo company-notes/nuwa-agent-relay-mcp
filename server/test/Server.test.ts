@@ -24,8 +24,8 @@ test('public Agent Skill matches the checked-in SKILL.md without OAuth', async (
   assert.equal(await response.text(), expected);
   assert.equal(AGENT_SKILL_MD, expected);
   assert.match(expected, /^---\nname: nuwa-agent-relay\n/);
-  assert.match(expected, /WAKE_ALLOWED_HOSTS/);
-  assert.match(expected, /No supported inbound webhook/);
+  assert.match(expected, /relayVerifyWake/);
+  assert.match(expected, /No genuine inbound webhook/);
 
   const forbidden = await app.handle(new Request(
     'https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md',
@@ -314,6 +314,88 @@ test('remote MCP Wake registration is OAuth and Work-scoped and forwards callbac
     assert.equal(relayCalls[0].url.searchParams.get('work_address_id'), 'work-b');
     assert.equal(relayCalls[0].authorization, 'Bearer oauth-b');
     assert.deepEqual(relayCalls[0].body, { callbackUrl: callbackURL });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('remote MCP forwards Bearer Wake registration and OAuth verification without leaking secrets', async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ path: string; body: Record<string, string>; authorization: string | null }> = [];
+
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(String(input));
+
+    if (url.origin === env.ADDRESS_API_URL) {
+      return Response.json({ ok: true, data: { organization: { id: 'org-1' } } });
+    }
+
+    const body = JSON.parse(String(init?.body)) as Record<string, string>;
+    calls.push({
+      path: url.pathname, body,
+      authorization: new Headers(init?.headers).get('authorization'),
+    });
+
+    return Response.json({ ok: true, data: {
+      status: calls.length === 1 ? 'pending_verification' : 'active',
+      workAddressId: 'work-b',
+      callbackHost: 'api2.cursor.sh',
+      verificationId: '5e1f1504-c00e-4434-b783-37b1ba2a0670',
+    } }, { status: 201 });
+  };
+
+  async function toolCall(name: string, args: Record<string, unknown>) {
+    const app = new HTTPMCPApplication(env);
+    const response = await app.handle(new Request('https://mcp.example.com/mcp', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer oauth-b',
+        accept: 'application/json, text/event-stream',
+        'content-type': 'application/json',
+        'mcp-protocol-version': '2025-06-18',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0', id: 13, method: 'tools/call',
+        params: { name, arguments: { workAddressID: 'work-b', ...args } },
+      }),
+    }));
+    const payload = await response.json() as {
+      result: { isError?: boolean; content: Array<{ text: string }> };
+    };
+    assert.equal(response.status, 200);
+    assert.equal(payload.result.isError, undefined);
+    return JSON.parse(payload.result.content[0].text);
+  }
+
+  try {
+    const callbackURL = 'https://api2.cursor.sh/automations/webhook/private-id';
+    const bearerToken = 'GrokBot-super-secret-bearer';
+    const pending = await toolCall('relayRegisterWake', {
+      callbackURL, authMode: 'bearer', bearerToken,
+    });
+    assert.equal(pending.status, 'pending_verification');
+    assert.equal(JSON.stringify(pending).includes(bearerToken), false);
+
+    const confirmed = await toolCall('relayVerifyWake', {
+      verificationID: '5e1f1504-c00e-4434-b783-37b1ba2a0670',
+      challenge: 'received-secret-not-for-chat',
+    });
+    assert.equal(confirmed.status, 'active');
+    assert.deepEqual(calls, [
+      {
+        path: '/v1/wake-subscription',
+        body: { callbackUrl: callbackURL, authMode: 'bearer', bearerToken },
+        authorization: 'Bearer oauth-b',
+      },
+      {
+        path: '/v1/wake-subscription/verification',
+        body: {
+          verificationId: '5e1f1504-c00e-4434-b783-37b1ba2a0670',
+          challenge: 'received-secret-not-for-chat',
+        },
+        authorization: 'Bearer oauth-b',
+      },
+    ]);
   } finally {
     globalThis.fetch = originalFetch;
   }

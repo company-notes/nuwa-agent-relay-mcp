@@ -83,7 +83,11 @@ export class HTTPAPIClient {
 }
 
 export class RelayAPIClient extends HTTPAPIClient {
-  constructor(env: Env, authorization: string, requester?: typeof fetch) {
+  constructor(
+    env: Env,
+    authorization: string,
+    requester: typeof fetch = (input, init) => env.RELAY_WORKER.fetch(input, init),
+  ) {
     super(env.RELAY_API_URL, authorization, requester);
   }
 
@@ -99,7 +103,11 @@ export class RelayAPIClient extends HTTPAPIClient {
 }
 
 export class AddressAPIClient extends HTTPAPIClient {
-  constructor(env: Env, authorization: string, requester?: typeof fetch) {
+  constructor(
+    env: Env,
+    authorization: string,
+    requester: typeof fetch = (input, init) => env.ADDRESS_WORKER.fetch(input, init),
+  ) {
     super(env.ADDRESS_API_URL, authorization, requester);
   }
 

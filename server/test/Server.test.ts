@@ -10,6 +10,14 @@ import { OAuthResourceServer } from '../src/OAuthResourceServer';
 const env = {
   RELAY_API_URL: 'https://agent-relay.company-notes.com',
   ADDRESS_API_URL: 'https://address.company-notes.com',
+  // Unit tests delegate through a controllable fetch; the runtime always uses
+  // the same-account Service Bindings declared in wrangler.jsonc.
+  ADDRESS_WORKER: {
+    fetch: (input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(input, init),
+  },
+  RELAY_WORKER: {
+    fetch: (input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(input, init),
+  },
 };
 
 test('public Agent Skill matches the checked-in SKILL.md without OAuth', async () => {

@@ -46,7 +46,8 @@ export class OAuthResourceServer {
       status = await this.requester(url, {
         method: 'GET',
         headers: { authorization },
-        redirect: 'error',
+        // Workers does not implement redirect: 'error'; manual rejects 3xx below.
+        redirect: 'manual',
         signal: AbortSignal.timeout(10000),
       });
     } catch (error) {

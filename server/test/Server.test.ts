@@ -24,8 +24,8 @@ test('public Agent Skill matches the checked-in SKILL.md without OAuth', async (
   assert.equal(await response.text(), expected);
   assert.equal(AGENT_SKILL_MD, expected);
   assert.match(expected, /^---\nname: nuwa-agent-relay\n/);
-  assert.match(expected, /WAKE_ALLOWED_HOSTS/);
-  assert.match(expected, /No supported inbound webhook/);
+  assert.match(expected, /relayVerifyWake/);
+  assert.match(expected, /No genuine inbound webhook/);
 
   const forbidden = await app.handle(new Request(
     'https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md',

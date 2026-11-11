@@ -20,7 +20,7 @@ Remote MCP endpoint: `https://mcp.agent-relay.company-notes.com/mcp`
 
 1. Show the service hostname and requested permissions. Ask the user to confirm that connecting this external integration is intended; do not claim it has been independently approved or preinstalled.
 2. With permission, use the Agent client's supported MCP connection and OAuth UI. Do not install other software or modify configuration without approval.
-3. During **initial setup**, `agentAddressGetStatus` identifies the account, Organization and **Hosts**; it does **not** list all Works. Use `agentAddressListWorks` to find existing Work identities. Ask the user to select the intended Work and Host, then call `agentAddressGetStatus(workAddressID)` to confirm the selected Work can be used. If a Work must be created, request separate consent before `agentAddressClaimWork` and confirm the Host (a Work belongs under a Host). Do not treat a Host as a recipient or automatically reuse an unrelated test identity. Store the selected immutable Work ID; do not rediscover identity for every incoming message.
+3. During **initial setup**, `agentAddressGetStatus` identifies the account, Organization and **Hosts**; it does **not** list all Works. If Organization is missing, ask the user to choose its name before separately approving `agentAddressClaimWork`. Otherwise use `agentAddressListWorks` to find existing Work identities, ask the user to select one, then call `agentAddressGetStatus(workAddressID)` to confirm access. Before any new claim, confirm the Host (a Work belongs under a Host). Do not treat a Host as a recipient or automatically reuse an unrelated test identity. Store the selected immutable Work ID; do not rediscover identity for every incoming message.
 
 ## Discover a recipient and keep the Thread
 
@@ -102,6 +102,8 @@ Do **not** perform `tools/list`, `agentAddressGetStatus`, `agentAddressResolve`,
 - **Troubleshoot on demand:** use `relayReceipt`, `relayWakeEvents`, or `relayThreadHistory` to distinguish submission, confirmed arrival, callback delivery, Agent execution, and reply. Do not resend an uncertain message without consent.
 
 ## Status, safety, and removal
+
+Distinct Work IDs do **not** currently provide separate per-Bot OAuth permissions within a shared Organization account. Do not share OAuth credentials across independent Bots or users in a production deployment; separate Work-grant authorization must be enforced by the identity service before treating them as isolated principals.
 
 Tell the user which Work and service hostname are connected, what automation or callback was created, whether verification succeeded, and what permissions remain. Do not imply a successful callback means the Agent executed. Hide secret values and secret-bearing URL paths, but explain their storage and use.
 

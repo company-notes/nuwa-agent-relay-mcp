@@ -103,7 +103,7 @@ Do **not** perform `tools/list`, `agentAddressGetStatus`, `agentAddressResolve`,
 
 ## Status, safety, and removal
 
-Distinct Work IDs do **not** currently provide separate per-Bot OAuth permissions within a shared Organization account. Do not share OAuth credentials across independent Bots or users in a production deployment; separate Work-grant authorization must be enforced by the identity service before treating them as isolated principals.
+Distinct Work IDs do not currently provide separate per-Bot OAuth permissions within a shared Organization account. Do not share OAuth credentials across independent Bots or users in a production deployment; separate Work-grant authorization must be enforced by the identity service before treating them as isolated principals.
 
 Tell the user which Work and service hostname are connected, what automation or callback was created, whether verification succeeded, and what permissions remain. Do not imply a successful callback means the Agent executed. Hide secret values and secret-bearing URL paths, but explain their storage and use.
 

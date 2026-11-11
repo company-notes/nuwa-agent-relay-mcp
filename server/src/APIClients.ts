@@ -139,4 +139,24 @@ export class AddressAPIClient extends HTTPAPIClient {
   resolve(address: string): Promise<unknown> {
     return this.request('GET', '/v1/account/resolve', { query: { address } });
   }
+
+  listWorks(options: {
+    limit?: number;
+    cursor?: string;
+    search?: string;
+  }): Promise<unknown> {
+    const query: Record<string, string> = {};
+
+    if (options.limit !== undefined) {
+      query.limit = String(options.limit);
+    }
+    if (options.cursor !== undefined) {
+      query.cursor = options.cursor;
+    }
+    if (options.search !== undefined) {
+      query.search = options.search;
+    }
+
+    return this.request('GET', '/v1/account/works', { query });
+  }
 }

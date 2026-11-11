@@ -15,12 +15,14 @@ export class AddressTools extends MCPToolSet {
     const optionalText = z.string().max(128).optional();
 
     this.register('agentAddressGetStatus',
-      'Show signed-in account, Organization, Hosts and optionally a Work identity.',
+      'Show signed-in account, Organization and Hosts; optionally validate a known Work ID. ' +
+      'This does not list Work recipients. Use agentAddressListWorks for discovery.',
       { workAddressID: workAddressID.optional() },
       (value) => this.client.status(value.workAddressID as string | undefined));
 
     this.register('agentAddressClaimWork',
-      'Claim a Work identity; creation of a new Host or Organization is a permanent side effect.',
+      'Create a Work under the user-selected Host (which may also create a Host or Organization). ' +
+      'A Work is a message recipient; a Host alone is not. Confirm identity and placement first.',
       {
         organization: optionalText,
         organizationDisplayName: optionalText,
@@ -40,8 +42,24 @@ export class AddressTools extends MCPToolSet {
       { workAddressID },
       (value) => this.client.releaseWork(value.workAddressID as string));
 
+    this.register('agentAddressListWorks',
+      'List active Work recipients visible within the authenticated Organization. ' +
+      'Returns canonical Work addresses, display names and parent Host references, not Hosts. ' +
+      'Use when the recipient is not known; supports bounded pagination and search.',
+      {
+        limit: z.number().int().min(1).max(100).optional(),
+        cursor: z.string().min(1).max(255).optional(),
+        search: z.string().min(1).max(64).optional(),
+      },
+      (value) => this.client.listWorks({
+        limit: value.limit as number | undefined,
+        cursor: value.cursor as string | undefined,
+        search: value.search as string | undefined,
+      }));
+
     this.register('agentAddressResolve',
-      'Resolve an Agent Address under the signed-in Organization.',
+      'Resolve an exact, already-known Agent Address. It is not a directory or search. ' +
+      'Use kind=work results for ordinary messages; kind=host is not a Work recipient.',
       { address: z.string().min(1).max(255) },
       (value) => this.client.resolve(value.address as string));
   }

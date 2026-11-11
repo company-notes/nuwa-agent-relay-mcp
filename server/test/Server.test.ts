@@ -504,6 +504,62 @@ test('regression: authenticated GrokBot upstream fetch exception must log only i
   }
 });
 
+test('tool execution failures are reported centrally without exposing exception messages', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalLog = console.error;
+  const logs: unknown[][] = [];
+
+  console.error = (...args: unknown[]) => {
+    logs.push(args);
+  };
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input));
+
+    if (url.hostname === 'address.company-notes.com') {
+      return Response.json({ ok: true, data: { organization: { id: 'org-1' } } });
+    }
+
+    throw new TypeError('private-bearer-marker and secret callback path');
+  };
+
+  try {
+    const app = new HTTPMCPApplication(env);
+    const result = await app.handle(new Request('https://mcp.example.com/mcp', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer private-bearer-marker',
+        accept: 'application/json, text/event-stream',
+        'content-type': 'application/json',
+        'mcp-protocol-version': '2025-06-18',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 47,
+        method: 'tools/call',
+        params: {
+          name: 'relayWakeEvents',
+          arguments: { workAddressID: 'work-b' },
+        },
+      }),
+    }));
+
+    assert.equal(result.status, 200);
+    const payload = await result.json() as {
+      result: { isError: boolean; content: Array<{ text: string }> };
+    };
+    assert.equal(payload.result.isError, true);
+    assert.equal(payload.result.content[0].text, 'Unexpected backend service failure.');
+    assert.deepEqual(logs, [[
+      'mcp.tools.tool_execution_failed',
+      { tool: 'relayWakeEvents', errorType: 'TypeError' },
+    ]]);
+    assert.doesNotMatch(JSON.stringify(logs), /private-bearer-marker|secret callback path/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.error = originalLog;
+  }
+});
+
 test('regression: cross-Worker OAuth and Tool calls must use service bindings instead of public fetch', async () => {
   const originalFetch = globalThis.fetch;
   let oauthCalls = 0;

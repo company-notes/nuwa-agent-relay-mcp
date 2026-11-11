@@ -38,7 +38,7 @@ test('public Agent Skill matches the checked-in SKILL.md without OAuth', async (
   assert.match(expected, /sendToAgent/);
   assert.match(expected, /Choose the workflow/);
   assert.match(expected, /Status, safety, and removal/);
-  assert.match(expected, /supported MCP connection and OAuth interface/);
+  assert.match(expected, /supported MCP connection and OAuth UI/);
   assert.match(expected, /No webhook/);
   // External Skill: a capability contract, not internal architecture or history.
   const internalOnly = [

@@ -46,6 +46,33 @@ test('public Agent Skill matches the checked-in SKILL.md without OAuth', async (
   assert.equal(forbidden.status, 404);
 });
 
+test('Wake Skill separates one-time verification from minimal trusted message dispatch', () => {
+  const skill = readFileSync(new URL('../../skills/nuwa-agent-relay/SKILL.md', import.meta.url), 'utf8');
+  const verification = skill.split('### One-time verification handshake')[1]
+    ?.split('### Fast path for verified message events')[0];
+  const fastPath = skill.split('### Fast path for verified message events')[1]
+    ?.split('## Normal messaging')[0];
+
+  assert.ok(verification, 'Skill must explain the one-time verification handshake');
+  assert.match(verification, /nuwa\.wake\.verification/);
+  assert.match(verification, /relayVerifyWake/);
+  assert.match(verification, /verificationId/);
+  assert.match(verification, /challenge/);
+
+  assert.ok(fastPath, 'Skill must provide a dedicated post-verification fast path');
+  assert.match(fastPath, /nuwa\.message\.available/);
+  assert.match(fastPath, /workAddressId/);
+  assert.match(fastPath, /messageId/);
+  assert.match(fastPath, /relayMessage/);
+  assert.match(fastPath, /agentAddressGetStatus/);
+  assert.match(fastPath, /tools\/list/);
+  assert.match(fastPath, /relayAcknowledgeRead/);
+  assert.match(fastPath, /automatically|automated|Automation/);
+  assert.match(skill, /masked|redacted|masked-out/i);
+  assert.match(skill, /relayRegisterWake/);
+  assert.match(skill, /trusted.*webhook|authenticated.*webhook/i);
+});
+
 test('production Worker is bound only to the intended custom hostname', () => {
   const config = JSON.parse(readFileSync(new URL('../../wrangler.jsonc', import.meta.url), 'utf8')) as {
     workers_dev: boolean;

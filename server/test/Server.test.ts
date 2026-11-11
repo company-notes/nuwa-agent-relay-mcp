@@ -33,6 +33,8 @@ test('public Agent Skill matches the checked-in SKILL.md without OAuth', async (
   assert.equal(AGENT_SKILL_MD, expected);
   assert.match(expected, /^---\nname: nuwa-agent-relay\n/);
   assert.match(expected, /relayVerifyWake/);
+  assert.match(expected, /relayBeginWakePairing/);
+  assert.match(expected, /into the browser form, never into Agent chat/);
   assert.match(expected, /sendToAgent/);
   assert.match(expected, /Trust and consent come first/);
   assert.match(expected, /Do not hide configuration or actions from the user/);
@@ -288,6 +290,63 @@ test('sendToAgent MCP tool sends one Work-scoped message via Relay without claim
       subject: 'Review request',
       artifactLinks: ['https://files.example.com/report'],
     });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('relayBeginWakePairing passes only the Work ID, never a masked webhook key', async () => {
+  const originalFetch = globalThis.fetch;
+  const requests: Array<{ path: string; method: string; body: BodyInit | null | undefined }> = [];
+
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(String(input));
+    if (url.origin === env.ADDRESS_API_URL) {
+      return Response.json({ ok: true, data: { organization: { id: 'org-1' } } });
+    }
+
+    requests.push({ path: url.pathname + url.search, method: init?.method ?? 'GET', body: init?.body });
+
+    return Response.json({
+      ok: true,
+      data: {
+        status: 'awaiting_user',
+        workAddressId: 'work-b',
+        pairingUrl: 'https://agent-relay.company-notes.com/wake-pair/' + 'a'.repeat(64),
+      },
+    }, { status: 201 });
+  };
+
+  try {
+    const app = new HTTPMCPApplication(env);
+    const response = await app.handle(new Request('https://mcp.example.com/mcp', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer oauth-b',
+        accept: 'application/json, text/event-stream',
+        'content-type': 'application/json',
+        'mcp-protocol-version': '2025-06-18',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0', id: 33, method: 'tools/call',
+        params: {
+          name: 'relayBeginWakePairing',
+          arguments: { workAddressID: 'work-b' },
+        },
+      }),
+    }));
+
+    assert.equal(response.status, 200);
+    const result = await response.json() as {
+      result: { content: Array<{ text: string }>; isError?: boolean };
+    };
+    assert.equal(result.result.isError, undefined);
+    assert.match(result.result.content[0].text, /awaiting_user/);
+    assert.deepEqual(requests, [{
+      path: '/v1/wake-pairings?work_address_id=work-b',
+      method: 'POST',
+      body: undefined,
+    }]);
   } finally {
     globalThis.fetch = originalFetch;
   }

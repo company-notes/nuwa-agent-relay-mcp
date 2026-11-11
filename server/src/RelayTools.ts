@@ -156,6 +156,17 @@ export class RelayTools extends MCPToolSet {
   private registerWakeTools(): void {
     const { workAddressID } = this.schemas;
 
+    this.register('relayBeginWakePairing',
+      'Create a one-use, short-lived Wake pairing link for this OAuth-authorized Work. ' +
+      'Show the pairingUrl only to the user. The user signs in with Agent Address OAuth ' +
+      'and enters the Webhook URL and masked key directly on the HTTPS Relay pairing form. ' +
+      'The key never passes through the Agent or MCP tool arguments. The resulting Wake ' +
+      'subscription remains pending until the receiving Agent calls relayVerifyWake. ' +
+      'Use this for GrokBot/Cursor or any platform that hides webhook credentials.',
+      { workAddressID },
+      (value) => this.client.call('POST', '/v1/wake-pairings',
+        value.workAddressID as string));
+
     this.register('relayRegisterWake',
       'Begin a Work-scoped HTTPS Wake registration. POST a one-time challenge to the target ' +
       'using authMode hmac, bearer (GrokBot) or capability (OpenMausBot URL); this does NOT ' +

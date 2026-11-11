@@ -34,7 +34,7 @@ test('public Agent Skill matches the checked-in SKILL.md without OAuth', async (
   assert.match(expected, /^---\nname: nuwa-agent-relay\n/);
   assert.match(expected, /relayVerifyWake/);
   assert.match(expected, /relayBeginWakePairing/);
-  assert.match(expected, /private browser form/);
+  assert.match(expected, /into the browser form, never into Agent chat/);
   assert.match(expected, /sendToAgent/);
   assert.match(expected, /Trust and consent come first/);
   assert.match(expected, /Do not hide configuration or actions from the user/);

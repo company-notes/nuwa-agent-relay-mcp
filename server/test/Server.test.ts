@@ -116,7 +116,7 @@ test('public Skill has task-specific decisions and precise high-risk Wake instru
   const onboarding = section('## Connect and select a Work', '## Configure an incoming webhook');
   assert.match(onboarding, /MCP connection and OAuth UI/);
   assert.match(onboarding, /agentAddressGetStatus/);
-  assert.match(onboarding, /separate consent/);
+  assert.match(onboarding, /separately approving/);
 
   const registration = section('## Configure an incoming webhook', '## Webhook Automation instructions');
   assert.match(registration, /relayBeginWakePairing/);

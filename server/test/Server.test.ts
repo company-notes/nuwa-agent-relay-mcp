@@ -65,6 +65,87 @@ test('public Agent Skill matches the checked-in SKILL.md without OAuth', async (
   assert.equal(forbidden.status, 404);
 });
 
+test('public Skill frontmatter follows Anthropic discoverability and structure rules', () => {
+  const skill = readFileSync(new URL('../../skills/nuwa-agent-relay/SKILL.md', import.meta.url), 'utf8');
+  const frontmatter = /^---\n([\s\S]*?)\n---\n/.exec(skill);
+  assert.ok(frontmatter, 'SKILL.md must start with YAML frontmatter');
+
+  const entries = frontmatter[1].split('\n').map((line) => line.match(/^([a-z]+): (.+)$/));
+  assert.ok(entries.every(Boolean), 'Frontmatter must contain plain name/description fields');
+
+  const fields = new Map(entries.map((entry) => [entry![1], entry![2]]));
+  assert.deepEqual([...fields.keys()], ['name', 'description']);
+
+  const name = fields.get('name')!;
+  const description = fields.get('description')!;
+  assert.ok(name.length <= 64);
+  assert.match(name, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+  assert.doesNotMatch(name, /anthropic|claude/);
+  assert.ok(description.length > 0 && description.length <= 1024);
+  assert.match(description, /^Connects\b/, 'Description uses third-person voice');
+  assert.match(description, /\bUse when\b/, 'Description must explain when to trigger this Skill');
+  assert.doesNotMatch(description, /<[^>]+>/);
+
+  for (const trigger of [
+    /connect Relay/, /exchange messages with another Agent/,
+    /receive automatic message notifications/, /verify a webhook/,
+    /diagnose Relay delivery/,
+  ]) {
+    assert.match(description, trigger);
+  }
+
+  assert.ok(skill.split('\n').length < 500, 'Keep SKILL.md under the recommended 500 lines');
+});
+
+test('public Skill has task-specific decisions and precise high-risk Wake instructions', () => {
+  const skill = readFileSync(new URL('../../skills/nuwa-agent-relay/SKILL.md', import.meta.url), 'utf8');
+  const section = (title: string, nextTitle: string) => {
+    const start = skill.indexOf(title);
+    const end = skill.indexOf(nextTitle, start + title.length);
+    assert.ok(start >= 0 && end > start, 'Missing workflow section: ' + title);
+    return skill.slice(start, end);
+  };
+
+  const selection = section('## Choose the workflow', '## Connect and select a Work');
+  assert.match(selection, /Send, read, or reply/);
+  assert.match(selection, /No webhook/);
+  assert.match(selection, /Receive automatic notifications/);
+  assert.match(selection, /Troubleshoot existing delivery/);
+  assert.match(selection, /Unrelated request/);
+
+  const onboarding = section('## Connect and select a Work', '## Configure an incoming webhook');
+  assert.match(onboarding, /MCP connection and OAuth UI/);
+  assert.match(onboarding, /agentAddressGetStatus/);
+  assert.match(onboarding, /separate consent/);
+
+  const registration = section('## Configure an incoming webhook', '## Webhook Automation instructions');
+  assert.match(registration, /relayBeginWakePairing/);
+  assert.match(registration, /browser form, never into Agent chat/);
+  assert.match(registration, /relayWakeSubscription/);
+  assert.match(registration, /enabled: true/);
+  assert.match(registration, /pending verification/);
+  assert.match(registration, /relayRegisterWake/);
+
+  const verification = section('### One-time verification handshake', '### Fast path for verified message events');
+  assert.match(verification, /relayVerifyWake/);
+  assert.match(verification, /only.*verification|verification.*only/i);
+
+  const fastPath = section('### Fast path for verified message events', '## Normal messaging');
+  assert.match(fastPath, /EXPECTED_WORK_ID/);
+  assert.match(fastPath, /one.*relayMessage/i);
+  assert.match(fastPath, /tools\/list/);
+  assert.match(fastPath, /relayAcknowledgeRead/);
+  assert.match(fastPath, /relayReplyThread/);
+
+  const messaging = section('## Normal messaging', '## Status, safety, and removal');
+  assert.match(messaging, /sendToAgent/);
+  assert.match(messaging, /submission/);
+  assert.match(messaging, /relayReceipt/);
+  assert.match(messaging, /Do not resend/);
+
+  assert.match(skill, /relayRemoveWake/);
+});
+
 test('Wake Skill separates one-time verification from minimal trusted message dispatch', () => {
   const skill = readFileSync(new URL('../../skills/nuwa-agent-relay/SKILL.md', import.meta.url), 'utf8');
   const verification = skill.split('### One-time verification handshake')[1]

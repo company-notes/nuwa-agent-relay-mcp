@@ -32,7 +32,8 @@ export class RelayTools extends MCPToolSet {
     const { workAddressID } = this.schemas;
 
     this.register('relayProvisionHostMailbox',
-      'Create or reuse a managed Host mailbox.',
+      'Create or reuse a persistent inbound address for the selected authorized Work. ' +
+      'This changes external resources; obtain user approval before invoking.',
       { workAddressID },
       (value) => this.client.call('POST', '/v1/hosts/provision', value.workAddressID as string));
   }
@@ -80,10 +81,10 @@ export class RelayTools extends MCPToolSet {
     const { workAddressID, to, body, subject, artifactLinks, threadID } = this.schemas;
 
     this.register('sendToAgent',
-      'Normal Agent-to-Agent sending tool. With the recipient already enrolled, MailTrigger ' +
-      'delivery and its verified Wake webhook happen automatically; no manual CLI or separate ' +
-      'smoke-test tool is required. Success confirms submission, not recipient execution. ' +
-      'Use relayReplyThread to respond in an existing conversation.',
+      'Send a message from an authorized Work to a recipient Agent address. ' +
+      'If the recipient has an active verified callback, Relay can notify it automatically. ' +
+      'Success confirms submission, not recipient execution or reply. ' +
+      'Use relayReplyThread for an existing conversation.',
       { workAddressID, to, message: body, subject: subject.optional(), artifactLinks },
       ({ workAddressID, message, ...input }) => this.sendWorkMessage(
         workAddressID as string, { ...input, body: message },
@@ -158,24 +159,21 @@ export class RelayTools extends MCPToolSet {
 
     this.register('relayBeginWakePairing',
       'Create a one-use, short-lived Wake pairing link for this OAuth-authorized Work. ' +
-      'Show the pairingUrl only to the user. The user signs in with Agent Address OAuth ' +
-      'and enters the Webhook URL and masked key directly on the HTTPS Relay pairing form. ' +
-      'The key never passes through the Agent or MCP tool arguments. The resulting Wake ' +
-      'subscription remains pending until the receiving Agent calls relayVerifyWake. ' +
-      'Use this for GrokBot/Cursor or any platform that hides webhook credentials.',
+      'Show the pairingUrl only to the user. The user signs in through Work-owner OAuth ' +
+      'and enters the webhook URL and key in the private HTTPS pairing form. ' +
+      'The key never passes through the Agent or MCP tool arguments. The subscription ' +
+      'remains pending until the receiving Agent calls relayVerifyWake.',
       { workAddressID },
       (value) => this.client.call('POST', '/v1/wake-pairings',
         value.workAddressID as string));
 
     this.register('relayRegisterWake',
       'Begin a Work-scoped HTTPS Wake registration. POST a one-time challenge to the target ' +
-      'using authMode hmac, bearer (GrokBot) or capability (OpenMausBot URL); this does NOT ' +
-      'activate the callback until relayVerifyWake proves the receiving Agent got the challenge. ' +
-      'The Agent should obtain its callback and credential through authorized provider ' +
-      'tooling when available. Some webhook keys are masked from the assistant; in that case ' +
-      'a user-approved credential handoff is required before registering Bearer Wake. Never ' +
-      'guess a hidden key, store it in Automation task text, or echo secrets in chat; host ' +
-      'MCP tool traces may still show arguments. A callback POST may trigger a paid Agent run.',
+      'using authMode hmac, bearer, or capability. The callback is not active until ' +
+      'relayVerifyWake confirms the receiving Agent got the challenge. Only use this ' +
+      'with an explicitly authorized credential-transfer interface; if the provider ' +
+      'masks webhook secrets, use relayBeginWakePairing instead. Never put secrets ' +
+      'in task text or chat; MCP tool traces may contain argument values.',
       {
         workAddressID,
         callbackURL: z.url(),

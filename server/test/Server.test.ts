@@ -177,6 +177,8 @@ test('public Skill distinguishes Work directory discovery, new sends and in-thre
   assert.match(fastPath, /one.*relayMessage/i);
   assert.match(fastPath, /same conversation/);
   assert.match(skill, /does not imply affiliation/);
+  assert.match(skill, /If Organization is missing/);
+  assert.match(skill, /not currently provide separate per-Bot OAuth permissions/);
   assert.doesNotMatch(skill, /MailTrigger|github\.com|ngrok|wrangler/i);
 });
 

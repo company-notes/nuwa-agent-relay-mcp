@@ -1,4 +1,5 @@
 import json
+import sys
 import threading
 import urllib.error
 import urllib.request
@@ -8,6 +9,7 @@ import pytest
 
 from src.Auth import OAuthCredentials
 from src.Config import LocalConfig
+from src import Installer
 from src.Installer import StudioInstaller
 
 
@@ -114,9 +116,6 @@ def test_browser_pkce_oauth_saves_private_tokens_and_refreshes(tmp_path, monkeyp
 
 
 def test_mcp_install_print_restores_sys_argv_and_uses_manifest(monkeypatch):
-    import sys
-    from src import Installer
-
     oldArguments = sys.argv
     result = []
 

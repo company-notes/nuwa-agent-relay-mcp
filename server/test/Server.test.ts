@@ -36,11 +36,28 @@ test('public Agent Skill matches the checked-in SKILL.md without OAuth', async (
   assert.match(expected, /relayBeginWakePairing/);
   assert.match(expected, /into the browser form, never into Agent chat/);
   assert.match(expected, /sendToAgent/);
-  assert.match(expected, /Trust and consent come first/);
-  assert.match(expected, /Do not hide configuration or actions from the user/);
-  assert.match(expected, /The user should not need to manually copy credentials/);
-  assert.match(expected, /No webhook/);
-  assert.doesNotMatch(expected, /nuwa-studio-mcp wake register/);
+  assert.match(expected, /Capabilities and prerequisites/);
+  assert.match(expected, /Status, safety, and removal/);
+  assert.match(expected, /into the browser form, never into Agent chat/);
+  assert.match(expected, /Manual use/);
+  // External Skill: a capability contract, not internal architecture or history.
+  const internalOnly = [
+    /github(?:\.com)?/i,
+    /mail[\s_-]?trigger/i,
+    /relayProvisionHostMailbox/,
+    /nuwa-(?:mis|wekan|mail)/i,
+    /\b(?:ngrok|tunnel|wrangler|d1|worker bindings)\b/i,
+    /(?:changelog|revision history|change log|修訂紀錄)/i,
+    /(?:company internal|company-approved|officially approved)/i,
+  ];
+
+  for (const pattern of internalOnly) {
+    assert.doesNotMatch(expected, pattern);
+  }
+
+  assert.match(expected, /does not imply affiliation/);
+  assert.match(expected, /selected Work/);
+  assert.match(expected, /EXPECTED_WORK_ID/);
   const forbidden = await app.handle(new Request(
     'https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md',
     { method: 'POST' },
@@ -213,6 +230,7 @@ test('a validated OAuth identity can initialize an independent MCP HTTP session'
     assert.match(toolsResponse, /relayRegisterWake/);
     assert.match(toolsResponse, /relayRemoveWake/);
     assert.match(toolsResponse, /agentAddressGetStatus/);
+    assert.doesNotMatch(toolsResponse, /MailTrigger|GrokBot|OpenMausBot/);
     assert.equal(validated, 2);
   } finally {
     globalThis.fetch = originalFetch;

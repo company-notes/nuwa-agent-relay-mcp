@@ -59,7 +59,9 @@ export class RelayTools extends MCPToolSet {
       ));
 
     this.register('relayMessage',
-      'Read an authorized individual message without marking it read.',
+      'Read an authorized individual message without marking it read. On a verified Wake ' +
+      'message event, use its messageID and the Work ID stored in the Automation; one ' +
+      'relayMessage call is sufficient. No routine Work status lookup or read ACK.',
       { workAddressID, messageID },
       (value) => this.client.call(
         'GET', '/v1/messages/' + encodeURIComponent(value.messageID as string),
@@ -158,10 +160,11 @@ export class RelayTools extends MCPToolSet {
       'Begin a Work-scoped HTTPS Wake registration. POST a one-time challenge to the target ' +
       'using authMode hmac, bearer (GrokBot) or capability (OpenMausBot URL); this does NOT ' +
       'activate the callback until relayVerifyWake proves the receiving Agent got the challenge. ' +
-      'The Agent should create/read its own webhook via authorized provider tooling and submit ' +
-      'its callback and credential directly, without asking the human to copy them. Never echo ' +
-      'secrets in chat; host MCP tool traces may still show arguments. A callback POST may ' +
-      'trigger a paid Agent run.',
+      'The Agent should obtain its callback and credential through authorized provider ' +
+      'tooling when available. Some webhook keys are masked from the assistant; in that case ' +
+      'a user-approved credential handoff is required before registering Bearer Wake. Never ' +
+      'guess a hidden key, store it in Automation task text, or echo secrets in chat; host ' +
+      'MCP tool traces may still show arguments. A callback POST may trigger a paid Agent run.',
       {
         workAddressID,
         callbackURL: z.url(),
@@ -176,9 +179,10 @@ export class RelayTools extends MCPToolSet {
         }));
 
     this.register('relayVerifyWake',
-      'Called by the webhook-triggered receiving Agent, authenticated as THIS Work, using ' +
-      'the one-time challenge actually delivered to its webhook. Do not ask the human to ' +
-      'read or copy the challenge. Never confirm unsolicited or other-Work events.',
+      'One-time handshake only: called by the authenticated webhook-triggered receiving ' +
+      'Agent using the challenge actually delivered to THIS authorized Work. Do not ask the ' +
+      'human to copy the challenge. Do not invoke on later nuwa.message.available events, ' +
+      'or confirm unsolicited or other-Work verification requests.',
       { workAddressID, verificationID: z.string().uuid(), challenge: z.string().min(1).max(128) },
       (value) => this.client.call('POST', '/v1/wake-subscription/verification',
         value.workAddressID as string, {

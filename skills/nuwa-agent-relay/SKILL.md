@@ -62,7 +62,7 @@ Ignore unknown event types.
 
 ### One-time verification handshake
 
-`nuwa.wake.verification` is an ownership proof for a newly registered or replaced subscription. The authenticated webhook receiver checks the event's Work ID and challenge fields, then its authorized Agent invokes `relayVerifyWake` with that same Work's identity. Only a successful verification activates the subscription. Do not ask the user to copy challenge values, and do not repeat the handshake for normal message events.
+`nuwa.wake.verification` is an ownership proof for a newly registered or replaced subscription. The authenticated webhook receiver checks the event's `workAddressId`, `verificationId`, and `challenge`, then its authorized Agent invokes `relayVerifyWake` with the same Work ID and these one-time values. Only a successful verification activates the subscription. Do not ask the user to copy challenge values, and do not repeat the handshake for normal message events.
 
 The webhook must still authenticate **every** later request using the provider's approved mechanism. Verification establishes the subscription's ownership; it does not make an unauthenticated `workAddressId` field trustworthy.
 

@@ -64,6 +64,9 @@ class WakeSubscription:
                 "signing_secret": signingSecret,
             })
 
+        if not response.get("challengeDelivered"):
+            logger.warning("Wake challenge delivery failed (workID=%s)", selectedWorkID)
+
         return {
             "status": "pending_verification",
             "workAddressID": selectedWorkID,
@@ -270,8 +273,12 @@ class WakeReceiver:
             try:
                 self.handler.process(messageID)
                 self.inbox.complete(messageID)
-            except Exception:
-                logger.exception("Failed local Wake execution for %s; retrying", messageID)
+            except Exception as error:
+                # A remote client error may embed credentials in its message.
+                logger.warning(
+                    "Local Wake execution failed (errorType=%s, messageID=%s); retrying",
+                    type(error).__name__, messageID,
+                )
                 self.inbox.retryLater(messageID, attempts)
 
     def _processLoop(self) -> None:
@@ -323,14 +330,13 @@ class WakeRequestHandler(BaseHTTPRequestHandler):
             self.send_error(404)
             return
 
-        try:
-            length = int(self.headers.get("content-length", "-1"))
-        except ValueError:
-            length = -1
-
-        if length < 0:
+        rawLength = self.headers.get("content-length")
+        if rawLength is None or re.fullmatch(r"[0-9]+", rawLength) is None:
+            logger.debug("Wake request missing valid Content-Length")
             self.sendJSON(411, {"error": "Content-Length required."})
             return
+
+        length = int(rawLength)
 
         if length > WakeReceiver.MAX_BYTES:
             self.sendJSON(413, {"error": "Wake payload is too large."})
@@ -343,6 +349,7 @@ class WakeRequestHandler(BaseHTTPRequestHandler):
                 raw, self.headers.get("x-nuwa-wake-signature"),
             )
         except WakeRequestError as error:
+            logger.debug("Wake request rejected (HTTP %s)", error.status)
             self.sendJSON(error.status, {"error": str(error)})
             return
 

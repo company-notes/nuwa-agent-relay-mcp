@@ -115,7 +115,7 @@ test('shared HTTP client isolates bearer identity, REST origin and Work ID', asy
   assert.equal(seen[0].url.searchParams.get('work_address_id'), 'work-test');
 
   assert.equal(new Headers(seen[0].request.headers).get('authorization'), 'Bearer secret');
-  assert.equal(seen[0].request.redirect, 'error');
+  assert.equal(seen[0].request.redirect, 'manual');
   assert.equal(seen[0].url.href.includes('secret'), false);
 
   await assert.rejects(client.request('GET', '//evil.example/steal'), /relative/);
@@ -592,4 +592,67 @@ test('production MCP declares same-account Agent Address and Relay service bindi
     { binding: 'ADDRESS_WORKER', service: 'agent-address' },
     { binding: 'RELAY_WORKER', service: 'nuwa-agent-relay-api' },
   ]);
+});
+
+test('regression: Cloudflare Workers OAuth fetch must not use unsupported redirect:error', async () => {
+  let calls = 0;
+  const auth = new OAuthResourceServer(env, async (_input, init) => {
+    calls += 1;
+    // Workers throws TypeError on redirect:error even with a valid token.
+    if (init?.redirect !== 'manual') {
+      throw new TypeError('Cloudflare Workers does not implement redirect:error');
+    }
+    assert.equal(new Headers(init.headers).get('authorization'), 'Bearer opaque-test');
+    return Response.json({ ok: true, data: { organization: { id: 'org-test' } } });
+  });
+
+  const response = await auth.authenticate(new Request('https://mcp.example.com/mcp', {
+    headers: { authorization: 'Bearer opaque-test' },
+  }));
+
+  assert.equal(response, 'Bearer opaque-test');
+  assert.equal(calls, 1);
+});
+
+test('regression: API client uses Workers-compatible manual redirects', async () => {
+  const client = new HTTPAPIClient('https://address.company-notes.com', 'Bearer opaque-test',
+    async (_input, init) => {
+      if (init?.redirect !== 'manual') {
+        throw new TypeError('Cloudflare Workers does not implement redirect:error');
+      }
+      assert.equal(new Headers(init.headers).get('authorization'), 'Bearer opaque-test');
+      return Response.json({ ok: true, data: { work: { id: 'work-test' } } });
+    });
+
+  assert.deepEqual(await client.request('GET', '/v1/account/status'), {
+    work: { id: 'work-test' },
+  });
+});
+
+test('regression: backend redirects are rejected without following or leaking OAuth', async () => {
+  let calls = 0;
+  const client = new HTTPAPIClient('https://address.company-notes.com', 'Bearer opaque-test',
+    async (_input, init) => {
+      calls += 1;
+      assert.equal(init?.redirect, 'manual');
+      return new Response(null, {
+        status: 302,
+        headers: { location: 'https://unexpected.example/steal-token' },
+      });
+    });
+
+  await assert.rejects(client.request('GET', '/v1/account/status'), /redirect/i);
+  assert.equal(calls, 1);
+});
+
+test('regression: OAuth validation rejects redirect responses instead of accepting them', async () => {
+  const auth = new OAuthResourceServer(env, async (_input, init) => {
+    assert.equal(init?.redirect, 'manual');
+    return new Response(null, { status: 302, headers: { location: 'https://unexpected.example/' } });
+  });
+  const result = await auth.authenticate(new Request('https://mcp.example.com/mcp', {
+    headers: { authorization: 'Bearer opaque-test' },
+  }));
+  assert.ok(result instanceof Response);
+  assert.equal(result.status, 502);
 });

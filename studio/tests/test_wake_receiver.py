@@ -14,7 +14,8 @@ import pytest
 
 from src.Client import RelayClient
 from src.Config import LocalConfig
-from src.WakeReceiver import WakeHTTPServer, WakeReceiver, WakeSubscription
+from src.WakeReceiver import WakeHTTPServer, WakeReceiver
+from src.WakeSubscription import WakeSubscription
 
 
 class TestCredentials:

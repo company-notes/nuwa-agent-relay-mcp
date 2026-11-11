@@ -146,6 +146,40 @@ test('public Skill has task-specific decisions and precise high-risk Wake instru
   assert.match(skill, /relayRemoveWake/);
 });
 
+test('public Skill distinguishes Work directory discovery, new sends and in-thread reply', () => {
+  const skill = readFileSync(new URL('../../skills/nuwa-agent-relay/SKILL.md', import.meta.url), 'utf8');
+  const directory = skill.split('## Discover a recipient and keep the Thread')[1]
+    ?.split('## Configure an incoming webhook')[0];
+  const automation = skill.split('## Webhook Automation instructions')[1]
+    ?.split('### One-time verification handshake')[0];
+  const fastPath = skill.split('### Fast path for verified message events')[1]
+    ?.split('## Normal messaging')[0];
+
+  assert.ok(directory);
+  assert.match(directory, /agentAddressListWorks/);
+  assert.match(directory, /agentAddressResolve/);
+  assert.match(directory, /kind: "work"/);
+  assert.match(directory, /Host/);
+  assert.match(directory, /sendToAgent/);
+  assert.match(directory, /relayReplyThread/);
+  assert.match(directory, /new Relay Thread/);
+  assert.match(directory, /stateless|new execution/);
+  assert.match(directory, /recentThreadMessages/);
+
+  assert.ok(automation);
+  assert.match(automation, /contextLimit=8/);
+  assert.match(automation, /relayMessage/);
+  assert.match(automation, /relayReplyThread/);
+  assert.match(automation, /Never use sendToAgent for an existing Thread/);
+
+  assert.ok(fastPath);
+  assert.match(fastPath, /contextLimit: 8/);
+  assert.match(fastPath, /one.*relayMessage/i);
+  assert.match(fastPath, /same conversation/);
+  assert.match(skill, /does not imply affiliation/);
+  assert.doesNotMatch(skill, /MailTrigger|github\.com|ngrok|wrangler/i);
+});
+
 test('Wake Skill separates one-time verification from minimal trusted message dispatch', () => {
   const skill = readFileSync(new URL('../../skills/nuwa-agent-relay/SKILL.md', import.meta.url), 'utf8');
   const verification = skill.split('### One-time verification handshake')[1]
@@ -311,6 +345,7 @@ test('a validated OAuth identity can initialize an independent MCP HTTP session'
     assert.match(toolsResponse, /relayRegisterWake/);
     assert.match(toolsResponse, /relayRemoveWake/);
     assert.match(toolsResponse, /agentAddressGetStatus/);
+    assert.match(toolsResponse, /agentAddressListWorks/);
     assert.doesNotMatch(toolsResponse, /MailTrigger|GrokBot|OpenMausBot/);
     assert.equal(validated, 2);
   } finally {

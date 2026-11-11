@@ -3,6 +3,7 @@ import os
 
 import pytest
 
+from src.CLI import StudioCLI
 from src.Config import LocalConfig
 from src.Installer import StudioInstaller
 
@@ -50,8 +51,6 @@ def test_installer_uses_project_manifest():
 
 def test_cli_exposes_real_local_wake_receiver_setup_commands():
     """Local Studio must register and listen for signed Wake without a Bot platform."""
-    from src.CLI import StudioCLI
-
     parser = StudioCLI.createParser()
     helpText = parser.format_help()
 

@@ -52,7 +52,9 @@ export class RelayTools extends MCPToolSet {
       (value) => this.client.call('GET', '/v1/host-inbox', value.workAddressID as string));
 
     this.register('relayThreadHistory',
-      'Read the conversation history for a participating Work.',
+      'Read the full conversation history for a participating Work. Use on demand; ' +
+      'for a new webhook run, relayMessage with contextLimit can fetch bounded earlier messages ' +
+      'in the same call.',
       { workAddressID, threadID },
       (value) => this.client.call(
         'GET', '/v1/threads/' + encodeURIComponent(value.threadID as string),
@@ -60,13 +62,18 @@ export class RelayTools extends MCPToolSet {
       ));
 
     this.register('relayMessage',
-      'Read an authorized individual message without marking it read. On a verified Wake ' +
-      'message event, use its messageID and the Work ID stored in the Automation; one ' +
-      'relayMessage call is sufficient. No routine Work status lookup or read ACK.',
-      { workAddressID, messageID },
+      'Read one authorized message without marking it read. For stateless webhook executions, ' +
+      'optionally request up to 12 preceding messages using contextLimit in this same tool call; ' +
+      'recentThreadMessages are oldest-first with explicitly truncated long bodies. ' +
+      'Use the returned threadId with relayReplyThread to continue the conversation. ' +
+      'No per-event identity lookup or automatic read acknowledgement.',
+      { workAddressID, messageID, contextLimit: z.number().int().min(1).max(12).optional() },
       (value) => this.client.call(
         'GET', '/v1/messages/' + encodeURIComponent(value.messageID as string),
         value.workAddressID as string,
+        undefined,
+        value.contextLimit === undefined
+          ? undefined : { context_limit: String(value.contextLimit) },
       ));
   }
 
@@ -81,24 +88,28 @@ export class RelayTools extends MCPToolSet {
     const { workAddressID, to, body, subject, artifactLinks, threadID } = this.schemas;
 
     this.register('sendToAgent',
-      'Send a message from an authorized Work to a recipient Agent address. ' +
-      'If the recipient has an active verified callback, Relay can notify it automatically. ' +
-      'Success confirms submission, not recipient execution or reply. ' +
-      'Use relayReplyThread for an existing conversation.',
+      'Start a NEW Thread from an authorized sender Work to an exact recipient WORK address ' +
+      '(not a Host). Discover recipients with agentAddressListWorks or verify an exact Work ' +
+      'using agentAddressResolve. If a callback is active, Relay can notify the recipient. ' +
+      'Success confirms submission, not recipient execution. ' +
+      'To continue an existing conversation, use relayReplyThread instead.',
       { workAddressID, to, message: body, subject: subject.optional(), artifactLinks },
       ({ workAddressID, message, ...input }) => this.sendWorkMessage(
         workAddressID as string, { ...input, body: message },
       ));
 
     this.register('relaySendMessage',
-      'Send a message to a Work address. This operation sends a real message.',
+      'Start a NEW conversation Thread with a WORK address (not a Host). ' +
+      'For a reply to an existing Thread, use relayReplyThread. This sends a real message.',
       { workAddressID, to, body, subject: subject.optional(), artifactLinks },
       ({ workAddressID, ...input }) => this.sendWorkMessage(
         workAddressID as string, input,
       ));
 
     this.register('relayReplyThread',
-      'Reply to a Thread as the specified Work.',
+      'Continue the SAME existing Thread as one of its participating Works. ' +
+      'Use the threadId from relayMessage, and do not call sendToAgent or relaySendMessage ' +
+      'for an existing conversation; those create new Threads.',
       { workAddressID, threadID, body, artifactLinks },
       ({ workAddressID, threadID, ...input }) => this.client.call(
         'POST', '/v1/threads/' + encodeURIComponent(threadID as string) + '/messages',

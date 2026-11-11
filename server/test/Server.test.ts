@@ -318,6 +318,158 @@ test('a validated OAuth identity can initialize an independent MCP HTTP session'
   }
 });
 
+class ToolRequestHarness {
+  private readonly app = new HTTPMCPApplication(env);
+  private readonly originalFetch = globalThis.fetch;
+
+  install(
+    handler: (url: URL, init?: RequestInit) => Promise<Response> | Response,
+  ): void {
+    globalThis.fetch = async (input, init) => handler(new URL(String(input)), init);
+  }
+
+  async call(name: string, args: Record<string, unknown>) {
+    const response = await this.app.handle(new Request(
+      'https://mcp.agent-relay.company-notes.com/mcp', {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer test-oauth',
+          accept: 'application/json, text/event-stream',
+          'content-type': 'application/json',
+          'mcp-protocol-version': '2025-06-18',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0', id: 91, method: 'tools/call',
+          params: { name, arguments: args },
+        }),
+      },
+    ));
+
+    assert.equal(response.status, 200);
+    return response.json() as Promise<{
+      result: { content: Array<{ text: string }>; isError?: boolean };
+    }>;
+  }
+
+  restore(): void {
+    globalThis.fetch = this.originalFetch;
+  }
+}
+
+test('agentAddressListWorks discovers only Work recipients through the authenticated directory', async () => {
+  const harness = new ToolRequestHarness();
+  const requests: Array<{ origin: string; path: string; query: string }> = [];
+
+  harness.install((url, init) => {
+    assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer test-oauth');
+    requests.push({ origin: url.origin, path: url.pathname, query: url.search });
+
+    if (url.pathname === '/v1/account/status') {
+      return Response.json({ ok: true, data: { organization: { id: 'org' } } });
+    }
+
+    assert.equal(url.origin, env.ADDRESS_API_URL);
+    assert.equal(url.pathname, '/v1/account/works');
+    assert.equal(init?.method, 'GET');
+    return Response.json({
+      ok: true,
+      data: {
+        items: [{
+          id: 'work-cosmo',
+          kind: 'work',
+          address: '@alpha/cosmo',
+          canonical: 'org/alpha/cosmo',
+          parentCanonical: 'org/alpha',
+          displayName: 'Cosmo',
+        }],
+        nextCursor: null,
+      },
+    });
+  });
+
+  try {
+    const result = await harness.call('agentAddressListWorks', {
+      limit: 2, search: 'cosmo',
+    });
+    assert.equal(result.result.isError, undefined);
+    const payload = JSON.parse(result.result.content[0].text);
+    assert.equal(payload.items[0].kind, 'work');
+    assert.equal(payload.items[0].canonical, 'org/alpha/cosmo');
+    assert.equal(requests.length, 2, 'One OAuth status check and one Work directory request');
+    assert.equal(requests[1].path, '/v1/account/works');
+    assert.deepEqual(new URLSearchParams(requests[1].query).getAll('limit'), ['2']);
+    assert.deepEqual(new URLSearchParams(requests[1].query).getAll('search'), ['cosmo']);
+  } finally {
+    harness.restore();
+  }
+});
+
+test('relayMessage restores bounded Thread history in one GET and replies within the same Thread', async () => {
+  const harness = new ToolRequestHarness();
+  const backendRequests: Array<{ pathname: string; method: string; search: string }> = [];
+  const threadID = 'thread-abc';
+
+  harness.install((url, init) => {
+    if (url.pathname === '/v1/account/status') {
+      return Response.json({ ok: true, data: { organization: { id: 'org' } } });
+    }
+
+    assert.equal(url.origin, env.RELAY_API_URL);
+    assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer test-oauth');
+    backendRequests.push({
+      pathname: url.pathname,
+      method: init?.method ?? 'GET',
+      search: url.search,
+    });
+
+    if (url.pathname === '/v1/messages/message-42') {
+      return Response.json({
+        ok: true,
+        data: {
+          id: 'message-42', threadId: threadID, body: 'New message',
+          recentThreadMessages: [{
+            id: 'message-41', threadId: threadID,
+            body: 'Earlier context', bodyTruncated: false,
+          }],
+        },
+      });
+    }
+
+    assert.equal(url.pathname, '/v1/threads/' + threadID + '/messages');
+    assert.equal(init?.method, 'POST');
+    const body = JSON.parse(String(init?.body));
+    assert.equal(body.body, 'Reply in the same Thread.');
+    return Response.json({ ok: true, data: { threadId: threadID, id: 'message-43' } }, {
+      status: 201,
+    });
+  });
+
+  try {
+    const read = await harness.call('relayMessage', {
+      workAddressID: 'work-cosmo', messageID: 'message-42', contextLimit: 8,
+    });
+    assert.equal(read.result.isError, undefined);
+    const message = JSON.parse(read.result.content[0].text);
+    assert.equal(message.threadId, threadID);
+    assert.equal(message.recentThreadMessages[0].body, 'Earlier context');
+
+    const reply = await harness.call('relayReplyThread', {
+      workAddressID: 'work-cosmo', threadID, body: 'Reply in the same Thread.',
+    });
+    assert.equal(reply.result.isError, undefined);
+    assert.deepEqual(backendRequests.map((request) => request.pathname), [
+      '/v1/messages/message-42',
+      '/v1/threads/' + threadID + '/messages',
+    ]);
+    assert.equal(new URLSearchParams(backendRequests[0].search).get('context_limit'), '8');
+    assert.equal(new URLSearchParams(backendRequests[0].search).get('work_address_id'), 'work-cosmo');
+    assert.equal(backendRequests[0].method, 'GET');
+    assert.equal(backendRequests[1].method, 'POST');
+  } finally {
+    harness.restore();
+  }
+});
+
 test('sendToAgent MCP tool sends one Work-scoped message via Relay without claiming Agent delivery', async () => {
   const app = new HTTPMCPApplication(env);
   const originalFetch = globalThis.fetch;

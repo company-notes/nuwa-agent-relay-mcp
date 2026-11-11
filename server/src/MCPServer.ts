@@ -2,7 +2,8 @@ import { McpServer } from '@modelcontextprotocol/server';
 
 import type { Env } from './Env';
 import { AddressAPIClient, RelayAPIClient } from './APIClients';
-import { AddressTools, RelayTools } from './Tools';
+import { AddressTools } from './AddressTools';
+import { RelayTools } from './RelayTools';
 
 export class NuwaMCPServer {
   constructor(

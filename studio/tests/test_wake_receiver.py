@@ -2,6 +2,7 @@
 
 import hashlib
 import hmac
+import http.client
 import json
 import os
 import threading
@@ -14,7 +15,8 @@ import pytest
 
 from src.Client import RelayClient
 from src.Config import LocalConfig
-from src.WakeReceiver import WakeHTTPServer, WakeReceiver, WakeSubscription
+from src.WakeReceiver import WakeHTTPServer, WakeReceiver
+from src.WakeSubscription import WakeSubscription
 
 
 class TestCredentials:
@@ -92,7 +94,7 @@ class WakeFlowBackend:
 class TestWakeReceiver:
     """Tests the real HTTP entry point, HMAC, durable queue and thread reply."""
 
-    def test_coreWakeEchoRoundTrip(self, tmp_path, monkeypatch):
+    def test_coreWakeEchoRoundTrip(self, tmp_path, monkeypatch, caplog):
         monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path))
         config = LocalConfig(apiURL="https://relay-test.example.com", workAddressID="work-b")
         backend = WakeFlowBackend()
@@ -100,6 +102,8 @@ class TestWakeReceiver:
         subscription = WakeSubscription(config, client)
         result = subscription.register("https://wake-tunnel.example.com/wake")
 
+        assert "Wake challenge delivery failed" in caplog.text
+        assert backend.signingSecret not in caplog.text
         assert result["status"] == "pending_verification"
         assert "signingSecret" not in result
         assert subscription.status()["localSigningKeyReady"] is True
@@ -181,6 +185,32 @@ class TestWakeReceiver:
         except urllib.error.HTTPError as error:
             assert error.code == expectedStatus
             return json.loads(error.read())
+
+
+def test_local_wake_rejects_malformed_content_length_without_handling_it_as_an_exception(
+        tmp_path, monkeypatch):
+    monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path))
+    config = LocalConfig(apiURL="https://relay-test.example.com", workAddressID="work-b")
+    backend = WakeFlowBackend()
+    client = RelayClient(config, TestCredentials(), httpx.MockTransport(backend.receive))
+    WakeSubscription(config, client).register("https://wake-tunnel.example.com/wake")
+
+    with WakeHTTPServer(("127.0.0.1", 0), WakeReceiver(config, client)) as server:
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+
+        try:
+            connection.putrequest("POST", "/wake")
+            connection.putheader("Content-Length", "not-a-number")
+            connection.endheaders()
+            response = connection.getresponse()
+            assert response.status == 411
+            assert json.loads(response.read())["error"] == "Content-Length required."
+        finally:
+            connection.close()
+            server.shutdown()
+            thread.join(timeout=3)
 
 
 def test_local_wake_rejects_other_work_credentials_before_listening(tmp_path, monkeypatch):

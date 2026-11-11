@@ -5,7 +5,7 @@ from fastmcp import FastMCP
 from .Auth import OAuthCredentials
 from .Client import RelayClient
 from .Config import LocalConfig
-from .WakeReceiver import WakeSubscription
+from .WakeSubscription import WakeSubscription
 
 
 class StudioMCP:

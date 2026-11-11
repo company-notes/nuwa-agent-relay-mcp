@@ -4,8 +4,10 @@ import type { Env } from './Env';
 import { NuwaMCPServer } from './MCPServer';
 import { AGENT_SKILL_MD } from './SkillDocument';
 import { OAuthResourceServer } from './OAuthResourceServer';
+import { Logger } from './Logger';
 
 export class HTTPMCPApplication {
+  private static readonly logger = Logger.forModule('mcp');
   constructor(private readonly env: Env) {}
 
   async handle(request: Request): Promise<Response> {
@@ -43,9 +45,7 @@ export class HTTPMCPApplication {
       result = await oauth.authenticate(request);
     } catch (error) {
       // Never log Bearer tokens, request bodies or upstream response payloads.
-      console.error('mcp.oauth_validation_failed', {
-        errorType: error instanceof Error ? error.name : 'unknown',
-      });
+      HTTPMCPApplication.logger.exception('oauth_validation_failed', error);
       return Response.json({ error: 'oauth_upstream_unavailable' }, { status: 502 });
     }
 
@@ -75,11 +75,7 @@ export class HTTPMCPApplication {
       // Report only the lifecycle stage and error type: never log OAuth headers,
       // tool arguments, callback URLs, request bodies or credential-bearing exceptions.
       const requestID = crypto.randomUUID();
-      console.error('mcp.request_failed', {
-        stage,
-        requestID,
-        errorType: error instanceof Error ? error.name : 'unknown',
-      });
+      HTTPMCPApplication.logger.exception('request_failed', error, { stage, requestID });
 
       return Response.json(
         { error: 'mcp_internal_error', requestID },

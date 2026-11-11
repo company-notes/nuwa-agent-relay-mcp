@@ -28,7 +28,7 @@ class WakeInbox:
                     )
                 """)
 
-        if __import__("os").name != "nt":
+        if os.name != "nt":
             self.path.chmod(0o600)
 
     def enqueue(self, messageID: str) -> bool:

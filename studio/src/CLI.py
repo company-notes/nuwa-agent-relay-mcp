@@ -12,7 +12,8 @@ from .Config import LocalConfig
 from .Installer import StudioInstaller
 from .LocalSmoke import LocalEchoRoundTrip
 from .Server import StudioMCP
-from .WakeReceiver import WakeReceiver, WakeSubscription
+from .WakeReceiver import WakeReceiver
+from .WakeSubscription import WakeSubscription
 
 
 class StudioCLI:

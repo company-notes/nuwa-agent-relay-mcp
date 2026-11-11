@@ -3,7 +3,7 @@
 import time
 from uuid import uuid4
 
-from .WakeReceiver import EchoAgentHandler
+from .WakeEcho import EchoAgentHandler
 
 
 class LocalEchoRoundTrip:

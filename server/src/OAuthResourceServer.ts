@@ -1,6 +1,8 @@
 import type { Env } from './Env';
+import { Logger } from './Logger';
 
 export class OAuthResourceServer {
+  private static readonly logger = Logger.forModule('mcp');
   private static readonly RESOURCE_PATH = '/mcp';
 
   constructor(
@@ -53,9 +55,8 @@ export class OAuthResourceServer {
     } catch (error) {
       // No exception messages, authorization headers, token values, or target
       // URLs in logs. Distinguish fetch failures from an upstream HTTP error.
-      console.error('mcp.oauth_upstream_failure', {
+      OAuthResourceServer.logger.exception('oauth_upstream_failure', error, {
         phase: 'fetch_exception',
-        errorType: error instanceof Error ? error.name : 'unknown',
       });
 
       return Response.json({ error: 'oauth_upstream_unavailable' }, { status: 502 });
@@ -68,7 +69,7 @@ export class OAuthResourceServer {
     if (!status.ok) {
       // Auth rejection is handled above as 401. Record only the status class
       // returned by Agent Address, never its response body or any credential.
-      console.error('mcp.oauth_upstream_failure', {
+      OAuthResourceServer.logger.error('oauth_upstream_failure', {
         phase: 'http_response',
         status: status.status,
       });

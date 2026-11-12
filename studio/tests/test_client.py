@@ -33,7 +33,8 @@ def test_relay_client_forwards_selected_session_and_private_runtime_token(tmp_pa
     assert all(request.headers["authorization"] == "Bearer test-oauth" for request in requests)
     assert all("runtime-private" not in str(request.url) for request in requests)
     assert requests[2].url.params["refresh"] == "archive"
-    assert "/handoff%2F1/accept" in str(requests[3].url)
+    assert "/handoff%2F1/acceptance" in str(requests[3].url)
+    assert requests[3].method == "PUT"
     assert all(request.url.path.startswith("/v2/") for request in requests)
 
 

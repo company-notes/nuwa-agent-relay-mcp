@@ -193,7 +193,7 @@ export class RemoteMCPScenario {
           }, { status: 201 });
         }
 
-        if (url.pathname === '/v2/account/agents/claim' && init?.method === 'POST') {
+        if (url.pathname === '/v2/account/agent-runtime-leases' && init?.method === 'POST') {
           if (!this.organizationExists) {
             return Response.json({ ok: false, error: { code: 'organization_required' } }, {
               status: 403,
@@ -218,15 +218,15 @@ export class RemoteMCPScenario {
           } }, { status: 201 });
         }
 
-        const action = url.pathname.match(
-          /^\/v2\/account\/sessions\/([0-9a-f-]+)\/(resume|heartbeat|release)$/,
+        const leaseMatch = url.pathname.match(
+          /^\/v2\/account\/sessions\/([0-9a-f-]+)\/runtime-lease$/,
         );
 
-        if (action) {
-          const [, sessionID, operation] = action;
+        if (leaseMatch) {
+          const [, sessionID] = leaseMatch;
           const runtime = sessionID === SESSION_B ? RUNTIME_SECRET + '_b' : RUNTIME_SECRET;
 
-          if (operation === 'resume') {
+          if (init?.method === 'PUT') {
             this.resumeCount += 1;
 
             if (body?.resumeToken !== RESUME_SECRET || this.activeLeases.has(sessionID)) {
@@ -254,13 +254,17 @@ export class RemoteMCPScenario {
             });
           }
 
-          if (operation === 'heartbeat') {
+          if (init?.method === 'PATCH') {
             this.heartbeatCount += 1;
 
             return Response.json({
               ok: true,
               data: { expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() },
             });
+          }
+
+          if (init?.method !== 'DELETE') {
+            throw new Error('Unsupported Session lease method.');
           }
 
           this.releaseCount += 1;

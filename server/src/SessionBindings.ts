@@ -138,8 +138,8 @@ export class SessionBindings {
     const resumeToken = await this.tokenCipher.decrypt(
       row.encryptedResumeToken, 'resume:' + key, row.sessionID,
     );
-    const resumed = await client.request('POST',
-      '/v2/account/sessions/' + encodeURIComponent(row.sessionID) + '/resume',
+    const resumed = await client.request('PUT',
+      '/v2/account/sessions/' + encodeURIComponent(row.sessionID) + '/runtime-lease',
       { body: { resumeToken, runtimeLabel: 'nuwa-relay-remote-mcp' } },
     ) as ResumeResponse;
 
@@ -307,8 +307,8 @@ export class SessionBindings {
         'An authorized Organization is required to bind a Session.');
     }
 
-    const resumed = await client.request('POST',
-      '/v2/account/sessions/' + encodeURIComponent(sessionID) + '/resume',
+    const resumed = await client.request('PUT',
+      '/v2/account/sessions/' + encodeURIComponent(sessionID) + '/runtime-lease',
       { body: { resumeToken, runtimeLabel: 'nuwa-relay-remote-mcp' } },
     ) as ResumeResponse;
 

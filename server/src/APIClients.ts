@@ -114,7 +114,7 @@ export class RelayAPIClient extends HTTPAPIClient {
   }
 
   async call(
-    method: 'GET' | 'POST' | 'DELETE',
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
     path: string,
     body?: Record<string, unknown>,
     query?: Record<string, string>,
@@ -147,12 +147,12 @@ export class AddressAPIClient extends HTTPAPIClient {
   }
 
   claimAgent(input: Record<string, unknown>): Promise<unknown> {
-    return this.request('POST', '/v2/account/agents/claim', { body: input });
+    return this.request('POST', '/v2/account/agent-runtime-leases', { body: input });
   }
 
   claimSession(agentID: string, input: Record<string, unknown>): Promise<unknown> {
     return this.request('POST',
-      '/v2/account/agents/' + encodeURIComponent(agentID) + '/sessions/claim', { body: input });
+      '/v2/account/agents/' + encodeURIComponent(agentID) + '/session-runtime-leases', { body: input });
   }
 
   listAgents(): Promise<unknown> {
@@ -165,18 +165,18 @@ export class AddressAPIClient extends HTTPAPIClient {
   }
 
   resolve(address: string): Promise<unknown> {
-    return this.request('GET', '/v2/account/resolve', { query: { address } });
+    return this.request('GET', '/v2/account/addresses', { query: { address } });
   }
 
   heartbeat(sessionID: string, runtimeToken: string): Promise<unknown> {
-    return this.request('POST',
-      '/v2/account/sessions/' + encodeURIComponent(sessionID) + '/heartbeat',
+    return this.request('PATCH',
+      '/v2/account/sessions/' + encodeURIComponent(sessionID) + '/runtime-lease',
       { body: { runtimeToken } });
   }
 
   release(sessionID: string, runtimeToken: string): Promise<unknown> {
-    return this.request('POST',
-      '/v2/account/sessions/' + encodeURIComponent(sessionID) + '/release',
+    return this.request('DELETE',
+      '/v2/account/sessions/' + encodeURIComponent(sessionID) + '/runtime-lease',
       { body: { runtimeToken } });
   }
 }

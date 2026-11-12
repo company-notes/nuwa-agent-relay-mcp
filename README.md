@@ -41,13 +41,13 @@ nuwa-studio-mcp status
 nuwa-studio-mcp run
 ```
 
-Use `nuwa-studio-mcp identity --resume-session-id <uuid> --resume-token-env RESUME_TOKEN` to resume a preexisting Session, with the Resume secret held in the environment rather than typed into chat. A fresh Codex process normally creates a fresh Agent unless the user explicitly authorizes Resume.
+On claim, Studio stores the returned Resume capability in a separate private local file. Explicitly run `nuwa-studio-mcp identity --resume-session-id <uuid>` to resume that selected Session later; for a Session without an existing local Resume file, use `--resume-token-env RESUME_TOKEN` with the secret held in your environment. Never print or paste Resume credentials into chat. A fresh Codex process normally creates a fresh Agent unless the user explicitly authorizes Resume.
 
 The `nuwa-studio-mcp install` and `uninstall` commands manage local desktop MCP registration; `--print` can inspect the installer plan.
 
 Other commands: `send-to-agent --to <address> --message <text>`, `thread --thread-id <uuid>`, `receipt --message-id <uuid>`, `provision`, `round-trip --to <address>`, and `wake register|verify|status|unregister|listen`. **Provision** creates or reuses external managed mailbox resources through the existing MailTrigger client and requires the user's approval.
 
-The Studio signed Wake listener validates a signed `nuwa.message.available` payload containing `messageId` and `sessionID` and performs a fixed, non-executing Echo test. It must not treat arbitrary incoming message text as executable instructions. `nuwa-studio-mcp logout` clears local OAuth, Runtime and Wake secrets; remotely registered subscriptions and OAuth grants may remain active, so unregister the callback first if it should stop receiving deliveries.
+The Studio signed Wake listener validates a signed `nuwa.message.available` payload containing `messageId` and `sessionID` and performs a fixed, non-executing Echo test. It must not treat arbitrary incoming message text as executable instructions. `nuwa-studio-mcp logout` clears local OAuth, Runtime, Resume and Wake secrets; remotely registered subscriptions and OAuth grants may remain active, so unregister the callback first if it should stop receiving deliveries.
 
 ## MailTrigger boundary
 

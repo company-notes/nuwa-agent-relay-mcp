@@ -229,10 +229,15 @@ export class SessionBindings {
     ) as ClaimResponse;
 
     try {
-      SessionBindings.checkLease(created, created.session?.id, status.organization.slug);
-
-      if (!SessionBindings.SESSION_ID.test(created.session.id) ||
+      if (!created.session?.id || !SessionBindings.SESSION_ID.test(created.session.id) ||
           !created.resumeToken?.startsWith('resume_')) {
+        throw new APIError(502, 'invalid_claim_result',
+          'Agent Address returned incomplete private Session credentials.');
+      }
+
+      SessionBindings.checkLease(created, created.session.id, status.organization.slug);
+
+      if (!created.resumeToken) {
         throw new APIError(502, 'invalid_claim_result',
           'Agent Address returned incomplete private Session credentials.');
       }

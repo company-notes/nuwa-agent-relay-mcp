@@ -27,7 +27,7 @@ class WakeReceiver:
         self.config = config
         self.settings = WakeSubscription(config, client).load()
         self.inbox = WakeInbox(config.wakeInboxPath())
-        self.handler = EchoAgentHandler(client, config.requireWork())
+        self.handler = EchoAgentHandler(client, config.requireSession())
         self._stopEvent = Event()
 
     def accept(self, body: bytes, signature: str | None) -> dict:
@@ -47,7 +47,7 @@ class WakeReceiver:
             raise WakeRequestError(400, "Wake payload must be JSON.") from error
 
         if not isinstance(payload, dict) or set(payload) != {
-            "event", "messageId", "workAddressId",
+            "event", "messageId", "sessionID",
         }:
             raise WakeRequestError(400, "Unexpected Wake payload structure.")
 
@@ -58,8 +58,8 @@ class WakeReceiver:
                 not self.MESSAGE_ID_PATTERN.fullmatch(messageID)):
             raise WakeRequestError(400, "Invalid Wake event or message ID.")
 
-        if payload["workAddressId"] != self.config.requireWork():
-            raise WakeRequestError(403, "Wake targeted another Work.")
+        if payload["sessionID"] != self.config.requireSession():
+            raise WakeRequestError(403, "Wake targeted another Session.")
 
         isNew = self.inbox.enqueue(messageID)
         return {"accepted": True, "messageId": messageID, "duplicate": not isNew}
@@ -89,7 +89,7 @@ class WakeReceiver:
             worker = Thread(target=self._processLoop, daemon=True, name="nuwa-wake-echo")
             worker.start()
             print("Nuwa Wake Echo listening on http://127.0.0.1:%d/wake" % port)
-            print("Work: %s; Relay: %s" % (self.config.requireWork(), self.config.apiURL))
+            print("Session: %s; Relay: %s" % (self.config.requireSession(), self.config.apiURL))
 
             try:
                 server.serve_forever(poll_interval=0.2)

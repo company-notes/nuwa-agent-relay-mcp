@@ -10,10 +10,11 @@ from src.Installer import StudioInstaller
 
 def test_private_session_and_runtime_capability_files_are_isolated(tmp_path, monkeypatch):
     monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path))
-    selected = LocalConfig.load().selectSession("session-a", "runtime-secret")
+    selected = LocalConfig.load().selectSession("session-a", "runtime-secret", "resume-secret")
 
     assert selected.requireSession() == "session-a"
     assert selected.requireRuntimeToken() == "runtime-secret"
+    assert selected.requireResumeToken("session-a") == "resume-secret"
     assert LocalConfig.load().requireSession() == "session-a"
     assert LocalConfig.load().requireRuntimeToken() == "runtime-secret"
 
@@ -23,10 +24,14 @@ def test_private_session_and_runtime_capability_files_are_isolated(tmp_path, mon
     assert publicConfig["session_id"] == "session-a"
     assert "runtime-secret" not in json.dumps(publicConfig)
     assert runtime == {"session_id": "session-a", "runtime_token": "runtime-secret"}
+    assert json.loads(LocalConfig.resumePath().read_text()) == {
+        "session_id": "session-a", "resume_token": "resume-secret",
+    }
 
     if os.name != "nt":
         assert LocalConfig.configPath().stat().st_mode & 0o777 == 0o600
         assert LocalConfig.runtimePath().stat().st_mode & 0o777 == 0o600
+        assert LocalConfig.resumePath().stat().st_mode & 0o777 == 0o600
 
 
 def test_missing_session_mismatched_token_and_unsafe_origin_fail_fast(tmp_path, monkeypatch):
@@ -86,7 +91,7 @@ def test_logout_clears_runtime_and_local_wake_secrets(tmp_path, monkeypatch):
     from src.Auth import OAuthCredentials
 
     monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path))
-    config = LocalConfig.load().selectSession("session-b", "old-runtime")
+    config = LocalConfig.load().selectSession("session-b", "old-runtime", "old-resume")
     LocalConfig.writePrivate(config.authPath(), {"access_token": "old-oauth"})
     LocalConfig.writePrivate(config.wakePath(), {"signing_secret": "private-wake"})
 
@@ -94,7 +99,51 @@ def test_logout_clears_runtime_and_local_wake_secrets(tmp_path, monkeypatch):
 
     assert not config.authPath().exists()
     assert not config.runtimePath().exists()
+    assert not config.resumePath().exists()
     assert not config.wakePath().exists()
 
     with pytest.raises(ValueError, match="No Runtime capability"):
         config.requireRuntimeToken()
+
+def test_studio_claim_stores_resume_secret_and_requires_explicit_resume(tmp_path, monkeypatch):
+    monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path))
+    parser = StudioCLI.createParser()
+
+    class AddressStub:
+        resumed = False
+
+        def claimAgent(self, agentName, sessionName):
+            assert agentName == "analyst"
+            assert sessionName == "main"
+            return {
+                "session": {"id": "session-new", "canonical": "org/analyst/main"},
+                "runtimeToken": "runtime-first",
+                "resumeToken": "resume-private",
+            }
+
+        def resumeSession(self, sessionID, resumeToken):
+            self.resumed = True
+            assert sessionID == "session-new"
+            assert resumeToken == "resume-private"
+            return {
+                "session": {"id": sessionID, "canonical": "org/analyst/main"},
+                "runtimeToken": "runtime-second",
+            }
+
+    address = AddressStub()
+    config = LocalConfig.load()
+    created = parser.parse_args(["identity", "--create",
+                                 "--agent-name", "analyst", "--session-name", "main"])
+
+    assert StudioCLI.selectIdentity(created, config, address) == "org/analyst/main"
+    assert LocalConfig.load().requireRuntimeToken() == "runtime-first"
+    assert LocalConfig.load().requireResumeToken("session-new") == "resume-private"
+    assert address.resumed is False
+
+    resumed = parser.parse_args(["identity", "--resume-session-id", "session-new"])
+    assert StudioCLI.selectIdentity(resumed, LocalConfig.load(), address) == "org/analyst/main"
+    assert address.resumed is True
+    assert LocalConfig.load().requireRuntimeToken() == "runtime-second"
+
+    with pytest.raises(ValueError, match="does not match"):
+        LocalConfig.load().requireResumeToken("session-other")

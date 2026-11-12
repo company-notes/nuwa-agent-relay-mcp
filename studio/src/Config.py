@@ -125,6 +125,8 @@ class LocalConfig:
             raise ValueError("Select an immutable Session ID, not an address.")
         if not runtimeToken or len(runtimeToken) > 256:
             raise ValueError("A valid Runtime capability is required.")
+        if resumeToken is not None and (not resumeToken or len(resumeToken) > 256):
+            raise ValueError("Resume capability is invalid.")
 
         updated = replace(self, sessionID=sessionID)
         updated.save()
@@ -134,9 +136,6 @@ class LocalConfig:
         })
 
         if resumeToken is not None:
-            if not resumeToken or len(resumeToken) > 256:
-                raise ValueError("Resume capability is invalid.")
-
             self.writePrivate(self.resumePath(), {
                 "session_id": sessionID,
                 "resume_token": resumeToken,

@@ -16,13 +16,15 @@ export class NuwaMCPServer {
       name: 'nuwa-agent-relay',
       version: '0.2.0',
     }, {
-      instructions: 'Agent Address is the OAuth identity provider. ' +
-        'Call agentAddressGetStatus and agentAddressClaimWork to obtain an owned immutable ' +
-        'workAddressID before using Relay tools. The remote MCP forwards the same OAuth ' +
-        'Bearer identity to Agent Address and Nuwa Relay; it does not require ' +
-        'separate delivery provider credentials. Listing Inbox is not a delivery receipt and does not ' +
-        'mark a message read. When transferring files, provide explicit HTTPS artifact ' +
-        'links; Relay only transports references.',
+      instructions: 'Nuwa connects Organization/Agent/Session identities with asynchronous ' +
+        'messages and work handoffs. Discover identity with agentAddressListAgents, ' +
+        'agentAddressListSessions and agentAddressResolve. A Session Runtime must be claimed ' +
+        'or resumed with the separate Agent Address V2 identity service. Every Relay operation ' +
+        'requires that Session ID and its valid Runtime capability. Do not paste the runtimeToken ' +
+        'into chat, persistent prompts, logs, or untrusted tools; MCP tool arguments may be ' +
+        'visible in client traces. A provider that cannot protect the capability must not ' +
+        'perform privileged Relay actions until secure delegated runtime authentication is available. ' +
+        'An HTTP submission is not proof of MailTrigger arrival or Agent execution.',
     });
 
     new AddressTools(server, new AddressAPIClient(this.env, this.authorization)).install();

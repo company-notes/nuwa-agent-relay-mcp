@@ -31,8 +31,10 @@ export type BoundSession = { sessionID: string; runtimeToken: string };
 
 export class SessionBindings {
   private static readonly logger = Logger.forModule('session.binding');
+  private static readonly SESSION_ID =
+    /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+
   private readonly tokenCipher: RuntimeTokenCipher;
-  private static readonly SESSION_ID = /^[0-9a-f]{8}-[0-9a-f-]{27,36}$/i;
 
   constructor(
     private readonly env: Env,

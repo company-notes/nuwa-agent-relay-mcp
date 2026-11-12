@@ -1,4 +1,4 @@
-"""Wake callback registration and credential lifecycle for one Work."""
+"""Wake callback registration and credential lifecycle for one Session."""
 
 import json
 import logging
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class WakeSubscription:
-    """Own one Work's signing secret and the Relay subscription lifecycle."""
+    """Own one Session's signing secret and the Relay subscription lifecycle."""
 
     def __init__(self, config: LocalConfig, client):
         self.config = config
@@ -31,12 +31,12 @@ class WakeSubscription:
     def register(self, callbackURL: str, authMode: str = "hmac",
                  bearerToken: str | None = None) -> dict:
         callbackURL = self.validateCallbackURL(callbackURL)
-        selectedWorkID = self.config.requireWork()
+        selectedSessionID = self.config.requireSession()
         response = self.client.registerWake(callbackURL, authMode, bearerToken)
 
-        if (response.get("workAddressId") != selectedWorkID or
+        if (response.get("sessionID") != selectedSessionID or
                 response.get("status") != "pending_verification"):
-            raise RuntimeError("Relay did not return a pending registration for this Work.")
+            raise RuntimeError("Relay did not return a pending registration for this Session.")
 
         if authMode == "hmac":
             signingSecret = response.get("signingSecret")
@@ -46,18 +46,18 @@ class WakeSubscription:
 
             LocalConfig.writePrivate(self.config.wakePath(), {
                 "api_url": self.config.apiURL,
-                "work_address_id": selectedWorkID,
+                "session_id": selectedSessionID,
                 "callback_host": urlparse(callbackURL).hostname,
                 "signing_secret": signingSecret,
             })
 
         if not response.get("challengeDelivered"):
-            logger.warning("Wake challenge delivery failed (workID=%s)", selectedWorkID)
+            logger.warning("Wake challenge delivery failed (workID=%s)", selectedSessionID)
 
         return {
             "status": "pending_verification",
-            "workAddressID": selectedWorkID,
-            "callbackHost": urlparse(callbackURL).hostname,
+            "sessionID": selectedSessionID,
+            "callbackAgent": urlparse(callbackURL).hostname,
             "authMode": authMode,
             "verificationID": response["verificationId"],
             "challengeDelivered": bool(response.get("challengeDelivered")),
@@ -74,9 +74,9 @@ class WakeSubscription:
 
         details = json.loads(path.read_text(encoding="utf-8"))
 
-        if (details["work_address_id"] != self.config.requireWork() or
+        if (details["session_id"] != self.config.requireSession() or
                 details["api_url"] != self.config.apiURL):
-            raise RuntimeError("Wake credentials belong to a different Work or Relay origin.")
+            raise RuntimeError("Wake credentials belong to a different Session or Relay origin.")
 
         return details
 
@@ -86,11 +86,11 @@ class WakeSubscription:
 
         if response.get("authMode") == "hmac" and self.config.wakePath().exists():
             details = self.load()
-            detailsReady = response.get("callbackHost") == details.get("callback_host")
+            detailsReady = response.get("callbackAgent") == details.get("callback_host")
 
         return {
             "enabled": response.get("enabled", False),
-            "callbackHost": response.get("callbackHost"),
+            "callbackAgent": response.get("callbackAgent"),
             "authMode": response.get("authMode"),
             "pending": response.get("pending"),
             "localSigningKeyReady": detailsReady,

@@ -21,7 +21,7 @@ from src.WakeSubscription import WakeSubscription
 
 class TestCredentials:
     def accessToken(self):
-        return "work-b-oauth-token"
+        return "session-b-oauth-token"
 
 
 class WakeFlowBackend:
@@ -36,21 +36,22 @@ class WakeFlowBackend:
         self.messages = [{
             "id": self.messageID,
             "threadId": self.threadID,
-            "senderWorkId": "work-a",
-            "recipientWorkId": "work-b",
+            "senderSessionID": "session-a",
+            "recipientSessionID": "session-b",
             "kind": "message",
             "body": "Please check my build.",
         }]
 
     def receive(self, request):
         self.calls.append(request)
-        assert request.headers["authorization"] == "Bearer work-b-oauth-token"
-        assert request.url.params["work_address_id"] == "work-b"
+        assert request.headers["authorization"] == "Bearer session-b-oauth-token"
+        assert request.headers["x-nuwa-runtime-token"] == "runtime-b"
+        assert request.url.params["session_id"] == "session-b"
 
-        if request.method == "POST" and request.url.path == "/v1/wake-subscription":
+        if request.method == "POST" and request.url.path == "/v2/wake-subscription":
             assert request.content
             return httpx.Response(201, json={"ok": True, "data": {
-                "workAddressId": "work-b",
+                "sessionID": "session-b",
                 "status": "pending_verification",
                 "verificationId": str(uuid4()),
                 "callbackHost": "wake-tunnel.example.com",
@@ -58,31 +59,31 @@ class WakeFlowBackend:
                 "signingSecret": self.signingSecret,
             }})
 
-        if request.method == "GET" and request.url.path == "/v1/wake-subscription":
+        if request.method == "GET" and request.url.path == "/v2/wake-subscription":
             return httpx.Response(200, json={"ok": True, "data": {
-                "workAddressId": "work-b",
+                "sessionID": "session-b",
                 "enabled": True,
                 "callbackHost": "wake-tunnel.example.com",
                 "authMode": "hmac",
                 "pending": None,
             }})
 
-        if request.method == "DELETE" and request.url.path == "/v1/wake-subscription":
+        if request.method == "DELETE" and request.url.path == "/v2/wake-subscription":
             return httpx.Response(200, json={"ok": True, "data": {"removed": True}})
 
-        if request.method == "GET" and request.url.path == "/v1/messages/" + self.messageID:
+        if request.method == "GET" and request.url.path == "/v2/messages/" + self.messageID:
             return httpx.Response(200, json={"ok": True, "data": self.messages[0]})
 
-        if request.method == "GET" and request.url.path == "/v1/threads/" + self.threadID:
+        if request.method == "GET" and request.url.path == "/v2/threads/" + self.threadID:
             return httpx.Response(200, json={"ok": True, "data": self.messages})
 
-        if request.method == "POST" and request.url.path == "/v1/threads/" + self.threadID + "/messages":
+        if request.method == "POST" and request.url.path == "/v2/threads/" + self.threadID + "/messages":
             body = json.loads(request.content)
             self.messages.append({
                 "id": str(uuid4()),
                 "threadId": self.threadID,
-                "senderWorkId": "work-b",
-                "recipientWorkId": "work-a",
+                "senderSessionID": "session-b",
+                "recipientSessionID": "session-a",
                 "kind": "message",
                 "body": body["body"],
             })
@@ -96,7 +97,7 @@ class TestWakeReceiver:
 
     def test_coreWakeEchoRoundTrip(self, tmp_path, monkeypatch, caplog):
         monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path))
-        config = LocalConfig(apiURL="https://relay-test.example.com", workAddressID="work-b")
+        config = LocalConfig(apiURL="https://relay-test.example.com").selectSession("session-b", "runtime-b")
         backend = WakeFlowBackend()
         client = RelayClient(config, TestCredentials(), httpx.MockTransport(backend.receive))
         subscription = WakeSubscription(config, client)
@@ -122,8 +123,16 @@ class TestWakeReceiver:
             try:
                 payload = {
                     "event": "nuwa.message.available",
-                    "messageId": backend.messageID,
-                    "workAddressId": "work-b",
+                    "eventVersion": 2,
+                    "messageID": backend.messageID,
+                    "recipientSessionID": "session-b",
+                    "relayThreadID": backend.threadID,
+                    "senderSessionID": "session-a",
+                    "senderCanonicalAddress": "nuwa/alpha/main",
+                    "recipientAgentID": "agent-b",
+                    "recipientCanonicalAddress": "nuwa/beta/main",
+                    "recipientBotID": "bot-b",
+                    "body": "Please check my build.",
                 }
                 raw = json.dumps(payload, separators=(",", ":")).encode()
                 valid = "sha256=" + hmac.new(
@@ -132,12 +141,31 @@ class TestWakeReceiver:
 
                 self._request(target, raw, "sha256=invalid", expectedStatus=401)
 
-                otherWork = dict(payload, workAddressId="work-a")
-                otherRaw = json.dumps(otherWork).encode()
+                otherSession = dict(payload, recipientSessionID="session-a")
+                otherRaw = json.dumps(otherSession).encode()
                 otherSignature = "sha256=" + hmac.new(
                     backend.signingSecret.encode(), otherRaw, hashlib.sha256,
                 ).hexdigest()
                 self._request(target, otherRaw, otherSignature, expectedStatus=403)
+
+                invalidVersion = dict(payload, eventVersion=1)
+                invalidVersionRaw = json.dumps(invalidVersion).encode()
+                invalidVersionSignature = "sha256=" + hmac.new(
+                    backend.signingSecret.encode(), invalidVersionRaw, hashlib.sha256,
+                ).hexdigest()
+                self._request(target, invalidVersionRaw, invalidVersionSignature,
+                              expectedStatus=400)
+
+                legacyPayload = {
+                    "event": "nuwa.message.available",
+                    "messageId": backend.messageID,
+                    "sessionID": "session-b",
+                }
+                legacyRaw = json.dumps(legacyPayload).encode()
+                legacySignature = "sha256=" + hmac.new(
+                    backend.signingSecret.encode(), legacyRaw, hashlib.sha256,
+                ).hexdigest()
+                self._request(target, legacyRaw, legacySignature, expectedStatus=400)
 
                 accepted = self._request(target, raw, valid, expectedStatus=202)
                 assert accepted["accepted"] is True
@@ -146,10 +174,25 @@ class TestWakeReceiver:
                 duplicate = self._request(target, raw, valid, expectedStatus=202)
                 assert duplicate["duplicate"] is True
 
+                minimal = {
+                    "event": "nuwa.message.available",
+                    "eventVersion": 2,
+                    "messageID": backend.messageID,
+                    "recipientSessionID": "session-b",
+                }
+                minimalRaw = json.dumps(minimal, separators=(",", ":")).encode()
+                minimalSignature = "sha256=" + hmac.new(
+                    backend.signingSecret.encode(), minimalRaw, hashlib.sha256,
+                ).hexdigest()
+                minimalResult = self._request(target, minimalRaw, minimalSignature,
+                                              expectedStatus=202)
+                assert minimalResult["duplicate"] is True
+                assert minimalResult["messageID"] == backend.messageID
+
                 assert len(backend.calls) == 2, "Webhook accepts without reading message synchronously"
                 receiver.processDue()
                 replies = [message for message in backend.messages
-                           if message["senderWorkId"] == "work-b"]
+                           if message["senderSessionID"] == "session-b"]
                 assert len(replies) == 1, "Exactly one automatic Echo reply is expected"
                 assert replies[0]["body"] == "Nuwa local echo receipt for " + backend.messageID
 
@@ -190,7 +233,7 @@ class TestWakeReceiver:
 def test_local_wake_rejects_malformed_content_length_without_handling_it_as_an_exception(
         tmp_path, monkeypatch):
     monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path))
-    config = LocalConfig(apiURL="https://relay-test.example.com", workAddressID="work-b")
+    config = LocalConfig(apiURL="https://relay-test.example.com").selectSession("session-b", "runtime-b")
     backend = WakeFlowBackend()
     client = RelayClient(config, TestCredentials(), httpx.MockTransport(backend.receive))
     WakeSubscription(config, client).register("https://wake-tunnel.example.com/wake")
@@ -215,13 +258,13 @@ def test_local_wake_rejects_malformed_content_length_without_handling_it_as_an_e
 
 def test_local_wake_rejects_other_work_credentials_before_listening(tmp_path, monkeypatch):
     monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path))
-    config = LocalConfig(apiURL="https://relay-test.example.com", workAddressID="work-b")
+    config = LocalConfig(apiURL="https://relay-test.example.com").selectSession("session-b", "runtime-b")
     backend = WakeFlowBackend()
     client = RelayClient(config, TestCredentials(), httpx.MockTransport(backend.receive))
     subscription = WakeSubscription(config, client)
     subscription.register("https://wake-tunnel.example.com/wake")
 
-    changed = LocalConfig(apiURL=config.apiURL, workAddressID="work-a")
+    changed = LocalConfig(apiURL=config.apiURL, sessionID="session-a")
 
-    with pytest.raises(RuntimeError, match="different Work"):
+    with pytest.raises(RuntimeError, match="different Session"):
         WakeReceiver(changed, client)

@@ -17,38 +17,39 @@ export class HTTPAPIClient {
     private readonly authorization: string,
     private readonly requester: typeof fetch = fetch,
   ) {
-    const parsed = new URL(apiURL);
+    const origin = new URL(apiURL);
 
-    if (parsed.protocol !== 'https:' || parsed.pathname !== '/' ||
-      parsed.search || parsed.hash || parsed.username || parsed.password) {
+    if (origin.protocol !== 'https:' || origin.pathname !== '/' ||
+        origin.search || origin.hash || origin.username || origin.password) {
       throw new Error('API URL must be a clean HTTPS origin.');
     }
   }
 
   async request(
-    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     path: string,
     options: {
-      workAddressID?: string;
+      sessionID?: string;
+      runtimeToken?: string;
       body?: Record<string, unknown>;
       query?: Record<string, string>;
     } = {},
   ): Promise<unknown> {
     if (!path.startsWith('/') || path.startsWith('//')) {
-      throw new Error('Service path must be relative to the configured API origin.');
+      throw new Error('Service path must remain relative to its origin.');
     }
 
     const url = new URL(path, this.apiURL);
 
     if (url.origin !== this.apiURL) {
-      throw new Error('Service path escaped the configured API origin.');
+      throw new Error('Service path escaped its API origin.');
     }
 
-    if (options.workAddressID) {
-      url.searchParams.set('work_address_id', options.workAddressID);
+    if (options.sessionID) {
+      url.searchParams.set('session_id', options.sessionID);
     }
 
-    for (const [key, value] of Object.entries(options.query || {})) {
+    for (const [key, value] of Object.entries(options.query ?? {})) {
       url.searchParams.set(key, value);
     }
 
@@ -57,55 +58,70 @@ export class HTTPAPIClient {
       headers: {
         authorization: this.authorization,
         accept: 'application/json',
+        ...(options.runtimeToken ? { 'x-nuwa-runtime-token': options.runtimeToken } : {}),
         ...(options.body ? { 'content-type': 'application/json' } : {}),
       },
       body: options.body ? JSON.stringify(options.body) : undefined,
       redirect: 'manual',
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(20_000),
     });
 
-    // Workers does not implement redirect: 'error'. Manual mode keeps OAuth
-    // credentials from being forwarded to a redirect destination; fail closed
-    // before parsing a potentially empty or non-JSON redirect body.
     if (response.status >= 300 && response.status < 400) {
-      throw new APIError(response.status, 'unexpected_redirect', 'Backend API redirected unexpectedly.');
+      throw new APIError(502, 'unexpected_redirect', 'Backend API unexpectedly redirected.');
     }
 
-    const payload = await response.json() as {
+    let payload: unknown;
+
+    try {
+      payload = await response.json();
+    } catch {
+      throw new APIError(502, 'invalid_response', 'Backend returned invalid JSON.');
+    }
+
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload) ||
+        !('ok' in payload) || !('data' in payload) && !('error' in payload)) {
+      throw new APIError(502, 'invalid_response', 'Backend returned invalid API envelope.');
+    }
+
+    const result = payload as {
       ok: boolean;
       data?: unknown;
       error?: { code?: string; message?: string };
     };
 
-    if (!response.ok || !payload.ok) {
+    if (!response.ok || !result.ok) {
       throw new APIError(
         response.status,
-        payload.error?.code || 'request_failed',
-        payload.error?.message || 'Backend API rejected the request.',
+        result.error?.code ?? 'request_failed',
+        result.error?.message ?? 'Backend API rejected the request.',
       );
     }
 
-    return payload.data;
+    return result.data;
   }
 }
+
+export type BoundSession = { sessionID: string; runtimeToken: string };
 
 export class RelayAPIClient extends HTTPAPIClient {
   constructor(
     env: Env,
     authorization: string,
+    private readonly boundSession: () => Promise<BoundSession>,
     requester: typeof fetch = (input, init) => env.RELAY_WORKER.fetch(input, init),
   ) {
     super(env.RELAY_API_URL, authorization, requester);
   }
 
-  call(
+  async call(
     method: 'GET' | 'POST' | 'DELETE',
     path: string,
-    workAddressID: string,
     body?: Record<string, unknown>,
     query?: Record<string, string>,
   ): Promise<unknown> {
-    return this.request(method, path, { workAddressID, body, query });
+    const { sessionID, runtimeToken } = await this.boundSession();
+
+    return this.request(method, path, { sessionID, runtimeToken, body, query });
   }
 }
 
@@ -118,45 +134,49 @@ export class AddressAPIClient extends HTTPAPIClient {
     super(env.ADDRESS_API_URL, authorization, requester);
   }
 
-  status(workAddressID?: string): Promise<unknown> {
-    return this.request('GET', '/v1/account/status', { workAddressID });
+  status(): Promise<unknown> {
+    return this.request('GET', '/v2/account/status');
   }
 
-  claimWork(input: Record<string, unknown>): Promise<unknown> {
-    return this.request('POST', '/v1/account/work', { body: input });
+  grant(): Promise<unknown> {
+    return this.request('GET', '/v2/account/grant');
   }
 
-  renameWork(workAddressID: string, handle: string): Promise<unknown> {
-    return this.request('PATCH', '/v1/account/work/' + encodeURIComponent(workAddressID), {
-      body: { handle },
-    });
+  registerOrganization(input: Record<string, unknown>): Promise<unknown> {
+    return this.request('POST', '/v2/account/organization', { body: input });
   }
 
-  releaseWork(workAddressID: string): Promise<unknown> {
-    return this.request('DELETE', '/v1/account/work/' + encodeURIComponent(workAddressID));
+  claimAgent(input: Record<string, unknown>): Promise<unknown> {
+    return this.request('POST', '/v2/account/agents/claim', { body: input });
+  }
+
+  claimSession(agentID: string, input: Record<string, unknown>): Promise<unknown> {
+    return this.request('POST',
+      '/v2/account/agents/' + encodeURIComponent(agentID) + '/sessions/claim', { body: input });
+  }
+
+  listAgents(): Promise<unknown> {
+    return this.request('GET', '/v2/account/agents');
+  }
+
+  listSessions(agentID: string): Promise<unknown> {
+    return this.request('GET',
+      '/v2/account/agents/' + encodeURIComponent(agentID) + '/sessions');
   }
 
   resolve(address: string): Promise<unknown> {
-    return this.request('GET', '/v1/account/resolve', { query: { address } });
+    return this.request('GET', '/v2/account/resolve', { query: { address } });
   }
 
-  listWorks(options: {
-    limit?: number;
-    cursor?: string;
-    search?: string;
-  }): Promise<unknown> {
-    const query: Record<string, string> = {};
+  heartbeat(sessionID: string, runtimeToken: string): Promise<unknown> {
+    return this.request('POST',
+      '/v2/account/sessions/' + encodeURIComponent(sessionID) + '/heartbeat',
+      { body: { runtimeToken } });
+  }
 
-    if (options.limit !== undefined) {
-      query.limit = String(options.limit);
-    }
-    if (options.cursor !== undefined) {
-      query.cursor = options.cursor;
-    }
-    if (options.search !== undefined) {
-      query.search = options.search;
-    }
-
-    return this.request('GET', '/v1/account/works', { query });
+  release(sessionID: string, runtimeToken: string): Promise<unknown> {
+    return this.request('POST',
+      '/v2/account/sessions/' + encodeURIComponent(sessionID) + '/release',
+      { body: { runtimeToken } });
   }
 }

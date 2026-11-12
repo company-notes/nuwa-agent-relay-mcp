@@ -5,6 +5,8 @@ import { NuwaMCPServer } from './MCPServer';
 import { AGENT_SKILL_MD } from './SkillDocument';
 import { OAuthResourceServer } from './OAuthResourceServer';
 import { Logger } from './Logger';
+import { SessionBindings } from './SessionBindings';
+import { SessionBindingController } from './SessionBindingController';
 
 export class HTTPMCPApplication {
   private static readonly logger = Logger.forModule('mcp');
@@ -35,7 +37,7 @@ export class HTTPMCPApplication {
       return Response.json(oauth.metadata(url.origin));
     }
 
-    if (url.pathname !== '/mcp') {
+    if (url.pathname !== '/mcp' && url.pathname !== '/session-bindings') {
       return new Response('Not found', { status: 404 });
     }
 
@@ -51,6 +53,18 @@ export class HTTPMCPApplication {
 
     if (result instanceof Response) {
       return result;
+    }
+
+    if (url.pathname === '/session-bindings') {
+      try {
+        return await new SessionBindingController(
+          new SessionBindings(this.env),
+        ).handle(request, result);
+      } catch (error) {
+        HTTPMCPApplication.logger.exception('session_binding_failed', error);
+
+        return SessionBindingController.error(error);
+      }
     }
 
     // One isolated stateless MCP transport per request: no credentials or

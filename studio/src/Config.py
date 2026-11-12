@@ -12,7 +12,7 @@ from urllib.parse import urlparse
 class LocalConfig:
     apiURL: str = "https://agent-relay.company-notes.com"
     addressURL: str = "https://address.company-notes.com"
-    workAddressID: str | None = None
+    sessionID: str | None = None
 
     @classmethod
     def configDir(cls) -> Path:
@@ -38,6 +38,14 @@ class LocalConfig:
     @classmethod
     def authPath(cls) -> Path:
         return cls.configDir() / "auth.json"
+
+    @classmethod
+    def runtimePath(cls) -> Path:
+        return cls.configDir() / "runtime.json"
+
+    @classmethod
+    def resumePath(cls) -> Path:
+        return cls.configDir() / "resume.json"
 
     @classmethod
     def wakePath(cls) -> Path:
@@ -71,12 +79,12 @@ class LocalConfig:
 
         apiURL = os.environ.get("NUWA_RELAY_URL", data.get("api_url", cls.apiURL))
         addressURL = os.environ.get("NUWA_ADDRESS_URL", data.get("address_url", cls.addressURL))
-        workAddressID = os.environ.get("NUWA_WORK_ADDRESS_ID", data.get("work_address_id"))
+        sessionID = os.environ.get("NUWA_SESSION_ID", data.get("session_id"))
 
         return cls(
             apiURL=cls.validateOrigin(apiURL),
             addressURL=cls.validateOrigin(addressURL),
-            workAddressID=workAddressID,
+            sessionID=sessionID,
         )
 
     @classmethod
@@ -107,20 +115,72 @@ class LocalConfig:
         self.writePrivate(self.configPath(), {
             "api_url": self.validateOrigin(self.apiURL),
             "address_url": self.validateOrigin(self.addressURL),
-            "work_address_id": self.workAddressID,
+            "session_id": self.sessionID,
         })
 
-    def selectWork(self, workAddressID: str) -> "LocalConfig":
-        if not workAddressID or len(workAddressID) > 128 or "/" in workAddressID:
-            raise ValueError("Use an immutable Work ID, not a name/address.")
+    def selectSession(
+        self, sessionID: str, runtimeToken: str, resumeToken: str | None = None,
+    ) -> "LocalConfig":
+        if not sessionID or len(sessionID) > 128 or "/" in sessionID:
+            raise ValueError("Select an immutable Session ID, not an address.")
+        if not runtimeToken or len(runtimeToken) > 256:
+            raise ValueError("A valid Runtime capability is required.")
+        if resumeToken is not None and (not resumeToken or len(resumeToken) > 256):
+            raise ValueError("Resume capability is invalid.")
 
-        updated = replace(self, workAddressID=workAddressID)
+        updated = replace(self, sessionID=sessionID)
         updated.save()
+        self.writePrivate(self.runtimePath(), {
+            "session_id": sessionID,
+            "runtime_token": runtimeToken,
+        })
+
+        if resumeToken is not None:
+            self.writePrivate(self.resumePath(), {
+                "session_id": sessionID,
+                "resume_token": resumeToken,
+            })
+        else:
+            # Never accidentally attach a former Session's Resume token.
+            existing = self.resumePath()
+
+            if existing.exists():
+                saved = json.loads(existing.read_text(encoding="utf-8"))
+
+                if saved.get("session_id") != sessionID:
+                    existing.unlink()
 
         return updated
 
-    def requireWork(self) -> str:
-        if not self.workAddressID:
-            raise ValueError("No Work selected. Run nuwa-studio-mcp identity first.")
+    def requireSession(self) -> str:
+        if not self.sessionID:
+            raise ValueError("No Session selected. Run nuwa-studio-mcp identity first.")
 
-        return self.workAddressID
+        return self.sessionID
+
+    def requireRuntimeToken(self) -> str:
+        sessionID = self.requireSession()
+        path = self.runtimePath()
+
+        if not path.exists():
+            raise ValueError("No Runtime capability. Claim or Resume the Session first.")
+
+        data = json.loads(path.read_text(encoding="utf-8"))
+
+        if data.get("session_id") != sessionID or not data.get("runtime_token"):
+            raise ValueError("Runtime capability does not belong to the selected Session.")
+
+        return data["runtime_token"]
+
+    def requireResumeToken(self, sessionID: str) -> str:
+        path = self.resumePath()
+
+        if not path.exists():
+            raise ValueError("No local Resume capability for this Session.")
+
+        data = json.loads(path.read_text(encoding="utf-8"))
+
+        if data.get("session_id") != sessionID or not data.get("resume_token"):
+            raise ValueError("Resume capability does not match this Session.")
+
+        return data["resume_token"]

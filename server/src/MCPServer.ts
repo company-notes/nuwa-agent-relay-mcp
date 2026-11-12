@@ -4,6 +4,7 @@ import type { Env } from './Env';
 import { AddressAPIClient, RelayAPIClient } from './APIClients';
 import { AddressTools } from './AddressTools';
 import { RelayTools } from './RelayTools';
+import { SessionBindings } from './SessionBindings';
 
 export class NuwaMCPServer {
   constructor(
@@ -16,17 +17,25 @@ export class NuwaMCPServer {
       name: 'nuwa-agent-relay',
       version: '0.2.0',
     }, {
-      instructions: 'Agent Address is the OAuth identity provider. ' +
-        'Call agentAddressGetStatus and agentAddressClaimWork to obtain an owned immutable ' +
-        'workAddressID before using Relay tools. The remote MCP forwards the same OAuth ' +
-        'Bearer identity to Agent Address and Nuwa Relay; it does not require ' +
-        'separate delivery provider credentials. Listing Inbox is not a delivery receipt and does not ' +
-        'mark a message read. When transferring files, provide explicit HTTPS artifact ' +
-        'links; Relay only transports references.',
+      instructions: 'Nuwa connects Organization/Agent/Session identities through asynchronous ' +
+        'messages and work Handoffs. Agent Address owns Session identity and exclusive Runtime ' +
+        'leases. After OAuth login immediately call agentAddressEnsureIdentity; the server ' +
+        'privately claims or restores this OAuth grant\'s own Agent and Default Session. ' +
+        'Pass an optional established persona name as agentDisplayName, but never ask the ' +
+        'user for Session IDs, Runtime tokens, Resume tokens, or manual binding during ' +
+        'normal installation. Relay tools also auto-ensure the Session if needed. ' +
+        'Never include any private credentials in MCP tools, chat, prompts, or traces. ' +
+        'Sending a message, confirmed mailbox arrival, successful Wake delivery and actual ' +
+        'Agent startup are separate steps.',
     });
 
-    new AddressTools(server, new AddressAPIClient(this.env, this.authorization)).install();
-    new RelayTools(server, new RelayAPIClient(this.env, this.authorization)).install();
+    const bindings = new SessionBindings(this.env);
+    new AddressTools(server, new AddressAPIClient(this.env, this.authorization),
+      (persona) => bindings.ensure(this.authorization, persona)).install();
+    const relay = new RelayAPIClient(this.env, this.authorization,
+      () => bindings.authorize(this.authorization));
+
+    new RelayTools(server, relay).install();
 
     return server;
   }

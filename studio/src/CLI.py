@@ -7,10 +7,11 @@ import getpass
 import os
 
 from .Auth import OAuthCredentials
-from .Client import AddressClient, RelayClient
+from .Client import AddressClient, RelayClient, RemoteBindingClient
 from .Config import LocalConfig
 from .Installer import StudioInstaller
 from .LocalSmoke import LocalEchoRoundTrip
+from .RemoteSessionTransfer import RemoteSessionTransfer
 from .Server import StudioMCP
 from .WakeReceiver import WakeReceiver
 from .WakeSubscription import WakeSubscription
@@ -27,12 +28,22 @@ class StudioCLI:
             commands.add_parser(name)
 
         identity = commands.add_parser("identity")
-        identity.add_argument("--work-id")
-        identity.add_argument("--host")
-        identity.add_argument("--handle")
-        identity.add_argument("--organization")
-        identity.add_argument("--create-host", action="store_true")
-        identity.add_argument("--create-organization", action="store_true")
+        identity.add_argument("--create", action="store_true")
+        identity.add_argument("--agent-name")
+        identity.add_argument("--session-name")
+        identity.add_argument("--resume-session-id")
+        identity.add_argument("--resume-token-env")
+
+        remoteBind = commands.add_parser("remote-bind",
+                                         help="Transfer the selected Session Runtime to trusted Remote MCP.")
+        remoteBind.add_argument("--mcp-origin", required=True)
+        remoteBind.add_argument("--mcp-oauth-token-env", required=True)
+        remoteBind.add_argument("--authorize-runtime-transfer", action="store_true")
+
+        remoteRevoke = commands.add_parser("remote-revoke",
+                                           help="Revoke a private Remote MCP Session binding.")
+        remoteRevoke.add_argument("--mcp-origin", required=True)
+        remoteRevoke.add_argument("--mcp-oauth-token-env", required=True)
 
         for name in ("install", "uninstall"):
             command = commands.add_parser(name)
@@ -40,7 +51,7 @@ class StudioCLI:
             command.add_argument("--print", dest="printOnly", action="store_true")
 
         send = commands.add_parser("send-to-agent",
-                                   help="Send a real message as the selected Work.")
+                                   help="Send a real message as the selected Session.")
         send.add_argument("--to", required=True)
         send.add_argument("--message", required=True)
         send.add_argument("--subject")
@@ -52,7 +63,7 @@ class StudioCLI:
         receipt = commands.add_parser("receipt", help="Read one message's delivery evidence.")
         receipt.add_argument("--message-id", required=True)
 
-        commands.add_parser("provision", help="Provision the selected Host mailbox.")
+        commands.add_parser("provision", help="Provision the selected Agent mailbox.")
 
         roundTrip = commands.add_parser("round-trip",
                                         help="Send once and verify B's signed Wake Echo reply.")
@@ -82,37 +93,40 @@ class StudioCLI:
         return parser
 
     @classmethod
-    def selectIdentity(cls, args, config: LocalConfig, address: AddressClient) -> None:
-        if args.work_id:
-            if args.host or args.handle or args.organization:
-                raise ValueError("--work-id cannot be combined with new Work options.")
+    def selectIdentity(cls, args, config: LocalConfig, address: AddressClient) -> str:
+        if args.create == bool(args.resume_session_id):
+            raise ValueError("Choose either --create or --resume-session-id.")
 
-            status = address.status(args.work_id)
-            work = status.get("work")
+        if args.resume_session_id:
+            if args.agent_name or args.session_name:
+                raise ValueError("Resume cannot create or rename an Agent or Session.")
 
-            if not work or work["id"] != args.work_id or not work.get("active"):
-                raise ValueError("Selected Work is not active or not owned by this account.")
+            resumeToken = (os.environ.get(args.resume_token_env)
+                           if args.resume_token_env
+                           else config.requireResumeToken(args.resume_session_id))
 
-            config.selectWork(args.work_id)
-            return
+            if not resumeToken:
+                raise ValueError("Resume capability is missing from the selected environment variable.")
 
-        if not args.host or not args.handle:
-            raise ValueError("Supply --work-id or --host and --handle.")
+            identity = address.resumeSession(args.resume_session_id, resumeToken)
+        else:
+            if args.resume_token_env:
+                raise ValueError("New Agent creation cannot use a Resume capability.")
 
-        current = address.status()
-        organization = current.get("organization")
+            identity = address.claimAgent(args.agent_name, args.session_name)
+            resumeToken = identity.get("resumeToken")
 
-        if not organization and (not args.organization or not args.create_organization):
-            raise ValueError("New Organizations require --organization and --create-organization.")
+        session = identity.get("session")
+        runtimeToken = identity.get("runtimeToken")
 
-        if organization and args.organization and organization["slug"] != args.organization:
-            raise ValueError("Requested Organization differs from account Organization.")
+        if not isinstance(session, dict) or not isinstance(session.get("id"), str) or (
+            not isinstance(runtimeToken, str) or not runtimeToken or
+            not isinstance(resumeToken, str) or not resumeToken
+        ):
+            raise RuntimeError("Agent Address did not return valid Runtime and Resume capabilities.")
 
-        if not any(host["path"] == args.host for host in current.get("hosts", [])) and not args.create_host:
-            raise ValueError("New Hosts require explicit --create-host.")
-
-        work = address.claimWork(args.host, args.handle, args.organization)["work"]
-        config.selectWork(work["id"])
+        config.selectSession(session["id"], runtimeToken, resumeToken)
+        return session["canonical"]
 
     @classmethod
     def run(cls) -> None:
@@ -136,8 +150,29 @@ class StudioCLI:
             return
 
         if args.command == "identity":
-            cls.selectIdentity(args, config, AddressClient(config.addressURL, credentials))
-            print("Work identity saved.")
+            address = cls.selectIdentity(args, config, AddressClient(config.addressURL, credentials))
+            print("Session identity selected: " + address)
+            return
+
+        if args.command in ("remote-bind", "remote-revoke"):
+            token = os.environ.get(args.mcp_oauth_token_env)
+
+            if not token:
+                raise ValueError("Selected Remote MCP OAuth token is missing from the environment.")
+
+            remote = RemoteBindingClient(args.mcp_origin, token)
+            transfer = RemoteSessionTransfer(config,
+                                             AddressClient(config.addressURL, credentials), remote)
+
+            if args.command == "remote-bind":
+                if not args.authorize_runtime_transfer:
+                    raise ValueError("Explicit --authorize-runtime-transfer is required.")
+
+                result = transfer.transfer()
+            else:
+                result = transfer.revoke()
+
+            print(json.dumps(result, indent=2, ensure_ascii=False))
             return
 
         if args.command in ("install", "uninstall"):
@@ -157,9 +192,9 @@ class StudioCLI:
         elif args.command == "receipt":
             result = relay.receipt(args.message_id)
         elif args.command == "provision":
-            result = relay.provisionHostMailbox()
+            result = relay.provisionAgentMailbox()
         elif args.command == "round-trip":
-            result = LocalEchoRoundTrip(relay, config.requireWork()).run(args.to, args.timeout)
+            result = LocalEchoRoundTrip(relay, config.requireSession()).run(args.to, args.timeout)
         elif args.command == "wake":
             subscription = WakeSubscription(config, relay)
 

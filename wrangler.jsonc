@@ -7,6 +7,14 @@
     { "binding": "ADDRESS_WORKER", "service": "agent-address" },
     { "binding": "RELAY_WORKER", "service": "nuwa-agent-relay-api" }
   ],
+  "d1_databases": [
+    {
+      "binding": "BINDINGS_DB",
+      "database_name": "nuwa-agent-relay-mcp",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
   "routes": [
     {
       "pattern": "mcp.agent-relay.company-notes.com",

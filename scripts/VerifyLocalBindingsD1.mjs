@@ -20,10 +20,12 @@ export class LocalBindingsD1Scenario {
       .map((value) => value.name);
 
     assert.deepEqual(columns, [
-      'oauth_token_hash',
+      'grant_fingerprint',
       'organization_id',
       'session_id',
+      'canonical_address',
       'encrypted_runtime_token',
+      'encrypted_resume_token',
       'expires_at',
       'created_at',
     ]);
@@ -34,33 +36,37 @@ export class LocalBindingsD1Scenario {
     const nextExpiry = new Date(Date.now() + 20 * 60_000).toISOString();
 
     this.execute(`INSERT INTO remote_session_bindings
-      (oauth_token_hash, organization_id, session_id,
-       encrypted_runtime_token, expires_at, created_at)
-      VALUES ('${key}', 'org-a', 'session-a', 'ciphertext-only', '${expiry}', '${now}')`);
+      (grant_fingerprint, organization_id, session_id, canonical_address,
+       encrypted_runtime_token, encrypted_resume_token, expires_at, created_at)
+      VALUES ('${key}', 'org-a', 'session-a', 'nuwa/a/main',
+        'runtime-ciphertext-only', 'resume-ciphertext-only', '${expiry}', '${now}')`);
 
-    const saved = this.execute(`SELECT organization_id, session_id, encrypted_runtime_token
-      FROM remote_session_bindings WHERE oauth_token_hash = '${key}'`);
+    const saved = this.execute(`SELECT organization_id, session_id, canonical_address,
+      encrypted_runtime_token, encrypted_resume_token
+      FROM remote_session_bindings WHERE grant_fingerprint = '${key}'`);
 
     assert.deepEqual(saved, [{
       organization_id: 'org-a',
       session_id: 'session-a',
-      encrypted_runtime_token: 'ciphertext-only',
+      canonical_address: 'nuwa/a/main',
+      encrypted_runtime_token: 'runtime-ciphertext-only',
+      encrypted_resume_token: 'resume-ciphertext-only',
     }]);
 
     this.execute(`UPDATE remote_session_bindings SET expires_at = '${nextExpiry}'
-      WHERE oauth_token_hash = '${key}' AND session_id = 'session-a'
-        AND encrypted_runtime_token = 'ciphertext-only'`);
+      WHERE grant_fingerprint = '${key}' AND session_id = 'session-a'
+        AND encrypted_runtime_token = 'runtime-ciphertext-only'`);
 
     const updated = this.execute(`SELECT expires_at
-      FROM remote_session_bindings WHERE oauth_token_hash = '${key}'`);
+      FROM remote_session_bindings WHERE grant_fingerprint = '${key}'`);
 
     assert.equal(updated[0].expires_at, nextExpiry);
 
     this.execute(`DELETE FROM remote_session_bindings
-      WHERE oauth_token_hash = '${key}'`);
+      WHERE grant_fingerprint = '${key}'`);
 
     assert.deepEqual(this.execute(`SELECT session_id FROM remote_session_bindings
-      WHERE oauth_token_hash = '${key}'`), []);
+      WHERE grant_fingerprint = '${key}'`), []);
 
     process.stdout.write('PASS: isolated local MCP binding D1 schema and lifecycle.\n');
   }

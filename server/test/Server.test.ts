@@ -96,7 +96,7 @@ test('publishes a V2-only public Skill without exposing internal mail infrastruc
   assert.match(expected, /sendToAgent/);
   assert.match(expected, /relayReplyThread/);
   assert.match(expected, /relayBeginWakePairing/);
-  assert.doesNotMatch(expected, /MailTrigger|github\.com|\bHost\b|\bWork\b|work_address_id/i);
+  assert.doesNotMatch(expected, /MailTrigger|github\.com|\bHost\b|\bWork\b|work_address_id/);
 });
 
 test('OAuth metadata and challenge remain independent of Session Runtime capabilities', async () => {

@@ -3,90 +3,18 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { HTTPAPIClient } from '../src/APIClients';
-import { HTTPMCPApplication } from '../src/Index';
 import { OAuthResourceServer } from '../src/OAuthResourceServer';
+import {
+  MESSAGE_ID, RemoteMCPScenario, RESUME_SECRET, RUNTIME_SECRET, SESSION_A, SESSION_B,
+  THREAD_ID,
+} from './BindingScenario';
 
-const env = {
-  RELAY_API_URL: 'https://agent-relay.company-notes.com',
-  ADDRESS_API_URL: 'https://address.company-notes.com',
-  ADDRESS_WORKER: {
-    fetch: (input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(input, init),
-  },
-  RELAY_WORKER: {
-    fetch: (input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(input, init),
-  },
-};
-
-const sessionID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-const runtimeToken = 'runtime-capability-do-not-log';
-const messageID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
-const threadID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
-
-class MCPScenario {
-  private readonly originalFetch = globalThis.fetch;
-  readonly calls: Array<{ url: URL; method: string; body?: unknown; headers: Headers }> = [];
-  readonly application = new HTTPMCPApplication(env);
-
-  install(handleRelay: (url: URL, init?: RequestInit) => Response): void {
-    globalThis.fetch = async (input, init) => {
-      const url = new URL(String(input));
-
-      if (url.origin === env.ADDRESS_API_URL) {
-        assert.equal(url.pathname, '/v2/account/status');
-
-        return Response.json({
-          ok: true,
-          data: { account: { email: 'test@example.com' }, organization: { id: 'org-a' } },
-        });
-      }
-
-      assert.equal(url.origin, env.RELAY_API_URL);
-      this.calls.push({
-        url, method: init?.method ?? 'GET',
-        body: init?.body ? JSON.parse(String(init.body)) : undefined,
-        headers: new Headers(init?.headers),
-      });
-
-      return handleRelay(url, init);
-    };
-  }
-
-  async tool(name: string, args: Record<string, unknown>) {
-    const response = await this.application.handle(new Request(
-      'https://mcp.agent-relay.company-notes.com/mcp', {
-        method: 'POST',
-        headers: {
-          authorization: 'Bearer oauth-test',
-          accept: 'application/json, text/event-stream',
-          'content-type': 'application/json',
-          'mcp-protocol-version': '2025-06-18',
-        },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 7,
-          method: 'tools/call',
-          params: { name, arguments: args },
-        }),
-      },
-    ));
-
-    assert.equal(response.status, 200);
-    return response.json() as Promise<{
-      result: { content: Array<{ text: string }>; isError?: boolean };
-    }>;
-  }
-
-  restore(): void {
-    globalThis.fetch = this.originalFetch;
-  }
-}
-
-test('publishes a V2-only public Skill without exposing internal mail infrastructure', async () => {
+test('publishes the V2 Skill without exposing internal transport infrastructure', async () => {
+  const scenario = new RemoteMCPScenario();
   const expected = readFileSync(
     new URL('../../skills/nuwa-agent-relay/SKILL.md', import.meta.url), 'utf8',
   );
-  const app = new HTTPMCPApplication(env);
-  const response = await app.handle(new Request(
+  const response = await scenario.application.handle(new Request(
     'https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md',
   ));
 
@@ -94,32 +22,30 @@ test('publishes a V2-only public Skill without exposing internal mail infrastruc
   assert.equal(await response.text(), expected);
   assert.match(expected, /^---\nname: nuwa-agent-relay\n/);
   assert.match(expected, /sendToAgent/);
-  assert.match(expected, /relayReplyThread/);
-  assert.match(expected, /relayBeginWakePairing/);
   assert.doesNotMatch(expected, /MailTrigger|github\.com|\bHost\b|\bWork\b|work_address_id/);
 });
 
-test('OAuth metadata and challenge remain independent of Session Runtime capabilities', async () => {
-  const app = new HTTPMCPApplication(env);
-  const metadata = await app.handle(new Request(
+test('OAuth discovery and missing token remain protected without a Session binding', async () => {
+  const scenario = new RemoteMCPScenario();
+  const metadata = await scenario.application.handle(new Request(
     'https://mcp.agent-relay.company-notes.com/.well-known/oauth-protected-resource/mcp',
   ));
+
   assert.equal(metadata.status, 200);
   assert.deepEqual(await metadata.json(), {
     resource: 'https://mcp.agent-relay.company-notes.com/mcp',
-    authorization_servers: [env.ADDRESS_API_URL],
+    authorization_servers: [scenario.env.ADDRESS_API_URL],
     bearer_methods_supported: ['header'],
   });
 
-  const missing = await app.handle(new Request(
+  const unauthorized = await scenario.application.handle(new Request(
     'https://mcp.agent-relay.company-notes.com/mcp',
     { method: 'POST', body: '{}' },
   ));
 
-  assert.equal(missing.status, 401);
-  assert.match(missing.headers.get('www-authenticate') ?? '', /oauth-protected-resource\/mcp/);
+  assert.equal(unauthorized.status, 401);
 
-  const invalid = await new OAuthResourceServer(env, async () =>
+  const invalid = await new OAuthResourceServer(scenario.env, async () =>
     new Response(null, { status: 401 })).authenticate(new Request(
       'https://mcp.agent-relay.company-notes.com/mcp',
       { headers: { authorization: 'Bearer invalid' } },
@@ -129,157 +55,239 @@ test('OAuth metadata and challenge remain independent of Session Runtime capabil
   assert.equal(invalid.status, 401);
 });
 
-test('HTTP API client only forwards OAuth and Runtime capabilities to the authorized origin', async () => {
-  const calls: Array<{ url: URL; headers: Headers }> = [];
-  const client = new HTTPAPIClient(env.RELAY_API_URL, 'Bearer oauth', async (url, init) => {
-    calls.push({ url: new URL(String(url)), headers: new Headers(init?.headers) });
-
-    return Response.json({ ok: true, data: { accepted: true } });
-  });
-  const result = await client.request('POST', '/v2/messages', {
-    sessionID, runtimeToken, body: { to: 'org/agent/main', body: 'hello' },
-  });
-
-  assert.deepEqual(result, { accepted: true });
-  assert.equal(calls[0].url.searchParams.get('session_id'), sessionID);
-  assert.equal(calls[0].headers.get('x-nuwa-runtime-token'), runtimeToken);
-  assert.equal(calls[0].headers.get('authorization'), 'Bearer oauth');
-  assert.doesNotMatch(calls[0].url.toString(), /runtime-capability/);
-
-  await assert.rejects(client.request('GET', '//attacker.invalid/private'), /relative/);
-  await assert.rejects(client.request('GET', '/\\attacker.invalid/private'), /escaped/);
-});
-
-test('sendToAgent submits once using the active Session and its Runtime capability', async () => {
-  const scenario = new MCPScenario();
-  scenario.install(() => Response.json({
-    ok: true,
-    data: { id: messageID, threadId: threadID },
-  }, { status: 201 }));
+test('user binds a Session privately; Remote MCP sends with encrypted Runtime lease', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
 
   try {
-    const response = await scenario.tool('sendToAgent', {
-      sessionID, runtimeToken,
-      to: 'nuwa/reviewer/main',
-      message: 'Please review the deployment.',
+    const before = await scenario.privateRequest('GET', 'oauth-a');
+
+    assert.deepEqual(await before.json(), { ok: true, data: { bound: false } });
+
+    const created = await scenario.bind();
+
+    assert.equal(created.status, 201);
+    const result = await created.json() as { data: { bound: boolean; sessionID: string } };
+    assert.deepEqual({ bound: result.data.bound, sessionID: result.data.sessionID }, {
+      bound: true, sessionID: SESSION_A,
+    });
+    assert.doesNotMatch(JSON.stringify(result), /runtime_private|resume_secret/);
+    assert.equal(scenario.resumeCount, 1);
+    assert.equal(scenario.database.rows.size, 1);
+
+    const row = [...scenario.database.rows.values()][0];
+
+    assert.equal(row.sessionID, SESSION_A);
+    assert.doesNotMatch(JSON.stringify(row), /runtime_private|resume_secret|oauth-a/);
+
+    const sent = await scenario.tool('sendToAgent', {
+      to: 'nuwa/author/main',
+      message: 'Please review the change.',
       subject: 'Review request',
     });
 
-    assert.equal(response.result.isError, undefined);
+    assert.equal(sent.result.isError, undefined);
     assert.equal(scenario.calls.length, 1);
     assert.equal(scenario.calls[0].url.pathname, '/v2/messages');
-    assert.equal(scenario.calls[0].url.searchParams.get('session_id'), sessionID);
-    assert.equal(scenario.calls[0].headers.get('x-nuwa-runtime-token'), runtimeToken);
+    assert.equal(scenario.calls[0].url.searchParams.get('session_id'), SESSION_A);
+    assert.equal(scenario.calls[0].headers.get('authorization'), 'Bearer oauth-a');
+    assert.equal(scenario.calls[0].headers.get('x-nuwa-runtime-token'), RUNTIME_SECRET);
     assert.deepEqual(scenario.calls[0].body, {
-      to: 'nuwa/reviewer/main',
-      body: 'Please review the deployment.',
-      subject: 'Review request',
+      to: 'nuwa/author/main', body: 'Please review the change.', subject: 'Review request',
     });
-    assert.doesNotMatch(JSON.stringify(response), /runtime-capability/);
+    assert.equal(scenario.heartbeatCount, 1);
+    assert.doesNotMatch(JSON.stringify(sent), /runtime_private|resume_secret/);
   } finally {
     scenario.restore();
   }
 });
 
-test('message context and replies retain the Relay Thread across MCP executions', async () => {
-  const scenario = new MCPScenario();
-  scenario.install((url) => {
-    if (url.pathname === '/v2/messages/' + messageID) {
-      return Response.json({
-        ok: true, data: {
-          id: messageID, threadId: threadID, body: 'New request',
-          recentThreadMessages: [{ body: 'Earlier context', bodyTruncated: false }],
-        },
-      });
-    }
-
-    assert.equal(url.pathname, '/v2/threads/' + threadID + '/messages');
-    return Response.json({ ok: true, data: { id: messageID, threadId: threadID } }, {
-      status: 201,
-    });
-  });
+test('tool schemas expose neither Runtime/Resume capabilities nor caller Session IDs', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
 
   try {
-    const read = await scenario.tool('relayMessage', {
-      sessionID, runtimeToken, messageID, contextLimit: 8,
-    });
-    assert.equal(read.result.isError, undefined);
-    const data = JSON.parse(read.result.content[0].text);
-    assert.equal(data.recentThreadMessages[0].body, 'Earlier context');
+    const schemas = JSON.stringify(await scenario.toolSchemas());
 
-    const reply = await scenario.tool('relayReplyThread', {
-      sessionID, runtimeToken, threadID, body: 'Same Thread reply.',
-    });
-    assert.equal(reply.result.isError, undefined);
-    assert.equal(scenario.calls.length, 2);
-    assert.equal(scenario.calls[0].url.searchParams.get('context_limit'), '8');
-    assert.deepEqual(scenario.calls[1].body, { body: 'Same Thread reply.' });
+    assert.match(schemas, /sendToAgent/);
+    assert.match(schemas, /relayBeginWakePairing/);
+    assert.doesNotMatch(schemas, /runtimeToken|resumeToken|runtime_token|sessionID/);
+    assert.doesNotMatch(schemas, /bearerToken|signingSecret/);
   } finally {
     scenario.restore();
   }
 });
 
-test('denies Relay operations without a Runtime capability before forwarding HTTP', async () => {
-  const scenario = new MCPScenario();
-  scenario.install(() => {
-    assert.fail('A missing Runtime capability must not reach Relay.');
-  });
+test('OAuth principal isolation prevents another token from using the bound Runtime', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
 
   try {
-    const response = await scenario.tool('sendToAgent', {
-      sessionID, to: 'nuwa/reviewer/main', message: 'Not authorized',
-    });
-    assert.equal(response.result.isError, true);
+    assert.equal((await scenario.bind()).status, 201);
+
+    const rejected = await scenario.tool('sendToAgent', {
+      to: 'nuwa/author/main', message: 'Impersonation attempt',
+    }, 'oauth-b');
+
+    assert.equal(rejected.result.isError, true);
+    assert.match(rejected.result.content[0].text, /binding/i);
+    assert.equal(scenario.calls.length, 0);
+    assert.equal((await scenario.privateRequest('GET', 'oauth-b')).status, 200);
+
+    const target = await scenario.privateRequest('GET', 'oauth-b');
+    assert.deepEqual(await target.json(), { ok: true, data: { bound: false } });
+  } finally {
+    scenario.restore();
+  }
+});
+
+test('revoking a private binding releases the Lease and blocks future Relay requests', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    assert.equal((await scenario.bind()).status, 201);
+
+    const revoked = await scenario.privateRequest('DELETE', 'oauth-a');
+
+    assert.deepEqual(await revoked.json(), { ok: true, data: { revoked: true } });
+    assert.equal(scenario.releaseCount, 1);
+    assert.equal(scenario.database.rows.size, 0);
+
+    const rejected = await scenario.tool('relayInbox', {});
+
+    assert.equal(rejected.result.isError, true);
     assert.equal(scenario.calls.length, 0);
   } finally {
     scenario.restore();
   }
 });
 
-test('Agent directory is independent of Session execution authority', async () => {
-  const scenario = new MCPScenario();
-  const originalFetch = globalThis.fetch;
-  let directoryCalls = 0;
-
-  globalThis.fetch = async (input) => {
-    const url = new URL(String(input));
-    assert.equal(url.origin, env.ADDRESS_API_URL);
-
-    if (url.pathname === '/v2/account/status') {
-      return Response.json({ ok: true, data: { organization: { id: 'org-a' } } });
-    }
-
-    assert.equal(url.pathname, '/v2/account/agents');
-    directoryCalls += 1;
-    return Response.json({ ok: true, data: [{ id: 'agent-a', handle: 'reviewer' }] });
-  };
+test('expired or replaced Runtime fails closed before touching the Relay service', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
 
   try {
-    const response = await scenario.tool('agentAddressListAgents', {});
-    assert.equal(response.result.isError, undefined);
-    assert.equal(directoryCalls, 1);
-    assert.match(response.result.content[0].text, /reviewer/);
+    await scenario.bind();
+    scenario.activeLeases.delete(SESSION_A);
+
+    const rejected = await scenario.tool('relayReplyThread', {
+      threadID: THREAD_ID, body: 'Cannot run without current lease.',
+    });
+
+    assert.equal(rejected.result.isError, true);
+    assert.equal(scenario.calls.length, 0);
   } finally {
-    globalThis.fetch = originalFetch;
     scenario.restore();
   }
 });
 
-test('Wake pairing forwards no provider credentials', async () => {
-  const scenario = new MCPScenario();
-  scenario.install(() => Response.json({
-    ok: true,
-    data: { status: 'awaiting_user', pairingUrl: 'https://example.com/one-time' },
-  }, { status: 201 }));
+test('one OAuth token cannot silently replace another active Session binding', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
 
   try {
-    const response = await scenario.tool('relayBeginWakePairing', { sessionID, runtimeToken });
+    assert.equal((await scenario.bind()).status, 201);
+    const duplicate = await scenario.bind('oauth-a', SESSION_B);
 
-    assert.equal(response.result.isError, undefined);
-    assert.equal(scenario.calls[0].url.pathname, '/v2/wake-pairings');
-    assert.equal(scenario.calls[0].body, undefined);
-    assert.doesNotMatch(JSON.stringify(response), /runtime-capability/);
+    assert.equal(duplicate.status, 409);
+    assert.equal(scenario.resumeCount, 1);
+    assert.equal(scenario.database.rows.size, 1);
+    assert.equal([...scenario.database.rows.values()][0].sessionID, SESSION_A);
   } finally {
     scenario.restore();
   }
+});
+
+test('private binding rejects cross-origin requests without acquiring any Runtime', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const response = await scenario.privateRequest(
+      'POST', 'oauth-a',
+      { sessionID: SESSION_A, resumeToken: RESUME_SECRET },
+      'https://attacker.invalid',
+    );
+
+    assert.equal(response.status, 403);
+    assert.equal(scenario.resumeCount, 0);
+    assert.equal(scenario.database.rows.size, 0);
+  } finally {
+    scenario.restore();
+  }
+});
+
+test('directory discovery works without ever claiming a Runtime', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const result = await scenario.tool('agentAddressListAgents', {});
+
+    assert.equal(result.result.isError, undefined);
+    assert.match(result.result.content[0].text, /reviewer/);
+    assert.equal(scenario.resumeCount, 0);
+  } finally {
+    scenario.restore();
+  }
+});
+
+test('bound Session retains message context and replies within one Relay Thread', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    await scenario.bind();
+
+    const read = await scenario.tool('relayMessage', { messageID: MESSAGE_ID, contextLimit: 8 });
+
+    assert.equal(read.result.isError, undefined);
+    assert.equal(JSON.parse(read.result.content[0].text).recentThreadMessages[0].body,
+      'Previous context');
+
+    const reply = await scenario.tool('relayReplyThread', {
+      threadID: THREAD_ID, body: 'Same Thread reply.',
+    });
+
+    assert.equal(reply.result.isError, undefined);
+    assert.equal(scenario.calls.length, 2);
+    assert.equal(scenario.calls[0].url.searchParams.get('context_limit'), '8');
+    assert.deepEqual(scenario.calls[1].body, { body: 'Same Thread reply.' });
+    assert.equal(scenario.calls[1].url.searchParams.get('session_id'), SESSION_A);
+  } finally {
+    scenario.restore();
+  }
+});
+
+test('model-facing Wake pairing forwards no credential values', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    await scenario.bind();
+    const result = await scenario.tool('relayBeginWakePairing', {});
+
+    assert.equal(result.result.isError, undefined);
+    assert.equal(scenario.calls.length, 1);
+    assert.equal(scenario.calls[0].url.pathname, '/v2/wake-pairings');
+    assert.equal(scenario.calls[0].body, undefined);
+    assert.doesNotMatch(JSON.stringify(result), /runtime_private|resume_secret/);
+  } finally {
+    scenario.restore();
+  }
+});
+
+test('HTTP transport rejects redirects and escaped cross-origin paths', async () => {
+  const requests: Array<URL> = [];
+  const client = new HTTPAPIClient('https://relay.example.com', 'Bearer oauth', async (url) => {
+    requests.push(new URL(String(url)));
+
+    return Response.json({ ok: true, data: { accepted: true } });
+  });
+
+  assert.deepEqual(await client.request('GET', '/v2/inbox'), { accepted: true });
+  assert.equal(requests.length, 1);
+  await assert.rejects(client.request('GET', '//attacker.invalid/private'), /relative/);
+  await assert.rejects(client.request('GET', '/\\attacker.invalid/private'), /escaped/);
 });

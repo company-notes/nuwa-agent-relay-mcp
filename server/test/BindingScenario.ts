@@ -13,7 +13,9 @@ export const RUNTIME_SECRET = 'runtime_private_lease_capability';
 type BindingRecord = {
   sessionID: string;
   organizationID: string;
+  canonicalAddress: string;
   encryptedRuntimeToken: string;
+  encryptedResumeToken: string;
   expiresAt: string;
 };
 
@@ -39,25 +41,27 @@ class MemoryStatement implements BindingStatement {
   }
 
   async run(): Promise<{ meta: { changes: number } }> {
-    const [key] = this.parameters;
-
-    if (this.sql.startsWith('INSERT INTO remote_session_bindings')) {
-      const [, organizationID, sessionID, encryptedRuntimeToken,
-        expiresAt, createdAt] = this.parameters;
+    if (this.sql.startsWith('INSERT')) {
+      const [key, organizationID, sessionID, canonicalAddress,
+        encryptedRuntimeToken, encryptedResumeToken, expiresAt, createdAt] = this.parameters;
       const current = this.store.get(key);
 
-      if (current && current.expiresAt > createdAt) {
+      if (current && (this.sql.startsWith('INSERT OR IGNORE') ||
+          current.expiresAt > createdAt)) {
         return { meta: { changes: 0 } };
       }
 
-      this.store.set(key, { sessionID, organizationID, encryptedRuntimeToken, expiresAt });
+      this.store.set(key, {
+        organizationID, sessionID, canonicalAddress, encryptedRuntimeToken,
+        encryptedResumeToken, expiresAt,
+      });
 
       return { meta: { changes: 1 } };
     }
 
-    if (this.sql.startsWith('UPDATE remote_session_bindings')) {
-      const [expiresAt, hash, sessionID, encryptedRuntimeToken] = this.parameters;
-      const current = this.store.get(hash);
+    if (this.sql.startsWith('UPDATE remote_session_bindings SET expires_at')) {
+      const [expiresAt, key, sessionID, encryptedRuntimeToken] = this.parameters;
+      const current = this.store.get(key);
 
       if (!current || current.sessionID !== sessionID ||
           current.encryptedRuntimeToken !== encryptedRuntimeToken) {
@@ -69,8 +73,32 @@ class MemoryStatement implements BindingStatement {
       return { meta: { changes: 1 } };
     }
 
+    if (this.sql.startsWith('UPDATE remote_session_bindings')) {
+      const [nextToken, expiresAt, key, sessionID, previousToken] = this.parameters;
+      const current = this.store.get(key);
+
+      if (!current || current.sessionID !== sessionID ||
+          current.encryptedRuntimeToken !== previousToken) {
+        return { meta: { changes: 0 } };
+      }
+
+      current.encryptedRuntimeToken = nextToken;
+      current.expiresAt = expiresAt;
+
+      return { meta: { changes: 1 } };
+    }
+
     if (this.sql.startsWith('DELETE FROM remote_session_bindings')) {
-      return { meta: { changes: Number(this.store.delete(key)) } };
+      const [key, token] = this.parameters;
+      const current = this.store.get(key);
+
+      if (!current || current.encryptedRuntimeToken !== token) {
+        return { meta: { changes: 0 } };
+      }
+
+      this.store.delete(key);
+
+      return { meta: { changes: 1 } };
     }
 
     throw new Error('Unexpected D1 statement in scenario.');
@@ -93,7 +121,10 @@ export class RemoteMCPScenario {
   readonly env: Env;
   readonly application: HTTPMCPApplication;
   organizationID = 'org-a';
+  organizationExists = true;
   resumeCount = 0;
+  claimCount = 0;
+  registerOrganizationCount = 0;
   heartbeatCount = 0;
   releaseCount = 0;
 
@@ -109,6 +140,20 @@ export class RemoteMCPScenario {
     this.application = new HTTPMCPApplication(this.env);
   }
 
+  private static principal(authorization: string | null): string | null {
+    if (!authorization?.startsWith('Bearer oauth-')) {
+      return null;
+    }
+
+    const token = authorization.slice('Bearer '.length);
+    // A refreshed token of the same OAuth grant maps to the same provider
+    // principal. Another grant on the same Account is deliberately isolated.
+    const id = token === 'oauth-a-refresh' ? 'a' :
+      token === 'oauth-b' ? 'b' : 'a';
+
+    return id.repeat(64);
+  }
+
   install(): void {
     globalThis.fetch = async (input, init) => {
       const url = new URL(String(input));
@@ -116,10 +161,16 @@ export class RemoteMCPScenario {
       const body = init?.body ? JSON.parse(String(init.body)) : undefined;
 
       if (url.origin === this.env.ADDRESS_API_URL) {
-        if (!headers.get('authorization')?.startsWith('Bearer oauth-')) {
+        const principal = RemoteMCPScenario.principal(headers.get('authorization'));
+
+        if (!principal) {
           return Response.json({ ok: false, error: { code: 'invalid_token' } }, {
             status: 401,
           });
+        }
+
+        if (url.pathname === '/v2/account/grant') {
+          return Response.json({ ok: true, data: { grantFingerprint: principal } });
         }
 
         if (url.pathname === '/v2/account/status') {
@@ -127,9 +178,44 @@ export class RemoteMCPScenario {
             ok: true,
             data: {
               account: { email: 'user@example.com' },
-              organization: { id: this.organizationID, slug: 'nuwa' },
+              organization: this.organizationExists
+                ? { id: this.organizationID, slug: 'nuwa' } : null,
             },
           });
+        }
+
+        if (url.pathname === '/v2/account/organization' && init?.method === 'POST') {
+          this.registerOrganizationCount += 1;
+          this.organizationExists = true;
+
+          return Response.json({
+            ok: true, data: { id: this.organizationID, slug: 'nuwa' },
+          }, { status: 201 });
+        }
+
+        if (url.pathname === '/v2/account/agents/claim' && init?.method === 'POST') {
+          if (!this.organizationExists) {
+            return Response.json({ ok: false, error: { code: 'organization_required' } }, {
+              status: 403,
+            });
+          }
+
+          this.claimCount += 1;
+          const sessionID = principal[0] === 'b' ? SESSION_B : SESSION_A;
+          const runtime = principal[0] === 'b' ? RUNTIME_SECRET + '_b' : RUNTIME_SECRET;
+          this.activeLeases.set(sessionID, runtime);
+
+          return Response.json({ ok: true, data: {
+            session: {
+              id: sessionID, agentId: 'agent-' + principal[0],
+              canonical: 'nuwa/' +
+                (body?.agentDisplayName === '小晴' ? 'xiaoqing' : 'reviewer-' + principal[0]) +
+                '/main',
+            },
+            runtimeToken: runtime,
+            resumeToken: RESUME_SECRET,
+            leaseExpiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+          } }, { status: 201 });
         }
 
         const action = url.pathname.match(
@@ -138,6 +224,7 @@ export class RemoteMCPScenario {
 
         if (action) {
           const [, sessionID, operation] = action;
+          const runtime = sessionID === SESSION_B ? RUNTIME_SECRET + '_b' : RUNTIME_SECRET;
 
           if (operation === 'resume') {
             this.resumeCount += 1;
@@ -148,13 +235,14 @@ export class RemoteMCPScenario {
               });
             }
 
-            this.activeLeases.set(sessionID, RUNTIME_SECRET);
+            this.activeLeases.set(sessionID, runtime);
 
             return Response.json({
               ok: true,
               data: {
-                session: { id: sessionID, canonical: 'nuwa/reviewer/main' },
-                runtimeToken: RUNTIME_SECRET,
+                session: { id: sessionID, canonical: 'nuwa/reviewer-' +
+                  (sessionID === SESSION_B ? 'b' : 'a') + '/main' },
+                runtimeToken: runtime,
                 leaseExpiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
               },
             });
@@ -188,7 +276,7 @@ export class RemoteMCPScenario {
         if (url.pathname === '/v2/account/sessions/' + SESSION_A) {
           return Response.json({
             ok: true,
-            data: { id: SESSION_A, agentId: 'agent-a', canonical: 'nuwa/reviewer/main' },
+            data: { id: SESSION_A, agentId: 'agent-a', canonical: 'nuwa/reviewer-a/main' },
           });
         }
 

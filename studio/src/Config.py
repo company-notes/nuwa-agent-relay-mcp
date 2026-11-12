@@ -44,6 +44,10 @@ class LocalConfig:
         return cls.configDir() / "runtime.json"
 
     @classmethod
+    def resumePath(cls) -> Path:
+        return cls.configDir() / "resume.json"
+
+    @classmethod
     def wakePath(cls) -> Path:
         return cls.configDir() / "wake.json"
 
@@ -114,7 +118,9 @@ class LocalConfig:
             "session_id": self.sessionID,
         })
 
-    def selectSession(self, sessionID: str, runtimeToken: str) -> "LocalConfig":
+    def selectSession(
+        self, sessionID: str, runtimeToken: str, resumeToken: str | None = None,
+    ) -> "LocalConfig":
         if not sessionID or len(sessionID) > 128 or "/" in sessionID:
             raise ValueError("Select an immutable Session ID, not an address.")
         if not runtimeToken or len(runtimeToken) > 256:
@@ -126,6 +132,24 @@ class LocalConfig:
             "session_id": sessionID,
             "runtime_token": runtimeToken,
         })
+
+        if resumeToken is not None:
+            if not resumeToken or len(resumeToken) > 256:
+                raise ValueError("Resume capability is invalid.")
+
+            self.writePrivate(self.resumePath(), {
+                "session_id": sessionID,
+                "resume_token": resumeToken,
+            })
+        else:
+            # Never accidentally attach a former Session's Resume token.
+            existing = self.resumePath()
+
+            if existing.exists():
+                saved = json.loads(existing.read_text(encoding="utf-8"))
+
+                if saved.get("session_id") != sessionID:
+                    existing.unlink()
 
         return updated
 
@@ -148,3 +172,16 @@ class LocalConfig:
             raise ValueError("Runtime capability does not belong to the selected Session.")
 
         return data["runtime_token"]
+
+    def requireResumeToken(self, sessionID: str) -> str:
+        path = self.resumePath()
+
+        if not path.exists():
+            raise ValueError("No local Resume capability for this Session.")
+
+        data = json.loads(path.read_text(encoding="utf-8"))
+
+        if data.get("session_id") != sessionID or not data.get("resume_token"):
+            raise ValueError("Resume capability does not match this Session.")
+
+        return data["resume_token"]

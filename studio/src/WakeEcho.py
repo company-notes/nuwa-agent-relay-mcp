@@ -11,15 +11,15 @@ class EchoAgentHandler:
 
     prefix = "Nuwa local echo receipt for "
 
-    def __init__(self, client, workAddressID: str):
+    def __init__(self, client, sessionID: str):
         self.client = client
-        self.workAddressID = workAddressID
+        self.sessionID = sessionID
 
     def process(self, messageID: str) -> None:
         message = self.client.getMessage(messageID)
 
-        if message["recipientWorkId"] != self.workAddressID:
-            raise ValueError("Wake message does not belong to the configured Work.")
+        if message["recipientSessionId"] != self.sessionID:
+            raise ValueError("Wake message does not belong to the configured Session.")
 
         # Handoffs have their own acceptance protocol. Do not auto-accept them.
         if message["kind"] != "message":
@@ -37,7 +37,7 @@ class EchoAgentHandler:
         # replyThread and writing the local completion record.
         history = self.client.threadHistory(threadID)
 
-        if any(item["senderWorkId"] == self.workAddressID and
+        if any(item["senderSessionID"] == self.sessionID and
                 item["body"] == reply for item in history):
             logger.info("Echo response already exists for %s", messageID)
             return

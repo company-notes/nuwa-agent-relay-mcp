@@ -1,6 +1,7 @@
 import { AddressAPIClient, APIError } from './APIClients';
 import type { Env } from './Env';
 import { Logger } from './Logger';
+import { RuntimeTokenCipher } from './RuntimeTokenCipher';
 
 type BindingRow = {
   sessionID: string;
@@ -30,13 +31,16 @@ export type BoundSession = { sessionID: string; runtimeToken: string };
 
 export class SessionBindings {
   private static readonly logger = Logger.forModule('session.binding');
+  private readonly tokenCipher: RuntimeTokenCipher;
   private static readonly SESSION_ID = /^[0-9a-f]{8}-[0-9a-f-]{27,36}$/i;
 
   constructor(
     private readonly env: Env,
     private readonly requester: typeof fetch =
       (input, init) => env.ADDRESS_WORKER.fetch(input, init),
-  ) {}
+  ) {
+    this.tokenCipher = new RuntimeTokenCipher(env.SESSION_BINDING_KEY);
+  }
 
   private address(authorization: string): AddressAPIClient {
     return new AddressAPIClient(this.env, authorization, this.requester);
@@ -49,61 +53,6 @@ export class SessionBindings {
 
     return Array.from(new Uint8Array(digest),
       (byte) => byte.toString(16).padStart(2, '0')).join('');
-  }
-
-  private async cipher(): Promise<CryptoKey> {
-    const encoded = this.env.SESSION_BINDING_KEY;
-
-    if (!encoded || !/^[A-Za-z0-9+/]{43}=$/.test(encoded)) {
-      throw new APIError(503, 'binding_key_missing', 'Session encryption key is not configured.');
-    }
-
-    const raw = Uint8Array.from(atob(encoded), (value) => value.charCodeAt(0));
-
-    if (raw.length !== 32) {
-      throw new APIError(503, 'binding_key_invalid', 'Session encryption key must be 256 bits.');
-    }
-
-    return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
-  }
-
-  private static binaryEncode(value: Uint8Array): string {
-    return btoa(Array.from(value, (byte) => String.fromCharCode(byte)).join(''));
-  }
-
-  private static binaryDecode(value: string): Uint8Array<ArrayBuffer> {
-    return Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
-  }
-
-  private async encrypt(token: string, identityKey: string, sessionID: string): Promise<string> {
-    const nonce = crypto.getRandomValues(new Uint8Array(12));
-    const encrypted = await crypto.subtle.encrypt({
-      name: 'AES-GCM',
-      iv: nonce,
-      additionalData: new TextEncoder().encode(identityKey + ':' + sessionID),
-    }, await this.cipher(), new TextEncoder().encode(token));
-    const combined = new Uint8Array(nonce.length + encrypted.byteLength);
-
-    combined.set(nonce);
-    combined.set(new Uint8Array(encrypted), nonce.length);
-
-    return SessionBindings.binaryEncode(combined);
-  }
-
-  private async decrypt(value: string, identityKey: string, sessionID: string): Promise<string> {
-    const combined = SessionBindings.binaryDecode(value);
-
-    if (combined.length < 29) {
-      throw new APIError(503, 'binding_corrupted', 'Encrypted Session binding is invalid.');
-    }
-
-    const plain = await crypto.subtle.decrypt({
-      name: 'AES-GCM',
-      iv: combined.slice(0, 12),
-      additionalData: new TextEncoder().encode(identityKey + ':' + sessionID),
-    }, await this.cipher(), combined.slice(12));
-
-    return new TextDecoder().decode(plain);
   }
 
   private async row(key: string): Promise<BindingRow | null> {
@@ -140,7 +89,7 @@ export class SessionBindings {
     }
 
     // Fail before acquiring the exclusive Runtime if encrypted storage is unavailable.
-    await this.cipher();
+    await this.tokenCipher.requireKey();
 
     const client = this.address(authorization);
     const status = await client.status() as AccountStatus;
@@ -165,7 +114,7 @@ export class SessionBindings {
         'Agent Address returned an inconsistent Runtime lease.');
     }
 
-    const encrypted = await this.encrypt(resumed.runtimeToken, key, sessionID);
+    const encrypted = await this.tokenCipher.encrypt(resumed.runtimeToken, key, sessionID);
 
     try {
       const stored = await this.env.BINDINGS_DB.prepare(
@@ -209,7 +158,7 @@ export class SessionBindings {
         'A trusted out-of-band Session binding is required before using Relay.');
     }
 
-    const runtimeToken = await this.decrypt(
+    const runtimeToken = await this.tokenCipher.decrypt(
       row.encryptedRuntimeToken, key, row.sessionID,
     );
     const client = this.address(authorization);
@@ -250,7 +199,7 @@ export class SessionBindings {
       return { revoked: false };
     }
 
-    const runtimeToken = await this.decrypt(
+    const runtimeToken = await this.tokenCipher.decrypt(
       row.encryptedRuntimeToken, key, row.sessionID,
     );
 

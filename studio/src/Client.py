@@ -1,15 +1,30 @@
 """HTTP adapters for Agent Address V2 identity and Session-scoped Relay operations."""
 
+from typing import Protocol
 from urllib.parse import quote, urlparse
 
 import httpx
 
-from .Auth import OAuthCredentials
 from .Config import LocalConfig
 
 
+class CredentialSource(Protocol):
+    def accessToken(self) -> str: ...
+
+
+class StaticBearerCredential:
+    def __init__(self, token: str):
+        if not token or len(token) > 4096 or any(char.isspace() for char in token):
+            raise ValueError("A private MCP OAuth access token is required.")
+
+        self.token = token
+
+    def accessToken(self) -> str:
+        return self.token
+
+
 class HTTPAPIClient:
-    def __init__(self, apiURL: str, credentials: OAuthCredentials, transport=None):
+    def __init__(self, apiURL: str, credentials: CredentialSource, transport=None):
         self.apiURL = LocalConfig.validateOrigin(apiURL)
         self.credentials = credentials
         self.transport = transport
@@ -81,7 +96,7 @@ class AddressClient(HTTPAPIClient):
 
 
 class RelayClient(HTTPAPIClient):
-    def __init__(self, config: LocalConfig, credentials: OAuthCredentials, transport=None):
+    def __init__(self, config: LocalConfig, credentials: CredentialSource, transport=None):
         super().__init__(config.apiURL, credentials, transport)
         self.config = config
 
@@ -168,3 +183,21 @@ class RelayClient(HTTPAPIClient):
 
     def provisionAgentMailbox(self):
         return self.call("POST", "/v2/agents/mailbox")
+
+
+class RemoteBindingClient(HTTPAPIClient):
+    """Manage a Session Runtime through trusted HTTPS, never model tool arguments."""
+
+    def __init__(self, origin: str, oauthToken: str, transport=None):
+        super().__init__(origin, StaticBearerCredential(oauthToken), transport)
+
+    def status(self):
+        return self.request("GET", "/session-bindings")
+
+    def bind(self, sessionID: str, resumeToken: str):
+        return self.request("POST", "/session-bindings", body={
+            "sessionID": sessionID, "resumeToken": resumeToken,
+        })
+
+    def revoke(self):
+        return self.request("DELETE", "/session-bindings")

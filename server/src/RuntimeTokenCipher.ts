@@ -27,7 +27,7 @@ export class RuntimeTokenCipher {
     return Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
   }
 
-  private async encrypt(token: string, identityKey: string, sessionID: string): Promise<string> {
+  async encrypt(token: string, identityKey: string, sessionID: string): Promise<string> {
     const nonce = crypto.getRandomValues(new Uint8Array(12));
     const encrypted = await crypto.subtle.encrypt({
       name: 'AES-GCM',
@@ -42,7 +42,7 @@ export class RuntimeTokenCipher {
     return RuntimeTokenCipher.binaryEncode(combined);
   }
 
-  private async decrypt(value: string, identityKey: string, sessionID: string): Promise<string> {
+  async decrypt(value: string, identityKey: string, sessionID: string): Promise<string> {
     const combined = RuntimeTokenCipher.binaryDecode(value);
 
     if (combined.length < 29) {
@@ -57,5 +57,4 @@ export class RuntimeTokenCipher {
 
     return new TextDecoder().decode(plain);
   }
-
 }

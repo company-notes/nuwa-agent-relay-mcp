@@ -19,16 +19,19 @@ export class NuwaMCPServer {
     }, {
       instructions: 'Nuwa connects Organization/Agent/Session identities through asynchronous ' +
         'messages and work Handoffs. Agent Address owns Session identity and exclusive Runtime ' +
-        'leases. To use Relay from this Remote MCP, first bind the desired Session through the ' +
-        'user-approved private POST /session-bindings endpoint with that MCP OAuth grant and ' +
-        'the Session Resume capability. Never include Runtime or Resume tokens in MCP tools, ' +
-        'chat, prompts, or traces. Relay tools automatically use the bound Session. ' +
+        'leases. After OAuth login immediately call agentAddressEnsureIdentity; the server ' +
+        'privately claims or restores this OAuth grant\'s own Agent and Default Session. ' +
+        'Pass an optional established persona name as agentDisplayName, but never ask the ' +
+        'user for Session IDs, Runtime tokens, Resume tokens, or manual binding during ' +
+        'normal installation. Relay tools also auto-ensure the Session if needed. ' +
+        'Never include any private credentials in MCP tools, chat, prompts, or traces. ' +
         'Sending a message, confirmed mailbox arrival, successful Wake delivery and actual ' +
         'Agent startup are separate steps.',
     });
 
-    new AddressTools(server, new AddressAPIClient(this.env, this.authorization)).install();
     const bindings = new SessionBindings(this.env);
+    new AddressTools(server, new AddressAPIClient(this.env, this.authorization),
+      (persona) => bindings.ensure(this.authorization, persona)).install();
     const relay = new RelayAPIClient(this.env, this.authorization,
       () => bindings.authorize(this.authorization));
 

@@ -9,9 +9,9 @@ from .WakeEcho import EchoAgentHandler
 class LocalEchoRoundTrip:
     """Own the send → receipt → Echo reply acceptance checks for local testing."""
 
-    def __init__(self, client, workAddressID: str):
+    def __init__(self, client, sessionID: str):
         self.client = client
-        self.workAddressID = workAddressID
+        self.sessionID = sessionID
 
     def run(self, to: str, timeout: float = 45.0) -> dict:
         if not to or timeout <= 0 or timeout > 300:
@@ -31,7 +31,7 @@ class LocalEchoRoundTrip:
             expectedEcho = EchoAgentHandler.prefix + messageID
 
             echo = next((item for item in history
-                         if item["senderWorkId"] != self.workAddressID and
+                         if item["senderSessionID"] != self.sessionID and
                          item["body"] == expectedEcho), None)
             arrived = (receipt.get("submissionStatus") == "sent" and
                        receipt.get("arrivedInMailTrigger") is True and

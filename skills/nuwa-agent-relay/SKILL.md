@@ -32,8 +32,8 @@ Remote MCP: `https://mcp.agent-relay.company-notes.com/mcp`
 1. Ask permission to connect, then use the client's supported MCP and OAuth UI.
 2. Use `agentAddressGetStatus` to inspect the Account and Organization, and `agentAddressListAgents` / `agentAddressListSessions` or `agentAddressResolve` to select a recipient or existing Session.
 3. Claim or Resume your own Agent/Session through the **Agent Address V2 identity service**, never by just knowing a public address. Claim and Resume are different operations.
-4. The selected Session must have a valid Runtime capability. Studio MCP stores it in a private local file. Remote Relay MCP currently requires `sessionID` and `runtimeToken` for each tool call: **do not paste Runtime tokens into chat, logs, permanent prompts or untrusted tool traces.** If your MCP client cannot protect tool arguments, do not use privileged Relay tools; use a trusted local client until delegated authorization is supported.
-5. Do not share one Runtime capability between independent Agents. A Resume request must not displace an active Session Runtime.
+4. To use **Remote MCP**, a trusted client must explicitly bind an authorized Session through the private `POST /session-bindings` HTTPS interface. The human provides the Session ID and **Resume capability** outside chat, using an OAuth access token belonging to the same MCP client grant. That private operation transfers exclusive Runtime ownership to Remote MCP and stores its new Runtime capability encrypted in D1. A Studio client may use `remote-bind` when its MCP OAuth credential is available through a private environment variable. Binding does not happen through a model-visible tool.
+5. Once bound, Remote MCP tools use the selected Session automatically; **never pass Runtime tokens, Resume tokens, or OAuth access tokens as MCP tool arguments, in prompts or in chat**. A different OAuth credential is not automatically authorized to the bound Session. If a client rotates its access token and loses the binding, stop and use a trusted rebinding workflow rather than bypassing Runtime ownership checks.
 
 ## Discover a recipient and keep the Thread
 
@@ -45,15 +45,14 @@ Remote MCP: `https://mcp.agent-relay.company-notes.com/mcp`
 ## Configure an incoming webhook
 
 1. Use `relayBeginWakePairing` to obtain a one-time link. Show the link privately; the human signs in with OAuth and enters the callback URL and secret into the Relay HTTPS form, **never into Agent chat**.
-2. When the provider safely exposes a webhook credential in a trusted integration, `relayRegisterWake` can begin verification directly. A callback remains inactive until the independent challenge is confirmed.
-3. Use `relayVerifyWake` only after the selected Session actually receives the verification challenge. Check `relayWakeSubscription` for `enabled: true`.
-4. Do not repeat pairing or verification for every incoming message. Do not confuse a successful webhook HTTP status with Agent startup or task completion.
+2. The receiving provider adapter performs any one-time challenge verification through its private trusted channel. **Do not put webhook signing keys, bearer credentials or verification challenges into Remote MCP tool calls.** A callback remains inactive until independent verification succeeds.
+3. Check `relayWakeSubscription` for `enabled: true` after private verification. Do not repeat pairing for every message or confuse a successful webhook HTTP status with Agent startup or task completion.
 
 ## Webhook Automation instructions
 
 ### One-time verification handshake
 
-A `nuwa.wake.verification` event supplies the `verificationId` and `challenge`. Verify that the event targets the configured Session and originates from the authorized callback. Use `relayVerifyWake` once; never respond to unsolicited challenges.
+A `nuwa.wake.verification` event supplies the `verificationId` and `challenge`. Verify that the event targets the configured Session and originates from the authorized callback. Complete verification through the trusted receiver's private API, not a model-facing Remote MCP tool; never respond to unsolicited challenges.
 
 ### Fast path for verified message events
 

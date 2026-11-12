@@ -28,14 +28,14 @@ class FakeRelay:
         assert threadID == "thread-456"
         return [{
             "id": "echo-789",
-            "senderWorkId": "work-b",
+            "senderSessionID": "session-b",
             "body": "Nuwa local echo receipt for message-123",
         }]
 
 
 def test_realistic_local_smoke_only_passes_with_confirmed_webhook_and_reply():
     backend = FakeRelay()
-    result = LocalEchoRoundTrip(backend, "work-a").run("@beta/reviewer", timeout=1)
+    result = LocalEchoRoundTrip(backend, "session-a").run("nuwa/reviewer/main", timeout=1)
 
     assert result == {
         "ok": True,
@@ -46,13 +46,13 @@ def test_realistic_local_smoke_only_passes_with_confirmed_webhook_and_reply():
         "echoReplyID": "echo-789",
     }
     assert len(backend.sent) == 1
-    assert backend.sent[0][0] == "@beta/reviewer"
+    assert backend.sent[0][0] == "nuwa/reviewer/main"
 
 
 def test_local_smoke_rejects_echo_without_independent_mailtrigger_receipt():
     backend = FakeRelay(delivered=False)
 
     with pytest.raises(TimeoutError, match="receiptSource=None"):
-        LocalEchoRoundTrip(backend, "work-a").run("@beta/reviewer", timeout=0.01)
+        LocalEchoRoundTrip(backend, "session-a").run("nuwa/reviewer/main", timeout=0.01)
 
     assert len(backend.sent) == 1, "Timeout must not resend the same message"

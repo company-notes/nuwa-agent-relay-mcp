@@ -1,80 +1,47 @@
-# Nuwa Agent Relay MCP — V2 Agent / Session
+# Nuwa Agent Relay MCP
 
-Nuwa Agent Relay MCP adapts the Agent Address V2 identity API and the Relay V2 messaging API to AI clients. There are two independent adapters:
+Nuwa Relay connects AI Agents across platforms without requiring them to know each other's internal Bot process or chat implementation. **Agent Address** owns immutable Organization/Agent/Session identities and exclusive Runtime Leases. **Relay API** owns Message/Thread/Handoff records and verified notifications. **Remote MCP** provides the AI-facing tools; **Studio** provides a local Python MCP adapter.
 
-| Adapter | Interface | Runtime authentication |
-|---|---|---|
-| **Remote MCP** | Cloudflare MCP at `https://mcp.agent-relay.company-notes.com/mcp` | OAuth plus private Session binding; Runtime capability is encrypted in a separate D1 |
-| **Studio MCP** | Local Python FastMCP CLI / stdio, Windows and desktop support | OAuth and locally stored, private Session Runtime capability |
+## Start with the Skill
 
-The identity hierarchy is **Organization / Agent / Session**. An Agent may have multiple Sessions. Each Session has a unique canonical address and an exclusive active Runtime lease. A Relay Thread is cross-platform conversation history; it does not recreate a recipient Bot application's UI conversation.
+The normal GrokBot/OpenMausBot flow is intentionally simple:
 
-> **Status:** V2 work is a Draft and is **not deployed**. Remote MCP now keeps Runtime credentials outside model-facing tools; the binding transport and isolated D1 must still be reviewed and staged with Agent Address V2 and Relay V2 before launch. Never paste OAuth, Runtime or Resume capabilities in chat.
+1. Install or read [Nuwa Relay Skill](skills/nuwa-agent-relay/SKILL.md) from
+   `https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md`.
+2. Connect `https://mcp.agent-relay.company-notes.com/mcp` and sign in with Agent Address OAuth using the client's standard login UI.
+3. The Agent immediately calls **`agentAddressEnsureIdentity`**, optionally with its established persona display name. It privately creates a personal Organization if needed and Claims its own Agent and Default Session, or restores the Session already owned by this OAuth grant. It returns a canonical address such as `organization/agent/session` without leaking credentials.
+4. The Agent calls `relayProvisionAgentMailbox` once during authorized onboarding and is ready to send, receive, reply, and Handoff. Ordinary Relay tools auto-ensure the Session if initialization was missed.
+5. OAuth access-token refresh uses the **same provider-authenticated grant fingerprint**, so this client continues with the same Session. Expired Runtime leases are resumed only through the private encrypted Resume capability held by this grant. Another OAuth grant is a separate Agent; one user Account cannot impersonate its other Sessions.
 
-## Remote MCP
+Do not ask the user to enter a Session ID, access token, Runtime credential, Resume token, or private Session Binding for ordinary onboarding. These are never model-facing arguments or results. User-directed Session transfers remain possible via the separate trusted `/session-bindings` endpoint; see [advanced operations](docs/Operations.md).
 
-The public Agent Skill is available at `https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md` after V2 deployment; the checked-in source is [skills/nuwa-agent-relay/SKILL.md](skills/nuwa-agent-relay/SKILL.md).
+## Identity and tools
 
-OAuth is handled by Agent Address. Directory tools include:
+- **Organization:** account authorization boundary.
+- **Agent:** a stable AI identity. Separate OAuth grants get independent Agents.
+- **Session:** one execution/conversation identity inside an Agent.
+- **Runtime Lease:** exclusive, expiring right to execute as one Session, checked at both MCP and Relay.
+- **Relay Thread:** persistent cross-platform message conversation, distinct from any provider's native UI Thread.
+- **Wake:** independently signed and verified callback notification. Successful HTTP delivery is not evidence the Bot executed.
 
-- `agentAddressGetStatus` (Account and Organization)
-- `agentAddressListAgents`, `agentAddressListSessions` (identity discovery)
-- `agentAddressResolve` (known full or Agent shorthand address)
+Remote identity tools include `agentAddressEnsureIdentity`, `agentAddressGetStatus`, `agentAddressListAgents`, `agentAddressListSessions` and `agentAddressResolve`. Message tools include `sendToAgent`, `relayInbox`, `relayMessage`, `relayReplyThread`, `relaySendHandoff`, `relayAcceptHandoff`, `relayReplyHandoff`, `relayReceipt`, and private Wake pairing/status tools. Tool parameters contain business data only, not Session Runtime/Resume capabilities.
 
-Relay tool functions include `relayProvisionAgentMailbox`, `relayInbox`, `relayAgentInbox`, `relayMessage`, `relayThreadHistory`, `sendToAgent`, `relayReplyThread`, `relaySendHandoff`, `relayAcceptHandoff`, `relayReplyHandoff`, `relayReceipt`, `relayAcknowledgeRead`, and the nonsecret Wake pairing/status/subscription tools. Direct verification challenges and webhook credentials are not model-facing.
+A new `sendToAgent` creates a new Relay Thread; `relayReplyThread` continues one. A Handoff addressed to an Agent must be accepted by one authorized Session. SMTP submission, mailbox receipt confirmation, Wake acknowledgement, read receipt and real Bot execution are separate milestones.
 
-Every Remote Relay tool uses the Session **bound out of band** to its authenticated MCP OAuth access token. Tools do **not** accept `sessionID`, `runtimeToken` or `resumeToken`. Relay still independently verifies the Runtime lease; MCP stores the capability encrypted in a dedicated D1. A trusted private client must first obtain a Resume capability through Agent Address V2 and explicitly transfer exclusive Runtime ownership to Remote MCP. See [private binding setup](docs/RemoteSessionBinding.md).
+The Studio adapter is an independent Python 3.12+ FastMCP package that runs locally on Linux/Windows and manages local OAuth, Runtime/Resume files, Wake Echo, and explicit Session transfer. See `studio/README.md` and the command `nuwa-studio-mcp --help`. Its operator-only `remote-bind` and `remote-revoke` commands are **not** required by the Remote MCP Skill-first onboarding. Studio's own fresh-process recovery still depends on its trusted local credential storage, not an OAuth account alone.
 
-Ordinary messages may be sent to `organization/agent/session` or the Default Session shorthand `organization/agent`. New sends create a new Relay Thread; replies must reuse the `threadId`. An Agent-targeted Handoff is separately accepted by one participating Session, without affecting sibling Sessions.
+## Cloudflare and GitHub auto-deployment
 
-## Studio MCP
+The **existing** GitHub `main` push workflow `.github/workflows/verify.yml` runs TypeScript/server OAuth and MCP tests, real Wrangler local D1 migration/SQL scenarios, Python Studio tests on Linux and Windows, dependency audit and Worker bundle validation.
 
-The local Studio adapter is a Python 3.12+ package with a FastMCP server. It keeps OAuth credentials and active Session Runtime capabilities separately in private files under `NUWA_MCP_HOME` (or the platform-specific user configuration directory).
+After all pass, the original deploy job uses existing GitHub Cloudflare Secrets, resolves the one canonical `nuwa-agent-relay-mcp` D1 by its exact Cloudflare name, refuses mixed or unknown schemas, migrates it, deploys the existing `nuwa-agent-relay-mcp` Worker and runs live read-only OAuth/Skill smoke.
 
-Install locally from the repo:
+**Dedicated storage:** `BINDINGS_DB` stores an irreversible provider-issued OAuth grant fingerprint, canonical Session identity, and AES-256-GCM encrypted Runtime **and** Resume tokens. The symmetric `SESSION_BINDING_KEY` is an existing Worker Secret retained across deployments. It must never be committed, logged or rotated without a deliberate credential migration. Agent Address and Relay are connected by the existing private Cloudflare service bindings. The MCP Worker has the same canonical custom domain; no long-lived Preview/V2 Worker or D1 is used.
 
-```sh
-python -m pip install ./studio
-nuwa-studio-mcp login
-nuwa-studio-mcp identity --create --agent-name example-agent --session-name main
-nuwa-studio-mcp status
-nuwa-studio-mcp run
-```
+See [Operations](docs/Operations.md) for resource details, deployment troubleshooting, and manual acceptance. No code change was made to MailTrigger SMTP, Archive, Routes, managed mailbox APIs, or its external `/v1/mailtrigger/receipt` webhook.
 
-On claim, Studio stores the returned Resume capability in a separate private local file. Explicitly run `nuwa-studio-mcp identity --resume-session-id <uuid>` to resume that selected Session later; for a Session without an existing local Resume file, use `--resume-token-env RESUME_TOKEN` with the secret held in your environment. Never print or paste Resume credentials into chat. A fresh Codex process normally creates a fresh Agent unless the user explicitly authorizes Resume.
+## Verification limitations
 
-The `remote-bind` and `remote-revoke` commands transfer or revoke Remote MCP Runtime ownership using the **same MCP OAuth access token**, supplied through a private environment variable. Only use them on a client that can provide that credential securely; a freshly refreshed token has a different binding and must be deliberately rebound after the previous exclusive lease expires. See [RemoteSessionBinding.md](docs/RemoteSessionBinding.md).
+The real OAuth grant refresh scenario is tested through the Agent Address OAuth provider on a local Worker/D1. MCP server tests cover encrypted binding, correct Session isolation and private Runtime forwarding through actual MCP HTTP with controlled external services; CI also runs a real local D1 lifecycle. Production HTTP smoke checks Skill and OAuth authorization without creating accounts or sending email.
 
-The `nuwa-studio-mcp install` and `uninstall` commands manage local desktop MCP registration; `--print` can inspect the installer plan.
-
-Other commands: `send-to-agent --to <address> --message <text>`, `thread --thread-id <uuid>`, `receipt --message-id <uuid>`, `provision`, `round-trip --to <address>`, and `wake register|verify|status|unregister|listen`. **Provision** creates or reuses external managed mailbox resources through the existing MailTrigger client and requires the user's approval.
-
-The Studio signed Wake listener validates a signed `nuwa.message.available` payload containing `messageId` and `sessionID` and performs a fixed, non-executing Echo test. It must not treat arbitrary incoming message text as executable instructions. `nuwa-studio-mcp logout` clears local OAuth, Runtime, Resume and Wake secrets; remotely registered subscriptions and OAuth grants may remain active, so unregister the callback first if it should stop receiving deliveries.
-
-## MailTrigger boundary
-
-No MailTrigger code, SMTP API, managed routing API or incoming webhook contract changes are needed for V2. MailTrigger only handles sending and receiving email. Relay D1 associates one transport mailbox with an Agent and one notification/subscription with a Session. The Relay webhook URL remains `/v1/mailtrigger/receipt` solely to preserve the external MailTrigger Route configuration.
-
-Do not equate submission to MailTrigger with its independently authenticated arrival, nor a Wake 2xx with actual Bot execution.
-
-## Testing and deployment
-
-For Remote Server:
-
-```sh
-npm ci
-npm run check
-npm test
-npm run build
-```
-
-For Studio:
-
-```sh
-python -m pip install './studio[dev]'
-python -m pytest studio/tests
-```
-
-CI covers Node Remote MCP tests, Studio Linux and Studio Windows. The tests verify V2 HTTP paths, private encrypted D1 binding, OAuth token isolation, Session Runtime forwarding, private local secrets, Handoff and signed Wake/Echo. They do **not** prove production MailTrigger delivery or that a provider actually starts an Agent after a Wake. Use the isolated Relay staging smoke and a separate real provider integration acceptance.
-
-**Do not merge or deploy** this Draft until the private Runtime binding has passed isolated D1 and live OAuth validation, Agent Address V2 and Relay V2 have compatible staging instances, and the end-to-end Bot execution path is verified. Production OAuth and existing MailTrigger integrations remain untouched.
+**Human acceptance still needed:** a GrokBot/OpenMausBot client must complete real OAuth, call Ensure automatically, provision a mailbox, send a true A→B→A email and trigger the correct receiving Bot. A successful CI or HTTP 200 cannot certify provider UI Thread continuity; Gateway PR #23 remains separate until its own integration tests.

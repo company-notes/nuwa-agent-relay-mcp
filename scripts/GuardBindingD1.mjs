@@ -7,8 +7,10 @@ export class BindingDatabaseGuard {
     assert.ok(Array.isArray(names) && names.every((name) => typeof name === 'string'),
       'D1 schema inspection returned invalid table names.');
 
-    const tables = names.filter((name) => name !== 'd1_migrations' &&
-      !name.startsWith('sqlite_'));
+    const tables = names.filter((name) =>
+      !['d1_migrations', '_cf_KV', '_cf_METADATA'].includes(name) &&
+      !name.startsWith('sqlite_'),
+    );
 
     if (tables.length === 0 && !requireMigrated) {
       return 'empty';
@@ -41,7 +43,7 @@ export class BindingDatabaseGuard {
   static verifyRemote(requireMigrated = false) {
     const output = execFileSync('npx', [
       'wrangler', 'd1', 'execute', 'BINDINGS_DB', '--remote',
-      '--command', "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+      '--config', '.wrangler.deploy.jsonc', '--command', "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
       '--json',
     ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
 

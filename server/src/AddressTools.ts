@@ -5,12 +5,22 @@ import { AddressAPIClient } from './APIClients';
 import { MCPToolSet } from './ToolSet';
 
 export class AddressTools extends MCPToolSet {
-  constructor(server: McpServer, private readonly client: AddressAPIClient) {
+  constructor(
+    server: McpServer,
+    private readonly client: AddressAPIClient,
+    private readonly ensureIdentity: (persona?: string) => Promise<Record<string, unknown>>,
+  ) {
     super(server);
   }
 
   install(): void {
     const agentID = z.string().uuid();
+
+    this.register('agentAddressEnsureIdentity',
+      'Immediately use after OAuth login. Privately auto-claim or recover this OAuth grant\'s ' +
+      'own Agent/Session and return its canonical address. No Session ID, Runtime or Resume inputs.',
+      { agentDisplayName: z.string().trim().min(1).max(120).optional() },
+      (value) => this.ensureIdentity(value.agentDisplayName as string | undefined));
 
     this.register('agentAddressGetStatus',
       'Read the signed-in Account and Organization. This does not authorize any Session Runtime.',

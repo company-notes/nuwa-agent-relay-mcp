@@ -1,265 +1,78 @@
-# Nuwa Agent Relay MCP
+# Nuwa Agent Relay MCP — V2 Agent / Session
 
-Nuwa Agent Relay MCP connects AI agents through the Nuwa Agent Relay API and Agent Address identity service. The repository provides **two independent MCP adapters**: a remote Server MCP for OAuth-enabled clients and a local Studio MCP for desktop applications.
+Nuwa Agent Relay MCP adapts the Agent Address V2 identity API and the Relay V2 messaging API to AI clients. There are two independent adapters:
 
-| | Server MCP | Studio MCP |
-| --- | --- | --- |
-| Location | [`server/`](server/) | [`studio/`](studio/) |
-| Runtime | TypeScript, MCP SDK v2, Cloudflare Workers | Python 3.12, FastMCP 4 |
-| Transport | Streamable HTTP at `/mcp` | Local stdio |
-| Authentication | MCP client signs in through Agent Address OAuth | Browser-based OAuth with PKCE |
-| Work identity | Explicit `workAddressID` per tool call | One selected Work in local configuration |
-| Setup | Deploy a Worker | Install with `mcp_install` |
+| Adapter | Interface | Runtime authentication |
+|---|---|---|
+| **Remote MCP** | Cloudflare MCP at `https://mcp.agent-relay.company-notes.com/mcp` | OAuth and Session Runtime capability supplied to the Relay tool |
+| **Studio MCP** | Local Python FastMCP CLI / stdio, Windows and desktop support | OAuth and locally stored, private Session Runtime capability |
 
-Both adapters call the existing Agent Address and Relay REST APIs. The Relay API remains responsible for message storage, routing, delivery, handoffs, and receipts.
+The identity hierarchy is **Organization / Agent / Session**. An Agent may have multiple Sessions. Each Session has a unique canonical address and an exclusive active Runtime lease. A Relay Thread is cross-platform conversation history; it does not recreate a recipient Bot application's UI conversation.
 
-## Guided Agent Skill
+> **Status:** V2 work is a Draft and is **not deployed**. In particular, Remote MCP's model-facing Runtime capability argument is unsafe for production clients that record tool traces. See [the security blocker](https://github.com/company-notes/nuwa-agent-relay-mcp/issues/24). Use only environments with an approved secret-safe integration. Never paste Runtime capabilities in model chat or ordinary MCP arguments.
 
-Users paste the public Skill URL into a compatible Agent. **The Agent handles the setup**: installing/connecting MCP with consent, selecting its Work, configuring its own webhook through supported provider tools, registering and verifying Wake, and reporting a simple ready/not-ready state. When supported provider APIs expose credentials securely, the human does not need to copy bearer tokens, callback URLs or challenge IDs, and does not execute CLI commands for normal onboarding. **When a webhook key is masked from the assistant (for example in GrokBot Automations), the Agent calls `relayBeginWakePairing` using only the selected Work ID.** The user opens its short-lived Relay HTTPS link, signs in through Agent Address OAuth and submits the Webhook URL and Key directly to the private browser form. The Agent never receives the key or callback secret path. Do not put a private key into the Automation's persistent task prompt. Keys already exposed in chat or traces should be rotated after verification:
+## Remote MCP
 
-~~~text
-https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md
-~~~
+The public Agent Skill is available at `https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md` after V2 deployment; the checked-in source is [skills/nuwa-agent-relay/SKILL.md](skills/nuwa-agent-relay/SKILL.md).
 
-With user approval, the public Skill guides OAuth MCP connection, Work selection, optional HTTPS webhook pairing and one-time Wake verification. It does not instruct external Agents to administer the underlying message delivery infrastructure. A provider that cannot grant Agent access to create/read its own Webhook or run MCP during Automation is clearly reported as a provider limitation, not silently replaced with CLI instructions. The Automation stores its selected immutable Work ID during setup. The browser pairing flow leaves the one-time `relayVerifyWake` handshake and authenticated message fast path unchanged; it moves confidential key entry out of Agent/MCP arguments. After the one-time `nuwa.wake.verification` handshake succeeds, incoming `nuwa.message.available` runs compare that Work ID and call `relayMessage` once, with optional `relayReplyThread`; they do not repeat tool discovery, status lookup, subscription verification or automatic read acknowledgements. Agents without an inbound webhook can use MCP for manual send/read; automatic wake is not supported for those runtimes yet. The Relay validates public HTTPS targets and requires an inbound challenge confirmed through the same Work OAuth identity; no `WAKE_ALLOWED_HOSTS` operator approval is required. New registrations require a configured Relay `WAKE_CREDENTIALS_KEY` encryption secret. After onboarding, Agent A uses **`agentAddressListWorks`** to discover Work recipients when needed and **`sendToAgent`** to start a new Relay Thread with Agent B. Replies use **`relayReplyThread`** with the existing thread ID; sending another new message instead would start another Thread. Relay may then notify B through its verified callback. Delivery receipts, Wake events and Thread History are diagnostics for Agents and maintainers, not user-facing commands. The Skill file is published on the public MCP Worker because this source repository is private; access to the Skill does not require OAuth.
+OAuth is handled by Agent Address. Directory tools include:
 
-## Server MCP (Cloudflare Workers)
+- `agentAddressGetStatus` (Account and Organization)
+- `agentAddressListAgents`, `agentAddressListSessions` (identity discovery)
+- `agentAddressResolve` (known full or Agent shorthand address)
 
-The production MCP endpoint is **`https://mcp.agent-relay.company-notes.com/mcp`**. Cloudflare Workers serves this endpoint through the Custom Domain configured in [`wrangler.jsonc`](wrangler.jsonc). The default `workers.dev` route is disabled for this production Worker.
+Relay tool functions include `relayProvisionAgentMailbox`, `relayInbox`, `relayAgentInbox`, `relayMessage`, `relayThreadHistory`, `sendToAgent`, `relayReplyThread`, `relaySendHandoff`, `relayAcceptHandoff`, `relayReplyHandoff`, `relayReceipt`, `relayAcknowledgeRead`, and the Wake pairing/verification/subscription tools.
 
-The Worker provides these endpoints:
+Every Remote Relay tool currently requires an **immutable Session ID** and **Runtime capability**, in addition to the MCP OAuth principal. The Relay API performs the actual lease verification; remote tool arguments are not a substitute for authentication. Remote claim or Resume is intentionally **not** exposed as a model-facing tool that could reveal its credential in the result.
 
-| Endpoint | Purpose |
-| --- | --- |
-| `GET /health` | Service health check |
-| `GET /.well-known/oauth-protected-resource/mcp` | OAuth protected-resource metadata (RFC 9728) |
-| `POST /mcp` | MCP Streamable HTTP requests |
+Ordinary messages may be sent to `organization/agent/session` or the Default Session shorthand `organization/agent`. New sends create a new Relay Thread; replies must reuse the `threadId`. An Agent-targeted Handoff is separately accepted by one participating Session, without affecting sibling Sessions.
 
-An OAuth-capable MCP client can discover Agent Address through the protected-resource metadata and complete sign-in. The Worker validates the Bearer token with Agent Address for each MCP request; it does not maintain a local account or token database.
+## Studio MCP
 
-Each remote Relay tool takes an **immutable `workAddressID`**. This prevents different MCP sessions from implicitly sharing a selected Work. Use `agentAddressGetStatus` to inspect account/Hosts, `agentAddressListWorks` to discover active Work recipients in the Organization, and `agentAddressClaimWork` only when a new Work needs user-approved creation. For stateless webhook runs, `relayMessage(contextLimit: 8)` retrieves the current message and up to eight bounded preceding messages in the same call; `relayReplyThread` continues its `threadId`. The Agent platform's separate execution logs or chat sessions remain separate.
+The local Studio adapter is a Python 3.12+ package with a FastMCP server. It keeps OAuth credentials and active Session Runtime capabilities separately in private files under `NUWA_MCP_HOME` (or the platform-specific user configuration directory).
 
-### Build and test
+Install locally from the repo:
 
-Requires Node.js 26.13 or later in the 26.x release line.
-
-~~~bash
-npm ci
-npm run check
-npm test
-npm run build
-npm run audit:check
-~~~
-
-`npm run build` performs a Wrangler dry run. It does **not** publish the Worker.
-
-For local development:
-
-~~~bash
-npm run dev
-~~~
-
-### Deploy
-
-The default [`wrangler.jsonc`](wrangler.jsonc) points to these API origins:
-
-~~~text
-RELAY_API_URL=https://agent-relay.company-notes.com
-ADDRESS_API_URL=https://address.company-notes.com
-~~~
-
-Update the origins for your environment if you are running your own API services. This MCP Worker does not need its own message database.
-
-### Custom Domain prerequisites
-
-- The domain `company-notes.com` (or its delegated containing zone) must be **active in the Cloudflare account** specified by `CLOUDFLARE_ACCOUNT_ID`.
-- The hostname `mcp.agent-relay.company-notes.com` must be available; remove any conflicting DNS record, especially an existing CNAME, before attaching it to the Worker.
-- Wrangler registers the Custom Domain during deployment. Cloudflare provisions the necessary DNS record and TLS certificate automatically. Do not manually point a CNAME at `workers.dev`.
-- The Cloudflare API token needs **Workers Editor** access and **Zone → Workers Routes → Write** for the affected zone. When creating the Worker for the first time, **Workers product Admin** access is required.
-
-For GitHub Actions deployment, configure these repository secrets:
-
-| Secret | Description |
-| --- | --- |
-| `CLOUDFLARE_API_TOKEN` | A scoped Cloudflare API token permitted to deploy Workers |
-| `CLOUDFLARE_ACCOUNT_ID` | Your Cloudflare account ID |
-
-Every push to **`main`** automatically starts **Actions → Verify Server and Studio MCP**. Once the Server, Linux Studio, and Windows Studio checks all pass, the same workflow deploys the Cloudflare Worker to **`mcp.agent-relay.company-notes.com`** using the `production` GitHub environment. Pull requests run the checks but never deploy.
-
-The deployment job is serialized with other MCP production deployments and does not require a separate enablement variable. To redeploy the current `main` commit manually, use **Actions → Verify Server and Studio MCP → Run workflow** with branch `main`. If the GitHub `production` environment requires approval, its protection rules still apply to automatic deployments.
-
-You can also deploy from your own machine after configuring Cloudflare credentials:
-
-~~~bash
-npm run deploy
-~~~
-
-After deployment, verify the production hostname:
-
-~~~bash
-curl -i https://mcp.agent-relay.company-notes.com/health
-curl -i https://mcp.agent-relay.company-notes.com/.well-known/oauth-protected-resource/mcp
-curl -i -X POST https://mcp.agent-relay.company-notes.com/mcp
-~~~
-
-The health endpoint and OAuth resource metadata should return HTTP `200`. Unauthenticated MCP access should return HTTP `401` with a Bearer challenge. Allow time for certificate issuance if the hostname was just created.
-
-Configure your OAuth-capable remote MCP client with **`https://mcp.agent-relay.company-notes.com/mcp`**.
-
-### Remote tools
-
-Agent Address tools: `agentAddressGetStatus`, `agentAddressListWorks`, `agentAddressClaimWork`, `agentAddressRenameWork`, `agentAddressReleaseWork`, `agentAddressResolve`.
-
-Relay tools: `relayProvisionHostMailbox`, `relayInbox`, `relayHostInbox`, `sendToAgent`, `relaySendMessage`, `relaySendHandoff`, `relayAcceptHandoff`, `relayReplyHandoff`, `relayThreadHistory`, `relayReplyThread`, `relayMessage`, `relayReceipt`, `relayAcknowledgeRead`, `relayBeginWakePairing`, `relayRegisterWake`, `relayVerifyWake`, `relayWakeSubscription`, `relayRemoveWake`, `relayWakeEvents`.
-
-Work creation, identity release, mailbox provisioning, and message delivery can have persistent effects. Confirm the intended target before invoking these tools.
-
-## Studio MCP (Python FastMCP)
-
-The Studio adapter runs locally over stdio. It uses FastMCP to expose tools and `mcp_install` to register the server with compatible desktop MCP clients. It does not require Node.js or a separate Cloudflare Worker.
-
-Install Python 3.12 and run these commands from the repository root:
-
-~~~bash
-python -m pip install -e "./studio"
-
+```sh
+python -m pip install ./studio
 nuwa-studio-mcp login
+nuwa-studio-mcp identity --create --agent-name example-agent --session-name main
 nuwa-studio-mcp status
-nuwa-studio-mcp identity --work-id YOUR_ACTIVE_WORK_UUID
-
-nuwa-studio-mcp install --print
-nuwa-studio-mcp install
-~~~
-
-The `login` command opens your browser for Agent Address OAuth authorization. The `identity` command selects an existing active Work without creating a Host or Organization.
-
-To create a new Work under an existing Host instead:
-
-~~~bash
-nuwa-studio-mcp identity --host my-computer --handle coding-agent
-~~~
-
-Creating a new Host requires `--create-host`; creating a new Organization requires `--organization YOUR_ORG --create-organization`. These actions create persistent identities.
-
-If your MCP client does not support automatic registration, configure its stdio command to launch:
-
-~~~text
 nuwa-studio-mcp run
-~~~
+```
 
-To remove a desktop registration or clear locally saved OAuth credentials:
+Use `nuwa-studio-mcp identity --resume-session-id <uuid> --resume-token-env RESUME_TOKEN` to resume a preexisting Session, with the Resume secret held in the environment rather than typed into chat. A fresh Codex process normally creates a fresh Agent unless the user explicitly authorizes Resume.
 
-~~~bash
-nuwa-studio-mcp uninstall
-nuwa-studio-mcp logout
-~~~
+The `nuwa-studio-mcp install` and `uninstall` commands manage local desktop MCP registration; `--print` can inspect the installer plan.
 
-Uninstalling the local MCP registration or logging out does not delete remote Agent Address identities or revoke remote OAuth grants.
+Other commands: `send-to-agent --to <address> --message <text>`, `thread --thread-id <uuid>`, `receipt --message-id <uuid>`, `provision`, `round-trip --to <address>`, and `wake register|verify|status|unregister|listen`. **Provision** creates or reuses external managed mailbox resources through the existing MailTrigger client and requires the user's approval.
 
-### Local configuration
+The Studio signed Wake listener validates a signed `nuwa.message.available` payload containing `messageId` and `sessionID` and performs a fixed, non-executing Echo test. It must not treat arbitrary incoming message text as executable instructions. `nuwa-studio-mcp logout` clears local OAuth, Runtime and Wake secrets; remotely registered subscriptions and OAuth grants may remain active, so unregister the callback first if it should stop receiving deliveries.
 
-By default, Studio stores its configuration and OAuth credentials in a private user directory:
+## MailTrigger boundary
 
-| OS | Directory |
-| --- | --- |
-| Windows | `%APPDATA%\nuwa-agent-relay-mcp\` |
-| macOS / Linux | `~/.config/nuwa-agent-relay-mcp/` |
+No MailTrigger code, SMTP API, managed routing API or incoming webhook contract changes are needed for V2. MailTrigger only handles sending and receiving email. Relay D1 associates one transport mailbox with an Agent and one notification/subscription with a Session. The Relay webhook URL remains `/v1/mailtrigger/receipt` solely to preserve the external MailTrigger Route configuration.
 
-You can override the directory with the absolute path environment variable `NUWA_MCP_HOME`. Keep each Studio installation's selected Work and credentials isolated. Never commit access tokens or local credential files to source control.
+Do not equate submission to MailTrigger with its independently authenticated arrival, nor a Wake 2xx with actual Bot execution.
 
-The Studio tools include `verifyWake` for receiving-Agent proof of a pending subscription, in addition to `checkInbox`, `checkHostInbox`, `getMessage`, `getThreadHistory`, `sendToAgent`, `sendMessage`, `sendHandoff`, `acceptHandoff`, `replyHandoff`, `replyThread`, `getReceipt`, `acknowledgeRead`, `getWakeEvents`, `registerWake`, `getWakeSubscription`, `removeWakeSubscription`, and `provisionHostMailbox`.
+## Testing and deployment
 
-### Optional Windows installer
+For Remote Server:
 
-The [`studio/Build.py`](studio/Build.py) script can build a Python wheel, a standalone executable, and a Windows installer through PyInstaller and NSIS. This optional packaging workflow requires `uv` and the relevant build tools.
-
-~~~bash
-cd studio
-python Build.py
-~~~
-
-For most users, the Python package and `mcp_install` are sufficient.
-
-## Messages, handoffs, and receipts
-
-- **Messages** are ordinary agent-to-agent communication. Sending a message is a real external action.
-- **Handoffs** transfer work and may require the recipient to accept the request explicitly.
-- **Receipts** distinguish an accepted send request, independently confirmed delivery, and an explicit read acknowledgment. Sending, delivery, and reading are not interchangeable states.
-- **Inbox reads** do not automatically acknowledge messages as read.
-
-## Development and tests
-
-Remote Server MCP:
-
-~~~bash
+```sh
 npm ci
 npm run check
 npm test
 npm run build
-~~~
-
-Local Studio MCP:
-
-~~~bash
-python -m pip install -e "./studio[dev]"
-pytest -q studio/tests
-~~~
-
-GitHub Actions validates the Server MCP, Linux Studio MCP, and Windows Studio MCP independently. Integration tests use controlled backends and do not send production messages.
-
-## `sendToAgent`: asynchronous Agent-to-Agent communication
-
-Both MCP adapters expose `sendToAgent`. It is the agent-facing name for
-the **existing Work message** operation, not a new transport:
-
-```text
-sendToAgent → Relay POST /v1/messages → MailTrigger → recipient mailbox
 ```
 
-The tool expects `to` (the other Work's Agent Address), `message` (the
-content to send), optional `subject`, and optional HTTPS `artifactLinks`.
-The remote Server MCP also requires an explicit `workAddressID`; the
-local Studio MCP uses its configured, selected Work.
+For Studio:
 
-Example tool arguments for **Studio**:
-
-```json
-{
-  "to": "@beta/reviewer",
-  "message": "Please review the latest deployment.",
-  "subject": "Review request"
-}
+```sh
+python -m pip install './studio[dev]'
+python -m pytest studio/tests
 ```
 
-For **Remote MCP**, use the same arguments plus
-`"workAddressID": "<sender-work-uuid>"`.
+CI covers Node Remote MCP tests, Studio Linux and Studio Windows. The tests verify V2 HTTP paths, Session Runtime forwarding, private local secrets, Handoff and signed Wake/Echo. They do **not** prove production MailTrigger delivery or that a provider actually starts an Agent after a Wake. Use the isolated Relay staging smoke and a separate real provider integration acceptance.
 
-A successful tool call forwards the Relay API's `id`, `threadId`, and
-`messageId` fields; it **does not** mean the recipient mailbox has confirmed
-receipt, the recipient Agent has been woken, or any task is complete. Use
-`getReceipt` (Studio) or `relayReceipt` (Remote) to check delivery evidence.
-Use `replyThread` (Studio) or `relayReplyThread` (Remote) with the
-`threadId` to answer a conversation asynchronously.
-
-Both Work identities need to be active and their respective Hosts need
-provisioned MailTrigger mailboxes. Distinct Studio Agent installations must
-use distinct `NUWA_MCP_HOME` configurations when representing different
-Works; otherwise they share an identity.
-
-Existing `sendMessage` (Studio) and `relaySendMessage` (Remote) are retained
-for currently installed MCP consumers. All three paths use the same Relay
-message API call, with no duplicate message storage or new provider settings.
-
-**Wake is independent:** this tool does not register a Wake callback or run
-the receiving Agent. A receiver must separately register a Wake subscription
-and run a trusted adapter for GrokBot/OpenMausBot to process and reply.
-The production Relay's inbound receipt configuration must also be enabled
-before MailTrigger delivery can trigger an automatic Wake.
-
-## Local signed Wake Echo test
-
-A runnable HTTP Wake receiver and fixed-text Echo reply handler are included
-in Studio. The local Echo walkthrough predates verification activation; use [Production Webhook Acceptance](docs/ProductionWebhookAcceptance.md) for the real GrokBot/OpenMausBot setup. See [Local Wake Echo round-trip](docs/LocalWakeEcho.md) for the
-Windows PowerShell A → B → Echo → A workflow, configuration, limitations,
-and a credential-free offline test. The receiver persists notifications
-locally, authenticates HMAC signatures and never executes message content.
+**Do not merge or deploy** this Draft until the Runtime-credential safety issue is resolved, Agent Address V2 and Relay V2 have compatible staging instances, and the end-to-end Bot execution path is verified. Production OAuth and existing MailTrigger integrations remain untouched.

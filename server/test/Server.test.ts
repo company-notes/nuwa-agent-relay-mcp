@@ -102,6 +102,90 @@ test('user binds a Session privately; Remote MCP sends with encrypted Runtime le
   }
 });
 
+test('Skill-first OAuth alone privately creates one persistent Agent/Session and sends immediately', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const ensured = await scenario.tool('agentAddressEnsureIdentity', {
+      agentDisplayName: '小晴',
+    });
+    const identity = JSON.parse(ensured.result.content[0].text) as {
+      sessionID: string;
+      canonical: string;
+      created: boolean;
+    };
+
+    assert.equal(ensured.result.isError, undefined);
+    assert.equal(identity.created, true);
+    assert.equal(identity.sessionID, SESSION_A);
+    assert.equal(identity.canonical, 'nuwa/xiaoqing/main');
+    assert.equal(scenario.claimCount, 1);
+    assert.equal(scenario.database.rows.size, 1);
+    assert.doesNotMatch(JSON.stringify(ensured), /runtime_private|resume_secret/);
+    assert.doesNotMatch(JSON.stringify([...scenario.database.rows.values()]),
+      /runtime_private|resume_secret|oauth-a/);
+
+    const repeated = await scenario.tool('agentAddressEnsureIdentity', {}, 'oauth-a-refresh');
+
+    assert.equal(JSON.parse(repeated.result.content[0].text).sessionID, SESSION_A);
+    assert.equal(JSON.parse(repeated.result.content[0].text).created, false);
+    assert.equal(scenario.claimCount, 1);
+
+    const sent = await scenario.tool('sendToAgent', {
+      to: 'nuwa/author/main', message: 'Hello from my own address.',
+    }, 'oauth-a-refresh');
+
+    assert.equal(sent.result.isError, undefined);
+    assert.equal(scenario.calls.length, 1);
+    assert.equal(scenario.calls[0].url.searchParams.get('session_id'), SESSION_A);
+    assert.equal(scenario.calls[0].headers.get('x-nuwa-runtime-token'), RUNTIME_SECRET);
+  } finally {
+    scenario.restore();
+  }
+});
+
+test('first OAuth login automatically creates a personal Organization when none exists', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.organizationExists = false;
+  scenario.install();
+
+  try {
+    const ensured = await scenario.tool('agentAddressEnsureIdentity', {});
+
+    assert.equal(ensured.result.isError, undefined);
+    assert.equal(scenario.registerOrganizationCount, 1);
+    assert.equal(scenario.claimCount, 1);
+    assert.equal(scenario.database.rows.size, 1);
+  } finally {
+    scenario.restore();
+  }
+});
+
+test('expired Runtime safely resumes the same saved Session after OAuth token refresh', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const first = await scenario.tool('agentAddressEnsureIdentity', {});
+    assert.equal(first.result.isError, undefined);
+
+    const row = [...scenario.database.rows.values()][0];
+    row.expiresAt = new Date(Date.now() - 60_000).toISOString();
+    scenario.activeLeases.delete(SESSION_A);
+
+    const resumed = await scenario.tool('agentAddressEnsureIdentity', {}, 'oauth-a-refresh');
+
+    assert.equal(resumed.result.isError, undefined);
+    assert.equal(JSON.parse(resumed.result.content[0].text).sessionID, SESSION_A);
+    assert.equal(scenario.resumeCount, 1);
+    assert.equal(scenario.claimCount, 1);
+    assert.doesNotMatch(JSON.stringify(resumed), /resume_secret|runtime_private/);
+  } finally {
+    scenario.restore();
+  }
+});
+
 test('tool schemas expose neither Runtime/Resume capabilities nor caller Session IDs', async () => {
   const scenario = new RemoteMCPScenario();
   scenario.install();
@@ -110,6 +194,7 @@ test('tool schemas expose neither Runtime/Resume capabilities nor caller Session
     const schemas = JSON.stringify(await scenario.toolSchemas());
 
     assert.match(schemas, /sendToAgent/);
+    assert.match(schemas, /agentAddressEnsureIdentity/);
     assert.match(schemas, /relayBeginWakePairing/);
     assert.doesNotMatch(schemas, /runtimeToken|resumeToken|runtime_token|sessionID/);
     assert.doesNotMatch(schemas, /bearerToken|signingSecret/);
@@ -118,24 +203,31 @@ test('tool schemas expose neither Runtime/Resume capabilities nor caller Session
   }
 });
 
-test('OAuth principal isolation prevents another token from using the bound Runtime', async () => {
+test('another OAuth grant receives a separate Agent and never borrows the first Runtime', async () => {
   const scenario = new RemoteMCPScenario();
   scenario.install();
 
   try {
     assert.equal((await scenario.bind()).status, 201);
 
-    const rejected = await scenario.tool('sendToAgent', {
-      to: 'nuwa/author/main', message: 'Impersonation attempt',
+    const first = await scenario.privateRequest('GET', 'oauth-b');
+    assert.deepEqual(await first.json(), { ok: true, data: { bound: false } });
+
+    const separate = await scenario.tool('sendToAgent', {
+      to: 'nuwa/author/main', message: 'A separate grant is a separate Agent.',
     }, 'oauth-b');
 
-    assert.equal(rejected.result.isError, true);
-    assert.match(rejected.result.content[0].text, /binding/i);
-    assert.equal(scenario.calls.length, 0);
-    assert.equal((await scenario.privateRequest('GET', 'oauth-b')).status, 200);
+    assert.equal(separate.result.isError, undefined);
+    assert.equal(scenario.calls.length, 1);
+    assert.equal(scenario.calls[0].url.searchParams.get('session_id'), SESSION_B);
+    assert.equal(scenario.calls[0].headers.get('x-nuwa-runtime-token'), RUNTIME_SECRET + '_b');
+    assert.equal(scenario.database.rows.size, 2);
 
-    const target = await scenario.privateRequest('GET', 'oauth-b');
-    assert.deepEqual(await target.json(), { ok: true, data: { bound: false } });
+    const firstAgent = await scenario.privateRequest('GET', 'oauth-a');
+    const secondAgent = await scenario.privateRequest('GET', 'oauth-b');
+
+    assert.notEqual((await firstAgent.json() as { data: { sessionID: string } }).data.sessionID,
+      (await secondAgent.json() as { data: { sessionID: string } }).data.sessionID);
   } finally {
     scenario.restore();
   }
@@ -154,9 +246,13 @@ test('revoking a private binding releases the Lease and blocks future Relay requ
     assert.equal(scenario.releaseCount, 1);
     assert.equal(scenario.database.rows.size, 0);
 
-    const rejected = await scenario.tool('relayInbox', {});
+    // The revoked credential cannot be recovered from D1. Reusing this valid
+    // OAuth grant later creates a separate, new Agent on first normal use.
+    const fresh = await scenario.tool('agentAddressEnsureIdentity', {});
 
-    assert.equal(rejected.result.isError, true);
+    assert.equal(fresh.result.isError, undefined);
+    assert.equal(scenario.claimCount, 1);
+    assert.equal(scenario.database.rows.size, 1);
     assert.equal(scenario.calls.length, 0);
   } finally {
     scenario.restore();
@@ -177,11 +273,10 @@ test('revoking a binding clears stale credentials even after Runtime lease was i
     assert.deepEqual(await revoked.json(), { ok: true, data: { revoked: true } });
     assert.equal(scenario.database.rows.size, 0);
 
-    const rejected = await scenario.tool('sendToAgent', {
-      to: 'nuwa/author/main', message: 'Cannot run after revocation.',
-    });
+    const fresh = await scenario.tool('agentAddressEnsureIdentity', {});
 
-    assert.equal(rejected.result.isError, true);
+    assert.equal(fresh.result.isError, undefined);
+    assert.equal(scenario.claimCount, 1);
     assert.equal(scenario.calls.length, 0);
   } finally {
     scenario.restore();

@@ -255,7 +255,17 @@ export class SessionBindings {
     );
 
     if (row.expiresAt > new Date().toISOString()) {
-      await this.address(authorization).release(row.sessionID, runtimeToken);
+      try {
+        await this.address(authorization).release(row.sessionID, runtimeToken);
+      } catch (error) {
+        if (!(error instanceof APIError) || error.status !== 409 ||
+            error.code !== 'runtime_not_owner') {
+          throw error;
+        }
+
+        // The lease is already gone. The stale encrypted binding must still be revoked.
+        SessionBindings.logger.error('stale_lease_binding_revoked', { status: error.status });
+      }
     }
 
     const deleted = await this.env.BINDINGS_DB.prepare(

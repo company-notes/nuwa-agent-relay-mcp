@@ -52,12 +52,12 @@ class WakeSubscription:
             })
 
         if not response.get("challengeDelivered"):
-            logger.warning("Wake challenge delivery failed (workID=%s)", selectedSessionID)
+            logger.warning("Wake challenge delivery failed (sessionID=%s)", selectedSessionID)
 
         return {
             "status": "pending_verification",
             "sessionID": selectedSessionID,
-            "callbackAgent": urlparse(callbackURL).hostname,
+            "callbackHost": urlparse(callbackURL).hostname,
             "authMode": authMode,
             "verificationID": response["verificationId"],
             "challengeDelivered": bool(response.get("challengeDelivered")),
@@ -86,11 +86,11 @@ class WakeSubscription:
 
         if response.get("authMode") == "hmac" and self.config.wakePath().exists():
             details = self.load()
-            detailsReady = response.get("callbackAgent") == details.get("callback_host")
+            detailsReady = response.get("callbackHost") == details.get("callback_host")
 
         return {
             "enabled": response.get("enabled", False),
-            "callbackAgent": response.get("callbackAgent"),
+            "callbackHost": response.get("callbackHost"),
             "authMode": response.get("authMode"),
             "pending": response.get("pending"),
             "localSigningKeyReady": detailsReady,

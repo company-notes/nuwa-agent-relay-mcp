@@ -123,8 +123,16 @@ class TestWakeReceiver:
             try:
                 payload = {
                     "event": "nuwa.message.available",
-                    "messageId": backend.messageID,
-                    "sessionID": "session-b",
+                    "eventVersion": 2,
+                    "messageID": backend.messageID,
+                    "recipientSessionID": "session-b",
+                    "relayThreadID": backend.threadID,
+                    "senderSessionID": "session-a",
+                    "senderCanonicalAddress": "nuwa/alpha/main",
+                    "recipientAgentID": "agent-b",
+                    "recipientCanonicalAddress": "nuwa/beta/main",
+                    "recipientBotID": "bot-b",
+                    "body": "Please check my build.",
                 }
                 raw = json.dumps(payload, separators=(",", ":")).encode()
                 valid = "sha256=" + hmac.new(
@@ -133,12 +141,31 @@ class TestWakeReceiver:
 
                 self._request(target, raw, "sha256=invalid", expectedStatus=401)
 
-                otherSession = dict(payload, sessionID="session-a")
+                otherSession = dict(payload, recipientSessionID="session-a")
                 otherRaw = json.dumps(otherSession).encode()
                 otherSignature = "sha256=" + hmac.new(
                     backend.signingSecret.encode(), otherRaw, hashlib.sha256,
                 ).hexdigest()
                 self._request(target, otherRaw, otherSignature, expectedStatus=403)
+
+                invalidVersion = dict(payload, eventVersion=1)
+                invalidVersionRaw = json.dumps(invalidVersion).encode()
+                invalidVersionSignature = "sha256=" + hmac.new(
+                    backend.signingSecret.encode(), invalidVersionRaw, hashlib.sha256,
+                ).hexdigest()
+                self._request(target, invalidVersionRaw, invalidVersionSignature,
+                              expectedStatus=400)
+
+                legacyPayload = {
+                    "event": "nuwa.message.available",
+                    "messageId": backend.messageID,
+                    "sessionID": "session-b",
+                }
+                legacyRaw = json.dumps(legacyPayload).encode()
+                legacySignature = "sha256=" + hmac.new(
+                    backend.signingSecret.encode(), legacyRaw, hashlib.sha256,
+                ).hexdigest()
+                self._request(target, legacyRaw, legacySignature, expectedStatus=400)
 
                 accepted = self._request(target, raw, valid, expectedStatus=202)
                 assert accepted["accepted"] is True

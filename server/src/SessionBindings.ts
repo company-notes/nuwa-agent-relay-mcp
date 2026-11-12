@@ -139,6 +139,9 @@ export class SessionBindings {
         'Release the bound Runtime before selecting another Session.');
     }
 
+    // Fail before acquiring the exclusive Runtime if encrypted storage is unavailable.
+    await this.cipher();
+
     const client = this.address(authorization);
     const status = await client.status() as AccountStatus;
 

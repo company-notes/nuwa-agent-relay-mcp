@@ -24,6 +24,8 @@ jobs:
         run: npm run check
       - name: Server OAuth and MCP tests
         run: npm test
+      - name: Real local D1 migration and Session binding SQL
+        run: npm run test:d1:local
       - name: Cloudflare Worker bundle
         run: npm run build
       - run: npm run audit:check

@@ -21,7 +21,16 @@ class WakeReceiver:
     """Verify signed HTTP callbacks and run queued messages off the HTTP path."""
 
     MAX_BYTES = 8192
-    MESSAGE_ID_PATTERN = re.compile(r"^[0-9a-f-]{36}$", re.IGNORECASE)
+    MESSAGE_ID_PATTERN = re.compile(
+        r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        re.IGNORECASE,
+    )
+    EVENT_FIELDS = {"event", "eventVersion", "messageID", "recipientSessionID"}
+    DISPATCH_FIELDS = {
+        "relayThreadID", "senderSessionID", "senderCanonicalAddress",
+        "recipientAgentID", "recipientCanonicalAddress", "recipientBotID", "body",
+    }
+    OPTIONAL_DISPATCH_FIELDS = {"recipientPlatformThreadID"}
 
     def __init__(self, config: LocalConfig, client):
         self.config = config
@@ -46,23 +55,33 @@ class WakeReceiver:
         except (UnicodeDecodeError, json.JSONDecodeError) as error:
             raise WakeRequestError(400, "Wake payload must be JSON.") from error
 
-        if not isinstance(payload, dict) or set(payload) != {
-            "event", "messageId", "sessionID",
-        }:
+        if not isinstance(payload, dict):
             raise WakeRequestError(400, "Unexpected Wake payload structure.")
 
-        messageID = payload["messageId"]
+        fields = set(payload)
+        additionalFields = fields - self.EVENT_FIELDS
+
+        if not self.EVENT_FIELDS.issubset(fields) or (
+            additionalFields and
+            (not self.DISPATCH_FIELDS.issubset(additionalFields) or
+             not additionalFields.issubset(
+                 self.DISPATCH_FIELDS | self.OPTIONAL_DISPATCH_FIELDS))
+        ):
+            raise WakeRequestError(400, "Unexpected Wake payload structure.")
+
+        messageID = payload["messageID"]
 
         if (payload["event"] != "nuwa.message.available" or
+                payload["eventVersion"] != 2 or
                 not isinstance(messageID, str) or
                 not self.MESSAGE_ID_PATTERN.fullmatch(messageID)):
             raise WakeRequestError(400, "Invalid Wake event or message ID.")
 
-        if payload["sessionID"] != self.config.requireSession():
+        if payload["recipientSessionID"] != self.config.requireSession():
             raise WakeRequestError(403, "Wake targeted another Session.")
 
         isNew = self.inbox.enqueue(messageID)
-        return {"accepted": True, "messageId": messageID, "duplicate": not isNew}
+        return {"accepted": True, "messageID": messageID, "duplicate": not isNew}
 
     def processDue(self) -> None:
         for messageID, attempts in self.inbox.due():

@@ -138,6 +138,14 @@ export class AddressAPIClient extends HTTPAPIClient {
     return this.request('GET', '/v2/account/status');
   }
 
+  grant(): Promise<unknown> {
+    return this.request('GET', '/v2/account/grant');
+  }
+
+  registerOrganization(input: Record<string, unknown>): Promise<unknown> {
+    return this.request('POST', '/v2/account/organization', { body: input });
+  }
+
   claimAgent(input: Record<string, unknown>): Promise<unknown> {
     return this.request('POST', '/v2/account/agents/claim', { body: input });
   }

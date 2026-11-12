@@ -12,10 +12,10 @@
     "test": "node --import tsx --test server/test/*.test.ts && node --test scripts/GuardBindingD1.checks.mjs",
     "build": "wrangler deploy --dry-run",
     "dev": "wrangler dev",
-    "deploy": "node scripts/GuardBindingD1.mjs --remote --require-migrated && wrangler deploy",
+    "deploy": "node scripts/GuardBindingD1.mjs --remote --require-migrated && wrangler deploy --config .wrangler.deploy.jsonc",
     "audit:check": "npm audit --audit-level=high",
     "db:migrate:local": "wrangler d1 migrations apply BINDINGS_DB --local",
-    "db:migrate:remote": "node scripts/GuardBindingD1.mjs --remote && wrangler d1 migrations apply BINDINGS_DB --remote",
+    "db:migrate:remote": "node scripts/GuardBindingD1.mjs --remote && wrangler d1 migrations apply BINDINGS_DB --remote --config .wrangler.deploy.jsonc",
     "test:d1:local": "npm run db:migrate:local && node scripts/VerifyLocalBindingsD1.mjs"
   },
   "dependencies": {

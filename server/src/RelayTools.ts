@@ -134,22 +134,6 @@ export class RelayTools extends MCPToolSet {
       {},
       () => this.client.call('POST', '/v2/wake-pairings'));
 
-    this.register('relayRegisterWake',
-      'Start a signed callback verification. Do not put private webhook secrets in tool arguments.',
-      { callbackURL: z.url(), authMode: z.enum(['hmac', 'bearer', 'capability']).optional() },
-      ({ callbackURL, authMode }) =>
-        this.client.call('POST', '/v2/wake-subscription', {
-          callbackUrl: callbackURL,
-          ...(authMode ? { authMode } : {}),
-        }));
-
-    this.register('relayVerifyWake',
-      'Complete an authenticated callback challenge for the bound Session.',
-      { verificationID: z.string().uuid(), challenge: z.string().min(1).max(128) },
-      ({ verificationID, challenge }) =>
-        this.client.call('POST', '/v2/wake-subscription/verification',
-          { verificationId: verificationID, challenge }));
-
     this.register('relayWakeSubscription',
       'Inspect the bound Session Wake without disclosing secrets.',
       {},

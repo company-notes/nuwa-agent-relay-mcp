@@ -74,6 +74,8 @@ class OAuthCredentials:
 
     def logout(self) -> None:
         self.config.authPath().unlink(missing_ok=True)
+        self.config.runtimePath().unlink(missing_ok=True)
+        self.config.wakePath().unlink(missing_ok=True)
 
     @classmethod
     def _callbackServer(cls, state: str) -> HTTPServer:
@@ -172,6 +174,10 @@ class OAuthCredentials:
                 "refresh_token": tokens.get("refresh_token"),
                 "expires_at": time.time() + tokens["expires_in"] if tokens.get("expires_in") else None,
             })
+            # A new OAuth login must never inherit a previous principal's
+            # Session Runtime or locally stored callback credential.
+            self.config.runtimePath().unlink(missing_ok=True)
+            self.config.wakePath().unlink(missing_ok=True)
         finally:
             timer.cancel()
             callback.server_close()

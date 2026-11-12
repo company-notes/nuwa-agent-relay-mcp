@@ -89,10 +89,9 @@ class StudioCLI:
             if args.agent_name or args.session_name:
                 raise ValueError("Resume cannot create or rename an Agent or Session.")
 
-            if not args.resume_token_env:
-                raise ValueError("Resume requires --resume-token-env.")
-
-            resumeToken = os.environ.get(args.resume_token_env)
+            resumeToken = (os.environ.get(args.resume_token_env)
+                           if args.resume_token_env
+                           else config.requireResumeToken(args.resume_session_id))
 
             if not resumeToken:
                 raise ValueError("Resume capability is missing from the selected environment variable.")
@@ -103,16 +102,18 @@ class StudioCLI:
                 raise ValueError("New Agent creation cannot use a Resume capability.")
 
             identity = address.claimAgent(args.agent_name, args.session_name)
+            resumeToken = identity.get("resumeToken")
 
         session = identity.get("session")
         runtimeToken = identity.get("runtimeToken")
 
         if not isinstance(session, dict) or not isinstance(session.get("id"), str) or (
-            not isinstance(runtimeToken, str) or not runtimeToken
+            not isinstance(runtimeToken, str) or not runtimeToken or
+            not isinstance(resumeToken, str) or not resumeToken
         ):
-            raise RuntimeError("Agent Address did not return the required Session Runtime capability.")
+            raise RuntimeError("Agent Address did not return valid Runtime and Resume capabilities.")
 
-        config.selectSession(session["id"], runtimeToken)
+        config.selectSession(session["id"], runtimeToken, resumeToken)
         return session["canonical"]
 
     @classmethod

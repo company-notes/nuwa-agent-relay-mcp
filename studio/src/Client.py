@@ -67,7 +67,7 @@ class AddressClient(HTTPAPIClient):
         return self.request("GET", "/v2/account/agents")
 
     def resolve(self, address: str):
-        return self.request("GET", "/v2/account/resolve", query={"address": address})
+        return self.request("GET", "/v2/account/addresses", query={"address": address})
 
     def claimAgent(
         self, agentName: str | None = None, sessionName: str | None = None,
@@ -80,17 +80,17 @@ class AddressClient(HTTPAPIClient):
         if sessionName:
             body["sessionName"] = sessionName
 
-        return self.request("POST", "/v2/account/agents/claim", body=body)
+        return self.request("POST", "/v2/account/agent-runtime-leases", body=body)
 
     def resumeSession(self, sessionID: str, resumeToken: str):
         return self.request(
-            "POST", "/v2/account/sessions/" + quote(sessionID, safe="") + "/resume",
+            "PUT", "/v2/account/sessions/" + quote(sessionID, safe="") + "/runtime-lease",
             body={"resumeToken": resumeToken},
         )
 
     def releaseRuntime(self, sessionID: str, runtimeToken: str):
         return self.request(
-            "POST", "/v2/account/sessions/" + quote(sessionID, safe="") + "/release",
+            "DELETE", "/v2/account/sessions/" + quote(sessionID, safe="") + "/runtime-lease",
             body={"runtimeToken": runtimeToken},
         )
 
@@ -137,11 +137,11 @@ class RelayClient(HTTPAPIClient):
         })
 
     def acceptHandoff(self, messageID: str):
-        return self.call("POST", f"/v2/handoffs/{quote(messageID, safe='')}/accept")
+        return self.call("PUT", f"/v2/handoffs/{quote(messageID, safe='')}/acceptance")
 
     def replyHandoff(self, messageID: str, body: str, artifactLinks: list[str] | None = None):
         return self.call(
-            "POST", f"/v2/handoffs/{quote(messageID, safe='')}/reply",
+            "POST", f"/v2/handoffs/{quote(messageID, safe='')}/replies",
             body={"body": body, "artifactLinks": artifactLinks or []},
         )
 
@@ -157,7 +157,7 @@ class RelayClient(HTTPAPIClient):
         return self.call("GET", f"/v2/messages/{quote(messageID, safe='')}/receipt", query=query)
 
     def acknowledgeRead(self, messageID: str):
-        return self.call("POST", f"/v2/messages/{quote(messageID, safe='')}/read")
+        return self.call("PUT", f"/v2/messages/{quote(messageID, safe='')}/read-receipt")
 
     def wakeEvents(self):
         return self.call("GET", "/v2/wake-events")
@@ -182,7 +182,7 @@ class RelayClient(HTTPAPIClient):
         return self.call("DELETE", "/v2/wake-subscription")
 
     def provisionAgentMailbox(self):
-        return self.call("POST", "/v2/agents/mailbox")
+        return self.call("POST", "/v2/agent-mailboxes")
 
 
 class RemoteBindingClient(HTTPAPIClient):

@@ -31,7 +31,7 @@ export class RelayTools extends MCPToolSet {
     this.register('relayProvisionAgentMailbox',
       'Provision the managed mailbox of the bound Agent. Requires user approval.',
       {},
-      () => this.client.call('POST', '/v2/agents/mailbox'));
+      () => this.client.call('POST', '/v2/agent-mailboxes'));
   }
 
   private registerInboxTools(): void {
@@ -99,15 +99,15 @@ export class RelayTools extends MCPToolSet {
     this.register('relayAcceptHandoff',
       'Atomically accept an Agent-level Handoff for the bound Session.',
       { messageID },
-      ({ messageID }) => this.client.call('POST',
-        '/v2/handoffs/' + encodeURIComponent(messageID as string) + '/accept'));
+      ({ messageID }) => this.client.call('PUT',
+        '/v2/handoffs/' + encodeURIComponent(messageID as string) + '/acceptance'));
 
     this.register('relayReplyHandoff',
       'Reply to an accepted Handoff in its existing Relay Thread.',
       { messageID, body, artifactLinks },
       ({ messageID, body: text, artifactLinks }) =>
         this.client.call('POST',
-          '/v2/handoffs/' + encodeURIComponent(messageID as string) + '/reply',
+          '/v2/handoffs/' + encodeURIComponent(messageID as string) + '/replies',
           { body: text, ...(artifactLinks ? { artifactLinks } : {}) }));
   }
 
@@ -124,8 +124,8 @@ export class RelayTools extends MCPToolSet {
     this.register('relayAcknowledgeRead',
       'Explicitly acknowledge a received message as the bound Session.',
       { messageID },
-      ({ messageID }) => this.client.call('POST',
-        '/v2/messages/' + encodeURIComponent(messageID as string) + '/read'));
+      ({ messageID }) => this.client.call('PUT',
+        '/v2/messages/' + encodeURIComponent(messageID as string) + '/read-receipt'));
   }
 
   private registerWakeTools(): void {

@@ -33,6 +33,7 @@ jobs:
           node --check scripts/PrepareProduction.mjs
           node --check scripts/GuardBindingD1.mjs
           node --check scripts/SmokeProduction.mjs
+          node --check scripts/VerifyWorkerSecret.mjs
       - run: npm run audit:check
 
   studio:
@@ -123,21 +124,11 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npm run deploy
-      - name: Confirm private Runtime encryption key is present in Worker Secrets
+      - name: Verify the permanent Runtime encryption Worker Secret safely
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        shell: bash
-        run: |
-          npx wrangler secret list --config .wrangler.deploy.jsonc --json | node --input-type=module -e '
-            let source = "";
-            for await (const chunk of process.stdin) source += chunk;
-            const secrets = JSON.parse(source);
-            if (!Array.isArray(secrets) ||
-                !secrets.some(item => item.name === "SESSION_BINDING_KEY")) {
-              throw Error("MCP Runtime encryption Worker Secret missing; refusing green deployment.");
-            }
-          '
+        run: node scripts/VerifyWorkerSecret.mjs
 
   smoke:
     name: Verify live official MCP Skill and OAuth protection

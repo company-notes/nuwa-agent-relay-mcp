@@ -5,8 +5,8 @@
 import { appendFile, readFile, writeFile } from 'node:fs/promises';
 
 class ProductionConfiguration {
-  static readonly ACCOUNT_ID = 'b471fa2c14470c664eec0a37616accd6';
-  static readonly D1_NAME = 'nuwa-agent-relay-mcp';
+  static ACCOUNT_ID = 'b471fa2c14470c664eec0a37616accd6';
+  static D1_NAME = 'nuwa-agent-relay-mcp';
 
   static require(name) {
     const value = (process.env[name] || '').trim();

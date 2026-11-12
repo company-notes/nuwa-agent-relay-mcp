@@ -17,8 +17,8 @@ class WakeSubscription:
         self.config = config
         self.client = client
 
-    @staticmethod
-    def validateCallbackURL(callbackURL: str) -> str:
+    @classmethod
+    def validateCallbackURL(cls, callbackURL: str) -> str:
         parsed = urlparse(callbackURL)
 
         if (parsed.scheme != "https" or not parsed.hostname or

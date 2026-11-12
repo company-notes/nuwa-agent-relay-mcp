@@ -22,6 +22,8 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - name: Remote MCP TypeScript
         run: npm run check
+      - name: Enforce Code Principles for TypeScript and scripts
+        run: npm run style:check
       - name: Server OAuth and MCP tests
         run: npm test
       - name: Real local D1 migration and Session binding SQL
@@ -47,7 +49,7 @@ jobs:
       - name: Install Studio FastMCP and test deps
         run: pip install -e './studio[dev]'
       - name: Check Python imports and style
-        run: ruff check studio/src --select E4,E7,E9,F
+        run: ruff check studio/src studio/tests --select E4,E7,E9,F
       - name: Python Studio tests
         run: pytest -q studio/tests
       - name: Preview mcp_install desktop registration

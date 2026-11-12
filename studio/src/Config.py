@@ -55,8 +55,8 @@ class LocalConfig:
     def wakeInboxPath(cls) -> Path:
         return cls.configDir() / "wake-inbox.sqlite3"
 
-    @staticmethod
-    def validateOrigin(value: str) -> str:
+    @classmethod
+    def validateOrigin(cls, value: str) -> str:
         parsed = urlparse(value)
 
         if (

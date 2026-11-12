@@ -20,13 +20,13 @@ class StudioMCP:
 
         @server.tool()
         def checkInbox():
-            """Read messages addressed to the selected Work without marking them read."""
+            """Read messages addressed to the selected Session without marking them read."""
             return client.inbox()
 
         @server.tool()
-        def checkHostInbox():
-            """List unclaimed Host handoffs."""
-            return client.hostInbox()
+        def checkAgentInbox():
+            """List unclaimed Agent handoffs."""
+            return client.agentInbox()
 
         @server.tool()
         def getMessage(messageID: str):
@@ -41,33 +41,27 @@ class StudioMCP:
         @server.tool()
         def sendToAgent(to: str, message: str, subject: str | None = None,
                         artifactLinks: list[str] | None = None):
-            """Submit an asynchronous Work message; success is not receipt, Wake or execution.
+            """Submit an asynchronous Session message; success is not receipt, Wake or execution.
 
             Use replyThread to answer an existing conversation.
             """
             return client.sendMessage(to, message, subject, artifactLinks)
 
         @server.tool()
-        def sendMessage(to: str, body: str, subject: str | None = None,
-                        artifactLinks: list[str] | None = None):
-            """Send a Work message to the recipient. This is a real external action."""
-            return client.sendMessage(to, body, subject, artifactLinks)
-
-        @server.tool()
         def sendHandoff(to: str, subject: str, body: str,
                         artifactLinks: list[str] | None = None):
-            """Send a Host handoff with optional artifact URLs."""
+            """Send a Agent handoff with optional artifact URLs."""
             return client.sendHandoff(to, subject, body, artifactLinks)
 
         @server.tool()
         def acceptHandoff(messageID: str):
-            """Explicitly accept a Host handoff."""
+            """Explicitly accept a Agent handoff."""
             return client.acceptHandoff(messageID)
 
         @server.tool()
         def replyHandoff(messageID: str, body: str,
                          artifactLinks: list[str] | None = None):
-            """Reply to an accepted Host handoff."""
+            """Reply to an accepted Agent handoff."""
             return client.replyHandoff(messageID, body, artifactLinks)
 
         @server.tool()
@@ -83,7 +77,7 @@ class StudioMCP:
 
         @server.tool()
         def acknowledgeRead(messageID: str):
-            """Explicitly record reading as the receiving Work."""
+            """Explicitly record reading as the receiving Session."""
             return client.acknowledgeRead(messageID)
 
         @server.tool()
@@ -94,7 +88,7 @@ class StudioMCP:
         @server.tool()
         def registerWake(callbackURL: str, authMode: str = "hmac",
                          bearerToken: str | None = None):
-            """Begin a verified Wake registration for this Work.
+            """Begin a verified Wake registration for this Session.
 
             Agent-managed Webhook callbacks may use HMAC, bearer or capability auth.
             Obtain provider credentials through approved tools rather than asking
@@ -104,23 +98,23 @@ class StudioMCP:
 
         @server.tool()
         def verifyWake(verificationID: str, challenge: str):
-            """Activate a pending Wake after this Work's webhook received its challenge."""
+            """Activate a pending Wake after this Session's webhook received its challenge."""
             return wakeSubscription.verify(verificationID, challenge)
 
         @server.tool()
         def getWakeSubscription():
-            """Read this Work's Wake subscription, without exposing its signing secret."""
+            """Read this Session's Wake subscription, without exposing its signing secret."""
             return wakeSubscription.status()
 
         @server.tool()
         def removeWakeSubscription():
-            """Remove this Work's Wake callback and the local signing key."""
+            """Remove this Session's Wake callback and the local signing key."""
             return wakeSubscription.remove()
 
         @server.tool()
-        def provisionHostMailbox():
-            """Explicitly create or reuse a managed Host mailbox."""
-            return client.provisionHostMailbox()
+        def provisionAgentMailbox():
+            """Explicitly create or reuse a managed Agent mailbox."""
+            return client.provisionAgentMailbox()
 
         return server
 

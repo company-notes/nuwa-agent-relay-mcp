@@ -163,6 +163,31 @@ test('revoking a private binding releases the Lease and blocks future Relay requ
   }
 });
 
+test('revoking a binding clears stale credentials even after Runtime lease was invalidated', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    assert.equal((await scenario.bind()).status, 201);
+    scenario.activeLeases.delete(SESSION_A);
+
+    const revoked = await scenario.privateRequest('DELETE', 'oauth-a');
+
+    assert.equal(revoked.status, 200);
+    assert.deepEqual(await revoked.json(), { ok: true, data: { revoked: true } });
+    assert.equal(scenario.database.rows.size, 0);
+
+    const rejected = await scenario.tool('sendToAgent', {
+      to: 'nuwa/author/main', message: 'Cannot run after revocation.',
+    });
+
+    assert.equal(rejected.result.isError, true);
+    assert.equal(scenario.calls.length, 0);
+  } finally {
+    scenario.restore();
+  }
+});
+
 test('expired or replaced Runtime fails closed before touching the Relay service', async () => {
   const scenario = new RemoteMCPScenario();
   scenario.install();

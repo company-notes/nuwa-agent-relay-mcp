@@ -7,10 +7,11 @@ import getpass
 import os
 
 from .Auth import OAuthCredentials
-from .Client import AddressClient, RelayClient
+from .Client import AddressClient, RelayClient, RemoteBindingClient
 from .Config import LocalConfig
 from .Installer import StudioInstaller
 from .LocalSmoke import LocalEchoRoundTrip
+from .RemoteSessionTransfer import RemoteSessionTransfer
 from .Server import StudioMCP
 from .WakeReceiver import WakeReceiver
 from .WakeSubscription import WakeSubscription
@@ -32,6 +33,17 @@ class StudioCLI:
         identity.add_argument("--session-name")
         identity.add_argument("--resume-session-id")
         identity.add_argument("--resume-token-env")
+
+        remoteBind = commands.add_parser("remote-bind",
+                                         help="Transfer the selected Session Runtime to trusted Remote MCP.")
+        remoteBind.add_argument("--mcp-origin", required=True)
+        remoteBind.add_argument("--mcp-oauth-token-env", required=True)
+        remoteBind.add_argument("--authorize-runtime-transfer", action="store_true")
+
+        remoteRevoke = commands.add_parser("remote-revoke",
+                                           help="Revoke a private Remote MCP Session binding.")
+        remoteRevoke.add_argument("--mcp-origin", required=True)
+        remoteRevoke.add_argument("--mcp-oauth-token-env", required=True)
 
         for name in ("install", "uninstall"):
             command = commands.add_parser(name)
@@ -140,6 +152,27 @@ class StudioCLI:
         if args.command == "identity":
             address = cls.selectIdentity(args, config, AddressClient(config.addressURL, credentials))
             print("Session identity selected: " + address)
+            return
+
+        if args.command in ("remote-bind", "remote-revoke"):
+            token = os.environ.get(args.mcp_oauth_token_env)
+
+            if not token:
+                raise ValueError("Selected Remote MCP OAuth token is missing from the environment.")
+
+            remote = RemoteBindingClient(args.mcp_origin, token)
+            transfer = RemoteSessionTransfer(config,
+                                             AddressClient(config.addressURL, credentials), remote)
+
+            if args.command == "remote-bind":
+                if not args.authorize_runtime_transfer:
+                    raise ValueError("Explicit --authorize-runtime-transfer is required.")
+
+                result = transfer.transfer()
+            else:
+                result = transfer.revoke()
+
+            print(json.dumps(result, indent=2, ensure_ascii=False))
             return
 
         if args.command in ("install", "uninstall"):

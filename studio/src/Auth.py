@@ -75,6 +75,7 @@ class OAuthCredentials:
     def logout(self) -> None:
         self.config.authPath().unlink(missing_ok=True)
         self.config.runtimePath().unlink(missing_ok=True)
+        self.config.resumePath().unlink(missing_ok=True)
         self.config.wakePath().unlink(missing_ok=True)
 
     @classmethod

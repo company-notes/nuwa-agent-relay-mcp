@@ -174,6 +174,21 @@ class TestWakeReceiver:
                 duplicate = self._request(target, raw, valid, expectedStatus=202)
                 assert duplicate["duplicate"] is True
 
+                minimal = {
+                    "event": "nuwa.message.available",
+                    "eventVersion": 2,
+                    "messageID": backend.messageID,
+                    "recipientSessionID": "session-b",
+                }
+                minimalRaw = json.dumps(minimal, separators=(",", ":")).encode()
+                minimalSignature = "sha256=" + hmac.new(
+                    backend.signingSecret.encode(), minimalRaw, hashlib.sha256,
+                ).hexdigest()
+                minimalResult = self._request(target, minimalRaw, minimalSignature,
+                                              expectedStatus=202)
+                assert minimalResult["duplicate"] is True
+                assert minimalResult["messageID"] == backend.messageID
+
                 assert len(backend.calls) == 2, "Webhook accepts without reading message synchronously"
                 receiver.processDue()
                 replies = [message for message in backend.messages

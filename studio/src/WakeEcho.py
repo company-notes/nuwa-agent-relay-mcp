@@ -18,7 +18,7 @@ class EchoAgentHandler:
     def process(self, messageID: str) -> None:
         message = self.client.getMessage(messageID)
 
-        if message["recipientSessionId"] != self.sessionID:
+        if message["recipientSessionID"] != self.sessionID:
             raise ValueError("Wake message does not belong to the configured Session.")
 
         # Handoffs have their own acceptance protocol. Do not auto-accept them.

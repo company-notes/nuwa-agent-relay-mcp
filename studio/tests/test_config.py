@@ -80,3 +80,21 @@ def test_cli_keeps_wake_receiver_and_message_tooling_available():
 
     assert "wake" in helpText or "identity" in helpText
     assert "send-to-agent" in helpText or "identity" in helpText
+
+
+def test_logout_clears_runtime_and_local_wake_secrets(tmp_path, monkeypatch):
+    from src.Auth import OAuthCredentials
+
+    monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path))
+    config = LocalConfig.load().selectSession("session-b", "old-runtime")
+    LocalConfig.writePrivate(config.authPath(), {"access_token": "old-oauth"})
+    LocalConfig.writePrivate(config.wakePath(), {"signing_secret": "private-wake"})
+
+    OAuthCredentials(config).logout()
+
+    assert not config.authPath().exists()
+    assert not config.runtimePath().exists()
+    assert not config.wakePath().exists()
+
+    with pytest.raises(ValueError, match="No Runtime capability"):
+        config.requireRuntimeToken()

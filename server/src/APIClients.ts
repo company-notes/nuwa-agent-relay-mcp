@@ -114,7 +114,7 @@ export class RelayAPIClient extends HTTPAPIClient {
   }
 
   async call(
-    method: 'GET' | 'POST' | 'DELETE',
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
     path: string,
     body?: Record<string, unknown>,
     query?: Record<string, string>,

@@ -101,23 +101,26 @@ export class HTTPAPIClient {
   }
 }
 
+export type BoundSession = { sessionID: string; runtimeToken: string };
+
 export class RelayAPIClient extends HTTPAPIClient {
   constructor(
     env: Env,
     authorization: string,
+    private readonly boundSession: () => Promise<BoundSession>,
     requester: typeof fetch = (input, init) => env.RELAY_WORKER.fetch(input, init),
   ) {
     super(env.RELAY_API_URL, authorization, requester);
   }
 
-  call(
+  async call(
     method: 'GET' | 'POST' | 'DELETE',
     path: string,
-    sessionID: string,
-    runtimeToken: string,
     body?: Record<string, unknown>,
     query?: Record<string, string>,
   ): Promise<unknown> {
+    const { sessionID, runtimeToken } = await this.boundSession();
+
     return this.request(method, path, { sessionID, runtimeToken, body, query });
   }
 }

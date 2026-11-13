@@ -274,27 +274,7 @@ export class RemoteMCPScenario {
         }
 
         if (url.pathname === '/v2/account/agents') {
-          return Response.json({ ok: true, data: [
-            { id: 'agent-a', handle: 'reviewer', displayName: null, defaultSessionHandle: 'main' },
-            { id: 'agent-x', handle: 'xiaoqing', displayName: '小晴', defaultSessionHandle: 'main' },
-            { id: 'agent-b1', handle: 'bear-one', displayName: '大熊', defaultSessionHandle: 'main' },
-            { id: 'agent-b2', handle: 'bear-two', displayName: '大熊', defaultSessionHandle: 'main' },
-            { id: 'agent-n', handle: 'newcomer', displayName: '新人', defaultSessionHandle: null },
-          ] });
-        }
-
-        if (url.pathname === '/v2/account/addresses') {
-          const requested = url.searchParams.get('address');
-
-          if (requested === 'nuwa/xiaoqing') {
-            return Response.json({ ok: true, data: {
-              canonical: 'nuwa/xiaoqing/main', agentId: 'agent-x', id: SESSION_B,
-            } });
-          }
-
-          return Response.json({ ok: false, error: { code: 'session_not_found' } }, {
-            status: 404,
-          });
+          return Response.json({ ok: true, data: [{ id: 'agent-a', handle: 'reviewer' }] });
         }
 
         if (url.pathname === '/v2/account/sessions/' + SESSION_A) {

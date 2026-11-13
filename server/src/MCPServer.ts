@@ -3,6 +3,7 @@ import { McpServer } from '@modelcontextprotocol/server';
 import type { Env } from './Env';
 import { AddressAPIClient, RelayAPIClient } from './APIClients';
 import { AddressTools } from './AddressTools';
+import { GatewayTools } from './GatewayTools';
 import { RelayTools } from './RelayTools';
 import { SessionBindings } from './SessionBindings';
 
@@ -36,6 +37,7 @@ export class NuwaMCPServer {
       () => bindings.authorize(this.authorization));
 
     new RelayTools(server, relay).install();
+    new GatewayTools(server, relay).install();
 
     return server;
   }

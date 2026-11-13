@@ -21,6 +21,24 @@ assert.equal(health.status, 200, 'MCP health should be available.');
 const healthy = await health.json();
 assert.equal(healthy.data?.service, 'nuwa-agent-relay-mcp');
 
+const landing = await request('/');
+assert.equal(landing.status, 200, 'Public onboarding homepage must be reachable.');
+const landingPage = await landing.text();
+assert.match(landingPage, /GrokBot/);
+assert.match(landingPage, /OpenMausBot/);
+assert.match(landingPage, /start\\.js/);
+assert.match(landing.headers.get('content-security-policy') || '', /script-src 'self'/);
+
+const guide = await request('/start');
+assert.equal(guide.status, 200, 'The guide should have a direct shareable URL.');
+
+const prompts = await request('/start.js');
+assert.equal(prompts.status, 200, 'Onboarding copyable prompts must load.');
+assert.match(await prompts.text(), /agentAddressEnsureIdentity/);
+
+const styles = await request('/start.css');
+assert.equal(styles.status, 200, 'The guide stylesheet must load.');
+
 const skill = await request('/skills/nuwa-agent-relay/SKILL.md');
 assert.equal(skill.status, 200, 'Skill installation entrypoint must remain reachable.');
 const skillText = await skill.text();
@@ -62,4 +80,4 @@ assert.equal(invalid.status, 401,
 const unknown = await request('/missing');
 assert.equal(unknown.status, 404, 'Unrecognized public endpoint should be denied.');
 
-console.log('PASS: production MCP Skill, OAuth discovery, private binding protection and live identity denial.');
+console.log('PASS: public onboarding, official Skill, OAuth discovery, private binding protection and live identity denial.');

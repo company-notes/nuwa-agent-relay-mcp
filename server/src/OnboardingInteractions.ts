@@ -1,5 +1,5 @@
 /** Browser-only prompt builder: all submitted values remain local and are written as text. */
-export const ONBOARDING_SCRIPT = \`
+export const ONBOARDING_SCRIPT = `
 (function () {
   'use strict';
 
@@ -254,4 +254,4 @@ export const ONBOARDING_SCRIPT = \`
   refresh();
   updateProgress();
 }());
-\`;
+`;

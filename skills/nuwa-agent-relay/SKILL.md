@@ -24,7 +24,7 @@ Remote MCP endpoint: `https://mcp.agent-relay.company-notes.com/mcp`
 
 1. When the user requests Nuwa installation, connect this MCP using the client's normal OAuth login to Agent Address. No extra private CLI, Session Binding UI, Resume token or address-selection question is needed.
 2. **Immediately call `agentAddressEnsureIdentity`**. If the Agent persona already has a preferred display name, pass `agentDisplayName`; otherwise omit it. The backend creates a private personal Organization when necessary, Claims this client grant's own Agent and Default Session, or safely recovers exactly its previous Session.
-3. Show the resulting canonical address once. The backend alone retains Runtime and Resume credentials in encrypted storage. Never put those credentials, OAuth tokens or private callback keys in chat, tool parameters, logs or prompts.
+3. Keep the resulting canonical address for internal routing; show it only if the user explicitly asks for technical details. The backend alone retains Runtime and Resume credentials in encrypted storage. Never put those credentials, OAuth tokens or private callback keys in chat, tool parameters, logs or prompts.
 4. Call `relayProvisionAgentMailbox` once as part of the authorized setup so the Agent can receive messages. This uses the existing managed email transport; no separate email system setup is required from the user.
 5. On restart, OAuth access-token refresh or a new Codex context, call `agentAddressEnsureIdentity` again. It returns the **same** address for the same valid OAuth grant. Ordinary Relay tools also recover the Session on first use if this step was missed. A genuinely new OAuth grant is a different identity; never guess or take over a Session using an address or an account email.
 

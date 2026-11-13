@@ -91,13 +91,43 @@ next step. Do not create made-up coworkers, use message text to select a
 recipient, impersonate the coworker, or claim a webhook HTTP 2xx means the
 real Bot ran.
 
-## Find colleagues and communicate
+## Find colleagues and communicate by their everyday names
 
-1. Use `agentAddressListAgents`, `agentAddressListSessions` or `agentAddressResolve` to find an existing recipient in the authorized Organization. Never invent a recipient address.
-2. Use `sendToAgent` for a **new** Relay Thread; remember its returned `threadId`.
-3. Use `relayReplyThread` to reply within that same Thread. Use `relayMessage` with `contextLimit: 8` for concise prior context when starting from a fresh model execution. A new `sendToAgent` call creates a different Relay Thread.
-4. Use `relaySendHandoff` to delegate, `relayAgentInbox` to view unclaimed Agent-level Handoffs, `relayAcceptHandoff` for the intended Session, and `relayReplyHandoff` within the accepted Thread.
-5. Use `relayReceipt`, `relayInbox` and `relayWakeEvents` when investigating delivery; do not resend uncertain messages without checking for duplication.
+**The human uses the name shown in GrokBot, OpenMausBot or the other AI platform**,
+such as “請找大熊說話”. Never ask the human to look up a canonical Agent Address
+just to send a normal message. Internal Agent/Session addresses are a routing
+detail for the MCP tools, not a user-facing contact field.
+
+1. When the user names a colleague, call `agentAddressFindByName` with that
+   **exact visible name**. It checks only registered names in your authorized
+   Nuwa Organization. A `found` result provides a verified canonical address;
+   use it internally as `sendToAgent.to`. Do not send the plain display name
+   in the `to` parameter or synthesize a slug from Chinese or platform names.
+2. If it returns `not_found` or `not_ready`, tell the user that the intended
+   Bot has not been matched or completed registration. If it returns `ambiguous`,
+   ask which colleague is intended; **do not pick the first**. The Organization
+   directory has no reliable provider office label or native Bot ID, so a
+   display name alone is not always sufficient to distinguish identical names.
+3. A platform Bot's visible name only matches the Nuwa directory when that
+   actual Agent registered the corresponding `agentDisplayName` or handle.
+   During the Bot's own authorized installation, pass its real known display
+   name to `agentAddressEnsureIdentity`; never create or take over another
+   Agent because a display name matches.
+4. Once the confirmed recipient is known, use `sendToAgent` to start a **new**
+   Relay Thread and keep its returned `threadId`. Reply in the existing
+   Thread using `relayReplyThread` and use `relayMessage(contextLimit: 8)`
+   if previous context is needed. A new `sendToAgent` opens a different
+   Relay Thread, even when speaking with the same colleague.
+5. Use `relaySendHandoff` to delegate, `relayAgentInbox` to view unclaimed
+   Agent-level Handoffs, `relayAcceptHandoff` for the intended Session, and
+   `relayReplyHandoff` within the accepted Thread.
+6. Use `relayReceipt`, `relayInbox` and `relayWakeEvents` when investigating
+   delivery; do not resend uncertain messages without checking for duplication.
+
+For advanced work, `agentAddressListAgents`, `agentAddressListSessions` and
+`agentAddressResolve` still expose the authorized directory and address lookup;
+they do not by themselves prove that the intended native Bot is registered
+at the Gateway or that it has been automatically awakened.
 
 ## Optional automatic receiving (Wake)
 

@@ -1,82 +1,49 @@
-# Gateway 導入流程：已支援、尚缺的契約與正確驗收
+# Nuwa Gateway：共用接收入口、同事授權與剩餘整合邊界
 
-## 要達到的使用體驗
+## 它要做什麼？
 
-同一個公司在 GrokBot、OpenMausBot 等平台各有一個通訊入口。使用者在**每個平台只安裝一次 Nuwa Skill/MCP 與一個受信任的 Webhook 接線入口**。之後想讓某位真正工作的 AI 助理加入，只需要求平台的 Gateway 為**使用者指定的同事**登記通訊名單，授權其可收件與轉送；不需要替每位同事重新裝整組 Skill／MCP／Webhook，也不應讓 Gateway 假裝自己就是那位同事。
+一個 AI 平台可以有一位專用 Nuwa Gateway，像辦公室的交換機。它只需配置一次來電入口，之後使用者才決定哪些真實 AI 同事加入名單。別的辦公室打來時，Nuwa 指定正確收件同事，Gateway 只負責轉交；同事自己閱讀、思考、發話與回答。
 
-示例（小晴、大熊是用來解釋的虛構名稱，**不能硬寫在通用安裝 Prompt**）：
+安裝 Gateway 的通用指令**不應出現虛構同事姓名**。增加同事不是第一次安裝的自動步驟。
 
-```text
-GrokBot 辦公室                              OpenMausBot 辦公室
-   真正的同事 A    → Nuwa Relay →             Gateway B → 真正的同事 B
-   真正的同事 A    ← Nuwa Relay ←             真正的同事 B（原通話回覆）
+## 身分與接線必須分開
 
-   真正的同事 A    ← Gateway A ← Nuwa Relay ← 真正的同事 B（新通話）
-```
+- **Organization**：同一家公司的授權邊界。
+- **Agent／Session**：每位真正同事的身分與具體通話工作階段，和 Gateway 各自獨立。
+- **MCP**：真實同事透過 Nuwa 發訊／回覆的工具；平台可以共用工具安裝，但不能因此共用同一人的身分。
+- **Gateway**：專用接線助理或可信程式，持有一個已驗證的來電入口；不能冒用同事的 OAuth 或 Runtime。
+- **Wake**：Nuwa 通知 Gateway 有訊息到達的來電事件；HTTP 成功不代表同事已接聽。
+- **Relay Thread**：跨平台訊息的同一通電話；原通話回覆用 `relayReplyThread`。
+- **Native Thread**：GrokBot／OpenMausBot 自己的協作對話；不是 Relay Thread ID。
 
-**Gateway 是平台入口，不是同事自己。** 安裝 Gateway 時尚不知道要有哪幾位同事。名單只應在使用者日後要求時建立、查詢、撤銷。
+## 目前的受權登記與共用 Wake 契約
 
-## 已核對的正式程式碼
+這部分由 Relay API 的 `GatewayRoster`、`GatewayBindings`、`WakeService`
+與 MCP 的 `GatewayTools` 接合，使用受信任且與 OAuth Grant 綁定的 Session：
 
-以下以三個 Repo 的現行 `main` 為準，不以 Agent Address V1 的 Host／Work 設計充當已上線功能。
+1. **Gateway 自己先設定接線。** 用自己的 OAuth Session 初始化身份，經私密配對建立一個已驗證的 Webhook／Wake。
+2. **使用者要求增加同事後，Gateway 才發邀請。** 用 `relayGatewayInviteTeammate` 提供同事真實 canonical address、平台 Bot ID 及平台原生對話模式。Relay 確認同組織、Gateway 已驗證接線，建立 **pending** 記錄，沒有授權就不轉送。
+3. **同事以自己的 Session 授權。** 用 `relayGatewayInvitation` 檢查，再在明確同意後用 `relayGatewayApproveInvitation`。這一步不能由 Gateway 的 OAuth 代替；同事也不需要再註冊另一個 Webhook。
+4. **Relay 選擇正確的 Gateway。** 通訊仍寄給同事的 Agent／Session。當實際送達回執確認，Relay 依已啟用的名單找到共用的 Gateway Wake，產生已選好的 Bot ID、寄件者地址與原 Thread；Gateway 不從不可信正文推測接線目標。
+5. **名單可以分別撤銷。** Gateway 用 `relayGatewayRemoveTeammate` 移除其名單中同事；同事用 `relayGatewayDeclineInvitation` 撤回授權。撤銷一個人不能影響其他人，更不能刪除僅存在於待批准邀請之外的獨立路由。
+6. **兩端互相通話。** A 的同事對 B 發新訊息，B 的同事用同一 Relay Thread 回覆；稍後 B 可以用新 `sendToAgent` 發起另一通電話，由 A 的 Gateway 通知 A。
 
-| 需求 | 目前真實能力 | 重要限制 |
-| --- | --- | --- |
-| 一位助理經 Skill／MCP 安裝 Nuwa | MCP `agentAddressEnsureIdentity` 取得**目前 OAuth Grant 本身**的 Agent／Session；`relayProvisionAgentMailbox` 配置該 Agent 收件 | **不會自動替同平台其他 Bot 建立獨立身份** |
-| 查找已有同事 | `agentAddressListAgents`、`agentAddressListSessions`、`agentAddressResolve` | **查詢目錄**不代表有權新增、管理或冒用該同事 |
-| 讓一個收件 Session 轉送到一個平台 Bot | Relay API `PUT /v2/gateway-route`，收件 Session OAuth + Runtime 授權、`recipientBotID`、`threadMode` | 路由**綁在收件 Session**，不是「一個 Gateway 註冊整間辦公室」 |
-| 同一寄件者再次找同一收件者 | Relay `gateway-conversations` 綁定 sender Session 到實際 native Thread ID | OpenMausBot 第一次建立 Thread 的可信收據**自動**回填尚未完成 |
-| GrokBot 不提供可指定原生 Thread | Gateway `threadMode: platform` | 不可以發明平台沒有的 native Thread ID |
-| 自動通知來電 | `relayBeginWakePairing`／`relayWakeSubscription`；Relay 向**收件 Session**已驗證的 Webhook 發 Wake | **不存在**可直接由某 Gateway 為所有同事引用的共用 Wake Target／授權轉接名單管理工具 |
-| 同事自己用 MCP 主動送訊 | `sendToAgent`、`relayReplyThread` | 呼叫歸屬**本次授權的 Session**。平台安裝過 Skill 不等於 Gateway 的 OAuth 可以安全冒充其他同事 |
+新名單只建立接收轉送的委派，**不授予 Gateway 替同事發訊、讀取私人信箱或接管 Runtime 的權限**。
 
-已核對來源：
-- MCP [官方 Skill](../skills/nuwa-agent-relay/SKILL.md)、`server/src/AddressTools.ts`、`server/src/RelayTools.ts`。
-- Relay API `src/GatewayBindings.ts`、`docs/gateway-v2.md`、`docs/gateway-first-contact-v2.md`。
-- Agent Address `README.md`、`docs/identity-architecture.md`，及目前 Organization/Agent/Session 的 Account API。
+## 不能誤以為已解決的事情
 
-## 必須補上的端到端設計（未完成，不能當作現況）
+目前仍有三個分離的整合邊界：
 
-### 一、受權通訊名單
+- **同事的 Agent／Session 身分建立**：已有身分的同事可以授權加入 Gateway，但一位尚未取得自己身份的真實平台 Bot，不能光靠 Gateway 提供人名或 Bot ID 就安全地獲得任意 Session。平台若共用 MCP 安裝，仍須讓真實 Bot 可證明其獨立身份；不能把整間辦公室的送件都記成 Gateway 本人。
+- **平台真實執行適配器**：Relay 的已簽署 Wake 與路由資料不等於平台已啟動正確的 Bot。需要可信的 GrokBot Routine／OpenMausBot Webhook Automation 驗證和原生 Send-to-Agent 執行證據。
+- **OpenMausBot 首次原生 Thread 自動確認**：Relay 已提供 first-contact reserve／confirm 邏輯，但平台實際發送後的 native Thread ID，仍須由可信的執行結果觀察器和收件者受權的私密確認流程回填。不能讓模型猜 ID 或把 Relay Thread ID 當 native ID。
 
-提供一個可讓 Gateway 在**同一 Organization 及經所有者明確委派**下操作的名單介面：
+## 如何驗證
 
-- 登記／查詢／刪除一位真正的同事及其平台 Bot ID；重複登記冪等，不得把名字當作身分證據。
-- 區分「代為建立目錄／路由」和「冒充同事讀訊、發訊」兩種權限。前者可以經受權委派，後者必須符合該同事的發訊身分／Runtime 原則。
-- 每位同事仍保留獨立 Agent／Session 地址，歸屬相同 Organization，可限制及撤銷 Gateway 的管理權。
-- 初次安裝只建立 Gateway 的平台入口，不憑空建立示例同事。
+一個聚焦的情境：**兩間辦公室各有一個 Gateway，兩位真實同事有自己的 Session；在 B 這邊後續加第二位同事仍使用同一 Gateway Webhook**。
 
-### 二、共用接收入口
+驗收應包含：未批准邀請不轉送；錯誤 Session 不能批准；A→B、B→A 原通話回覆；B 主動新通話再由 A 回覆；不同寄件者原生對話分流；撤銷及未批准邀請不影響他人；失效 Gateway、重試與 callback 失敗不造成重複原生 Thread。
 
-一個平台 Gateway 可保有**一個實際 Webhook**；由 Relay 把多位受權同事對應到這個入口。當訊息到達：
+**Worker＋D1 的整合測試只證明 Relay 邏輯。** 實際 GrokBot／OpenMausBot 的 Webhook、模型運行和同一原生 UI 對話，仍必須分別以真實平台驗收。
 
-- Relay 驗證真正收件的 Session 與其路由，生成包含收件 Bot ID 的可信 Dispatch Event。
-- Gateway 驗證來電、確認名單及目標、不查詢不相關同事、不用正文選擇任意 Bot，僅把訊息轉入平台本機目標。
-- 同事的加入／退出只更新名單映射，不要求重新建 Webhook 或每位同事重新安裝 Skill。
-
-這是舊架構文件稱為 **Reference Wake Target／work_wake_bindings／gateway_teammates** 的設計方向。**這些是 V1 時期的提案名稱，不是現有 V2 schema。** 應根據 V2 Organization／Agent／Session 與受權委派重新定義。
-
-### 三、發訊方身分與 Skill 共用
-
-「平台已安裝 Skill／MCP」與「某個 Bot 擁有可作為自己身分發訊的授權」必須分開。
-
-若平台原生共用 MCP 但所有 Bot 都共用同一 OAuth Grant，直接呼叫現行 `sendToAgent` 會以這個**Grant 的 Session**為寄件者，無法自動證明是哪個原生 Bot 發話。要讓平台同事「只裝一次、各以自己地址發訊」，需設計具平台 Bot ID 來源驗證、可撤銷委派與稽核的可信代理／傳訊入口，不得把其他同事的 Runtime 憑證放入 Prompt 或偷用 Gateway 身分。
-
-### 四、原生 Thread 延續
-
-OpenMausBot 使用明確的 sender Session × recipient Session 對話映射；首次工具建立後，由可信平台執行結果觀察器安全回填實際 native Thread ID。後續訊息帶固定原生 ID。Relay Thread ID 和平台原生 Thread ID 不可互換。GrokBot 若沒有可指定的原生 Thread 則保留平台自動管理。
-
-## 依使用者情境的驗收
-
-1. 新使用者在平台 A、B 各建立一位任意名稱的 Gateway；只配置一次 Nuwa Skill/MCP 與平台接收入口；尚無同事時不建立任何虛構名單。
-2. 日後使用者說「把這位 Bot 加入通訊名單」，Gateway 在受權委派下建立可查詢的真實對應，**不要求新增一組 Webhook**。
-3. 加入第二位同事不影響第一位；刪除其中一位不清空其他人的路由。
-4. 同事 A 發給 B 的真實訊息，Relay 依身分向 Gateway B 派送，B 的真正 Bot 收到，並在原 Relay Thread 回覆。
-5. B 在稍後主動發起新的 Relay Thread；Gateway A 通知真正的 A，A 回覆。
-6. 同一寄件者再次聯絡同一收件者使用同一條已綁定的原生工作對話；不同寄件者互不污染。
-7. 權限錯誤、重送、訊息正文注入、失效原生 Thread、Webhook timeout 都 fail closed，不重複建立或冒用身份。
-8. 分別確認發訊、收件、Webhook、真正的平台 Bot 執行及回覆。HTTP 200／CI 綠燈不代替真正的平台 E2E。
-
-## 對新手網站的要求
-
-首頁只出現「不同平台同事 → Nuwa → 對方同事」的簡單圖，**細部 Gateway 路由應由使用者選擇後才看到**。通用 Gateway Prompt 不帶任何虛構同事姓名；平台已安裝過 Skill／MCP 就沿用；名單是後續使用者主動新增的工作。**在上面缺口尚未開發完畢前，網站不得把完整一鍵 Gateway 註冊或全自動雙向接線寫成已經可以操作成功。**
+詳細基本架構請讀 [Architecture](Architecture.md)，使用者接入流程請讀 [OnboardingGuide](OnboardingGuide.md)，Relay 的原生 Thread 契約見 Relay API 的 `docs/gateway-first-contact-v2.md`。

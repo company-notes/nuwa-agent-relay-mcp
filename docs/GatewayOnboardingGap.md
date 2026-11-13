@@ -2,9 +2,9 @@
 
 ## 它要做什麼？
 
-一個 AI 平台可以有一位專用 Nuwa Gateway，像辦公室的交換機。它只需配置一次來電入口，之後使用者才決定哪些真實 AI 同事加入名單。別的辦公室打來時，Nuwa 指定正確收件同事，Gateway 只負責轉交；同事自己閱讀、思考、發話與回答。
+一個 AI 平台可以有一位專用 Nuwa Gateway，像辦公室的交換機。它只需配置一次來電入口。使用者希望預設讓這個平台目前所有符合資格的 AI 同事接入，不必逐個登記名稱；Gateway 應先盤點現有助理，再依法完成授權與路由。別的辦公室打來時，Nuwa 指定正確收件同事，Gateway 只負責轉交；同事自己閱讀、思考、發話與回答。
 
-安裝 Gateway 的通用指令**不應出現虛構同事姓名**。增加同事不是第一次安裝的自動步驟。
+安裝 Gateway 的通用指令**不應出現虛構同事姓名**。第一次安裝就可以盤點全部現有同事，但「自動找到」不等於「無須授權即已能接線」。
 
 ## 身分與接線必須分開
 
@@ -22,8 +22,8 @@
 與 MCP 的 `GatewayTools` 接合，使用受信任且與 OAuth Grant 綁定的 Session：
 
 1. **Gateway 自己先設定接線。** 用自己的 OAuth Session 初始化身份，經私密配對建立一個已驗證的 Webhook／Wake。
-2. **使用者要求增加同事後，Gateway 才發邀請。** 用 `relayGatewayInviteTeammate` 提供同事真實 canonical address、平台 Bot ID 及平台原生對話模式。Relay 確認同組織、Gateway 已驗證接線，建立 **pending** 記錄，沒有授權就不轉送。
-3. **同事以自己的 Session 授權。** 用 `relayGatewayInvitation` 檢查，再在明確同意後用 `relayGatewayApproveInvitation`。這一步不能由 Gateway 的 OAuth 代替；同事也不需要再註冊另一個 Webhook。
+2. **使用者同意接通整間辦公室後，Gateway 預設盤點現有同事。** `agentAddressListAgents`／`agentAddressListSessions` 只提供 Organization 的 Nuwa 地址，無法分辨誰在本平台；還必須從可信的平台 Bot 清單核對原生 Bot ID。對每一位能確認的本辦公室同事，呼叫 `relayGatewayInviteTeammate` 提出 **pending** 邀請，沒有授權就不轉送。
+3. **同事以自己的 Session 授權。** 用 `relayGatewayInvitation` 檢查，再在明確同意後用 `relayGatewayApproveInvitation`。這一步不能由 Gateway 的 OAuth 代替；同事不用另設 Webhook，也不需要重複安裝既有 Skill/MCP。Gateway 應把待授權項目整理給使用者，而不是要求使用者逐字輸入所有名字。
 4. **Relay 選擇正確的 Gateway。** 通訊仍寄給同事的 Agent／Session。當實際送達回執確認，Relay 依已啟用的名單找到共用的 Gateway Wake，產生已選好的 Bot ID、寄件者地址與原 Thread；Gateway 不從不可信正文推測接線目標。
 5. **名單可以分別撤銷。** Gateway 用 `relayGatewayRemoveTeammate` 移除其名單中同事；同事用 `relayGatewayDeclineInvitation` 撤回授權。撤銷一個人不能影響其他人，更不能刪除僅存在於待批准邀請之外的獨立路由。
 6. **兩端互相通話。** A 的同事對 B 發新訊息，B 的同事用同一 Relay Thread 回覆；稍後 B 可以用新 `sendToAgent` 發起另一通電話，由 A 的 Gateway 通知 A。
@@ -32,9 +32,9 @@
 
 ## 不能誤以為已解決的事情
 
-目前仍有三個分離的整合邊界：
+**預設全部加入**仍有三個需要補足的整合邊界：
 
-- **同事的 Agent／Session 身分建立**：已有身分的同事可以授權加入 Gateway，但一位尚未取得自己身份的真實平台 Bot，不能光靠 Gateway 提供人名或 Bot ID 就安全地獲得任意 Session。平台若共用 MCP 安裝，仍須讓真實 Bot 可證明其獨立身份；不能把整間辦公室的送件都記成 Gateway 本人。
+- **自動發現及授權策略**：目前缺少可信的「本辦公室原生 Bot ↔ Nuwa Agent／Session」自動對應、組織管理員核准全辦公室加入的授權契約，以及批次註冊／後續同步工具。既有 `agentAddressListAgents` 涵蓋整個 Organization，不應直接當成同平台 Bot 清單。已有身分的同事可以自行批准加入；沒有自己的身分或尚未批准的 Bot 不能被 Gateway 冒名開通。
 - **平台真實執行適配器**：Relay 的已簽署 Wake 與路由資料不等於平台已啟動正確的 Bot。需要可信的 GrokBot Routine／OpenMausBot Webhook Automation 驗證和原生 Send-to-Agent 執行證據。
 - **OpenMausBot 首次原生 Thread 自動確認**：Relay 已提供 first-contact reserve／confirm 邏輯，但平台實際發送後的 native Thread ID，仍須由可信的執行結果觀察器和收件者受權的私密確認流程回填。不能讓模型猜 ID 或把 Relay Thread ID 當 native ID。
 

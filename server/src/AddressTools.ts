@@ -17,8 +17,10 @@ export class AddressTools extends MCPToolSet {
     const agentID = z.string().uuid();
 
     this.register('agentAddressEnsureIdentity',
-      'Immediately use after OAuth login. Privately auto-claim or recover this OAuth grant\'s ' +
-      'own Agent/Session and return its canonical address. No Session ID, Runtime or Resume inputs.',
+      'Immediately use after OAuth login. Privately claim or recover this OAuth grant\'s ' +
+      'OWN Agent/Session. If agentDisplayName is provided on an existing binding, update only ' +
+      'this Grant\'s own registered display name to the real native Bot name for Relay routing. ' +
+      'Never pass another coworker\'s name from a Gateway or ask for Runtime/Resume credentials.',
       { agentDisplayName: z.string().trim().min(1).max(120).optional() },
       (value) => this.ensureIdentity(value.agentDisplayName as string | undefined));
 

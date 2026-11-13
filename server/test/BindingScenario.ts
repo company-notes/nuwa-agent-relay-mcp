@@ -274,22 +274,6 @@ export class RemoteMCPScenario {
           return Response.json({ ok: true, data: { id: sessionID } });
         }
 
-        if (url.pathname === '/v2/account/addresses' && init?.method === 'GET') {
-          const canonical = url.searchParams.get('address');
-          const agent = canonical?.match(/^nuwa\/(?:reviewer-([ab])|xiaoqing)\/main$/);
-
-          if (!agent) {
-            return Response.json({ ok: false, error: { code: 'not_found' } }, { status: 404 });
-          }
-
-          const owner = canonical?.includes('reviewer-b/') ? 'b' : 'a';
-          return Response.json({ ok: true, data: {
-            id: owner === 'b' ? SESSION_B : SESSION_A,
-            agentId: 'agent-' + owner,
-            canonical,
-          } });
-        }
-
         const agentNameMatch = url.pathname.match(/^\/v2\/account\/agents\/(agent-[ab])$/);
 
         if (agentNameMatch && init?.method === 'PATCH') {
@@ -316,10 +300,16 @@ export class RemoteMCPScenario {
           return Response.json({ ok: true, data: [{ id: 'agent-a', handle: 'reviewer' }] });
         }
 
-        if (url.pathname === '/v2/account/sessions/' + SESSION_A) {
+        if (url.pathname === '/v2/account/sessions/' + SESSION_A ||
+            url.pathname === '/v2/account/sessions/' + SESSION_B) {
+          const other = url.pathname.endsWith(SESSION_B);
           return Response.json({
             ok: true,
-            data: { id: SESSION_A, agentId: 'agent-a', canonical: 'nuwa/reviewer-a/main' },
+            data: {
+              id: other ? SESSION_B : SESSION_A,
+              agentId: other ? 'agent-b' : 'agent-a',
+              canonical: other ? 'nuwa/reviewer-b/main' : 'nuwa/reviewer-a/main',
+            },
           });
         }
 

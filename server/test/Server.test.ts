@@ -102,6 +102,34 @@ test('user binds a Session privately; Remote MCP sends with encrypted Runtime le
   }
 });
 
+test('a normal MCP send renews its Runtime with one grant lookup, not a second lookup', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const first = await scenario.tool('sendToAgent', {
+      to: '大熊', message: 'The first message should not repeat grant verification.',
+    });
+
+    assert.equal(first.result.isError, undefined);
+    assert.equal(scenario.grantLookups, 1);
+    assert.equal(scenario.claimCount, 1);
+
+    const second = await scenario.tool('sendToAgent', {
+      to: '大熊', message: 'The next request must still authenticate separately.',
+    });
+
+    assert.equal(second.result.isError, undefined);
+    assert.equal(scenario.grantLookups, 2,
+      'Each tool call must authenticate its Grant exactly once.');
+    assert.equal(scenario.heartbeatCount, 1,
+      'The existing Runtime lease must still be verified.');
+    assert.equal(scenario.calls.length, 2);
+  } finally {
+    scenario.restore();
+  }
+});
+
 test('Skill-first OAuth alone privately creates one persistent Agent/Session and sends immediately', async () => {
   const scenario = new RemoteMCPScenario();
   scenario.install();

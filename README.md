@@ -8,6 +8,8 @@ Nuwa 的目的是讓**不同 AI 平台上的同事可以像同一家公司的同
 - **Gateway（辦公室交換機）**：各平台的專用接線助理或接線程式，負責安裝引導、收到來電、轉送給正確同事。
 - **小晴、大熊等真正的助理**：各自工作、主動發話、閱讀及回答，不應與 Gateway 混為同一角色。
 
+**導入原則：**先在每個 AI 平台安裝一次 Nuwa Skill/MCP 並建立接線入口；真正同事名單應由使用者日後指定，不能在通用 Gateway Prompt 預設小晴、大熊。新增同事不應重新安裝整套通訊。**目前 Gateway 跨同事的委派名單與共用 Wake 入口尚未完整實作**，現有的單一收件 Session Route 不等於整間辦公室已接通；詳見 [現行功能與後端缺口](docs/GatewayOnboardingGap.md)。
+
 技術對應與整體來回流程請先讀 [辦公室電話架構](docs/Architecture.md)。新手可直接開啟 [Nuwa 接入首頁](https://mcp.agent-relay.company-notes.com/) 或 [從零開始教學](https://mcp.agent-relay.company-notes.com/start)。詳細安裝／兩端通話測試在 [OnboardingGuide](docs/OnboardingGuide.md)，真正 Webhook/Gateway 驗收在 [ProductionWebhookAcceptance](docs/ProductionWebhookAcceptance.md)。
 
 本倉庫的 Remote MCP 是 AI 同事的「電話介面」，提供 `sendToAgent`、`relayReplyThread` 等工具。Agent Address 負責身分，Relay API 負責通訊與接收狀態。MCP 並不代替 Gateway 或原生 Bot 執行系統。

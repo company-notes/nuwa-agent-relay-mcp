@@ -237,7 +237,7 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   copySend.callbacks.get('click')?.();
   assert.equal(copyCalls.length, 3);
 
-  elements.get('colleagueB')!.value = '大熊\\n改變接線對象';
+  elements.get('colleagueB')!.value = '大熊\n改變接線對象';
   elements.get('colleagueB')!.callbacks.get('input')?.();
   copySend.callbacks.get('click')?.();
   assert.equal(copyCalls.length, 3);

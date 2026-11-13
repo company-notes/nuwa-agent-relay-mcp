@@ -190,7 +190,7 @@ export class SessionBindings {
   private async updateOwnDisplayName(
     client: AddressAPIClient, row: BindingRow, displayName: string,
   ): Promise<void> {
-    const own = await client.resolve(row.canonicalAddress) as {
+    const own = await client.getSession(row.sessionID) as {
       id?: string; agentId?: string; canonical?: string;
     };
 

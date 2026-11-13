@@ -99,12 +99,13 @@ test('real HTTP routes keep Skill and OAuth protected', async () => {
   }
 
   assert.doesNotThrow(() => new Script(ONBOARDING_SCRIPT));
-  assert.match(ONBOARDING_SCRIPT, /agentAddressEnsureIdentity/);
-  assert.match(ONBOARDING_SCRIPT, /relayProvisionAgentMailbox/);
-  assert.match(ONBOARDING_SCRIPT, /relayWakeSubscription/);
-  assert.match(ONBOARDING_SCRIPT, /relayBeginWakePairing/);
-  assert.match(ONBOARDING_SCRIPT, /relayReplyThread/);
+  assert.match(ONBOARDING_SCRIPT, /Nuwa 助理指南/);
+  assert.match(ONBOARDING_SCRIPT, /如果 Skill 和 MCP 已經裝好/);
   assert.match(ONBOARDING_SCRIPT, /預設希望目前所有符合資格的同事都能接線/);
+  assert.match(ONBOARDING_SCRIPT, /密語是星河/);
+  assert.match(ONBOARDING_SCRIPT, /密語是月光/);
+  assert.doesNotMatch(ONBOARDING_SCRIPT,
+    /agentAddressEnsureIdentity|relayProvisionAgentMailbox|relayWakeSubscription|relayReplyThread/);
   assert.doesNotMatch(ONBOARDING_SCRIPT, /MailTrigger|relayRegisterWake|relayVerifyWake|remote-bind/);
   assert.doesNotMatch(ONBOARDING_SCRIPT, /(?:fetch|XMLHttpRequest|sendBeacon)\s*\(/);
 

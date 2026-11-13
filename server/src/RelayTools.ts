@@ -67,11 +67,11 @@ export class RelayTools extends MCPToolSet {
     const { to, body, subject, artifactLinks, threadID } = this.schemas;
 
     this.register('sendToAgent',
-      'Send to a canonical Agent or Session address, creating a new Relay Thread. ' +
-      'If the user supplied a familiar Bot name, first call agentAddressFindByName ' +
-      'and use the unique confirmed canonical address; never put a display name ' +
-      'directly in the to field or guess on ambiguous results. ' +
-      'Use relayReplyThread to continue a Thread; submission is not delivery.',
+      'Send to a canonical Agent/Session address OR the familiar display name of a ' +
+      'registered coworker, creating a new Relay Thread. Relay resolves names in ' +
+      'this SAME request; never call another MCP tool or ask Gateway to look up ' +
+      'the destination. Ambiguous or unknown names are rejected before delivery. ' +
+      'Use relayReplyThread to continue an existing Thread; submission is not delivery.',
       { to, message: body, subject: subject.optional(), artifactLinks },
       ({ to, message, subject, artifactLinks }) =>
         this.client.call('POST', '/v2/messages', {

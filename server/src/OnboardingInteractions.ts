@@ -10,34 +10,21 @@ export const ONBOARDING_SCRIPT = `
 
   function fieldValue(id) {
     var element = document.getElementById(id);
-    return element ? element.value.trim().toLowerCase() : '';
+    return element ? element.value.trim() : '';
   }
 
-  function validAddress(text) {
-    var parts = text.split('/');
-    return (parts.length === 2 || parts.length === 3) &&
-      parts.every(function (part) {
-        return /^[a-z0-9][a-z0-9-]*$/.test(part);
-      });
-  }
-
-  function addressFor(id) {
-    var address = fieldValue(id);
-    return validAddress(address) ? address : '（先填入這位助理真正的 Nuwa 地址）';
+  function validName(name) {
+    return name.length > 0 && name.length <= 120 &&
+      !/[\\u0000-\\u001f\\u007f]/.test(name);
   }
 
   function colleagueName(id) {
-    var address = fieldValue(id);
-    return validAddress(address) ? address.split('/')[1] : '另一位';
+    var name = fieldValue(id);
+    return validName(name) ? name : '另一位';
   }
 
-  function addressesReady() {
-    var sender = fieldValue('addressA');
-    var recipient = fieldValue('addressB');
-
-    return validAddress(sender) && validAddress(recipient) &&
-      sender.split('/')[0] === recipient.split('/')[0] &&
-      sender !== recipient;
+  function namesReady() {
+    return validName(fieldValue('colleagueA')) && validName(fieldValue('colleagueB'));
   }
 
   function gatewaySetup() {
@@ -62,38 +49,38 @@ export const ONBOARDING_SCRIPT = `
 
   function sendPrompt() {
     return [
-      '請透過 Nuwa 跟另一間辦公室的「' + colleagueName('addressB') +
-        '」助理聊一下（地址：' + addressFor('addressB') + '）。',
-      '告訴對方：「你好！來測試一下通話，密語是星河。請回答我密語。」',
-      '請只發一次，若尚未送出就告訴我。'
-    ].join('\\n');
+      '請透過 Nuwa 找另一間辦公室的「' + colleagueName('colleagueB') +
+        '」助理聊一下。',
+      '告訴他：「你好，我們來測試通話，密語是星河。收到後請回覆密語。」',
+      '若有同名的助理或找不到人，先問我，不要猜測。'
+    ].join('\\\\n');
   }
 
   function replyPrompt() {
     return [
-      '剛才「' + colleagueName('addressA') + '」助理（' + addressFor('addressA') +
-        '）打電話給你，密語是星河。',
-      '如果你真的收到，請直接在剛才那段對話回覆：「收到星河！」',
-      '如果還沒收到，就告訴我，不要猜測。'
-    ].join('\\n');
+      '如果你收到剛才「' + colleagueName('colleagueA') +
+        '」助理傳來的測試訊息，',
+      '請直接在原本的對話回覆：「收到星河！」',
+      '如果還沒收到，就告訴我。'
+    ].join('\\\\n');
   }
 
   function returnPrompt() {
     return [
-      '現在換你主動聯絡另一間辦公室的「' + colleagueName('addressA') +
-        '」助理（地址：' + addressFor('addressA') + '）。',
-      '開一段新的對話，告訴對方：「我也能主動打給你！這次的密語是月光。」',
-      '請對方收到後回覆密語。'
-    ].join('\\n');
+      '請透過 Nuwa 主動找另一間辦公室的「' + colleagueName('colleagueA') +
+        '」助理聊一下。',
+      '告訴他：「換我打給你了！這次密語是月光，請回覆密語。」',
+      '若有同名的助理或找不到人，先問我，不要猜測。'
+    ].join('\\\\n');
   }
 
   function verifyPrompt() {
     return [
-      '「' + colleagueName('addressB') + '」助理（' + addressFor('addressB') +
-        '）剛才主動聯絡你，密語是月光。',
-      '如果你真的收到，請直接在那段對話回覆：「收到月光！」',
+      '如果你收到「' + colleagueName('colleagueB') +
+        '」助理剛才主動打來的電話，',
+      '請在那段對話回覆：「收到月光！」',
       '如果還沒收到，就告訴我。'
-    ].join('\\n');
+    ].join('\\\\n');
   }
 
   function updatePrompts() {
@@ -109,20 +96,18 @@ export const ONBOARDING_SCRIPT = `
       document.getElementById(id).textContent = prompts[id];
     });
 
-    var sender = fieldValue('addressA');
-    var recipient = fieldValue('addressB');
-    var message = document.getElementById('addressHint');
+    var first = fieldValue('colleagueA');
+    var second = fieldValue('colleagueB');
+    var message = document.getElementById('nameHint');
 
-    if ((sender && !validAddress(sender)) || (recipient && !validAddress(recipient))) {
-      message.textContent = '請填入助理真正回報的地址，通常是 公司/助理/對話，以斜線分隔。';
-    } else if (sender && recipient && sender.split('/')[0] !== recipient.split('/')[0]) {
-      message.textContent = '兩位助理的地址不在同一個 Nuwa 組織，請先確認。';
-    } else if (sender && recipient && sender === recipient) {
-      message.textContent = '請填入兩位不同助理的地址。';
-    } else if (addressesReady()) {
-      message.textContent = '四段測試指令都已填好地址，直接複製即可，不必再改。';
+    if ((first && !validName(first)) || (second && !validName(second))) {
+      message.textContent = '請填寫平台上實際看到的助理名稱，每個名稱限 120 字且不得換行。';
+    } else if (namesReady()) {
+      message.textContent = first === second
+        ? '兩位助理同名；發訊時 Nuwa 可能需要你進一步確認是哪一位。'
+        : '四段測試指令已填入兩位助理名稱，直接複製即可。';
     } else {
-      message.textContent = '請填入兩位助理的地址；網頁只會在本機組成指令，不會上傳。';
+      message.textContent = '只要填入助理在平台上顯示的名稱，不需要 Nuwa 地址。';
     }
   }
 
@@ -170,8 +155,8 @@ export const ONBOARDING_SCRIPT = `
         return;
       }
 
-      if (button.getAttribute('data-copy') !== 'gatewayPrompt' && !addressesReady()) {
-        notify('請先填入同一組織中兩位不同助理的有效 Nuwa 地址。');
+      if (button.getAttribute('data-copy') !== 'gatewayPrompt' && !namesReady()) {
+        notify('請先填入兩位助理在平台上顯示的名稱。');
         return;
       }
 
@@ -185,7 +170,7 @@ export const ONBOARDING_SCRIPT = `
     });
   });
 
-  ['addressA', 'addressB'].forEach(function (id) {
+  ['colleagueA', 'colleagueB'].forEach(function (id) {
     var element = document.getElementById(id);
     element.addEventListener('input', updatePrompts);
     element.addEventListener('change', updatePrompts);

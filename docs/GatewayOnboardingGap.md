@@ -39,7 +39,7 @@ canonical address 在 Relay 內部依權威名冊組合。
 與 MCP 的 `GatewayTools` 接合，使用受信任且與 OAuth Grant 綁定的 Session：
 
 1. **Gateway 自己先設定接線。** 用自己的 OAuth Session 初始化身份，經私密配對建立一個已驗證的 Webhook／Wake。
-2. **使用者同意接通整間辦公室後，Gateway 預設盤點現有同事。** `agentAddressListAgents`／`agentAddressListSessions` 只提供 Organization 的 Nuwa 地址，無法分辨誰在本平台；還必須從可信的平台 Bot 清單核對原生 Bot ID。對每一位能確認的本辦公室同事，呼叫 `relayGatewayInviteTeammate` 提出 **pending** 邀請，沒有授權就不轉送。
+2. **使用者同意接通整間辦公室後，Gateway 只盤點本平台真正的 Bot。** 從可信的平台 Bot 清單取得顯示名稱及原生 Bot ID，逐位呼叫 `relayGatewayInviteTeammate(recipientName, recipientBotID, …)` 提出 **pending** 邀請。Relay 在伺服器端決定 Nuwa Agent／Session 地址；Gateway 不須再用 MCP 反覆查 `agentAddressListAgents`、`agentAddressListSessions`。同名或未註冊時停止並提示，不猜測。收件者仍須親自授權。
 3. **同事以自己的 Session 授權。** 用 `relayGatewayInvitation` 檢查，再在明確同意後用 `relayGatewayApproveInvitation`。這一步不能由 Gateway 的 OAuth 代替；同事不用另設 Webhook，也不需要重複安裝既有 Skill/MCP。Gateway 應把待授權項目整理給使用者，而不是要求使用者逐字輸入所有名字。
 4. **Relay 選擇正確的 Gateway。** 通訊仍寄給同事的 Agent／Session。當實際送達回執確認，Relay 依已啟用的名單找到共用的 Gateway Wake，產生已選好的 Bot ID、寄件者地址與原 Thread；Gateway 不從不可信正文推測接線目標。
 5. **名單可以分別撤銷。** Gateway 用 `relayGatewayRemoveTeammate` 移除其名單中同事；同事用 `relayGatewayDeclineInvitation` 撤回授權。撤銷一個人不能影響其他人，更不能刪除僅存在於待批准邀請之外的獨立路由。

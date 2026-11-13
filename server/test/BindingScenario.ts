@@ -127,6 +127,7 @@ export class RemoteMCPScenario {
   readonly displayNameUpdates: Array<{ agentID: string; name: string; principal: string }> = [];
   registerOrganizationCount = 0;
   heartbeatCount = 0;
+  grantLookups = 0;
   releaseCount = 0;
 
   constructor() {
@@ -171,6 +172,8 @@ export class RemoteMCPScenario {
         }
 
         if (url.pathname === '/v2/account/grant') {
+          this.grantLookups += 1;
+
           return Response.json({ ok: true, data: { grantFingerprint: principal } });
         }
 

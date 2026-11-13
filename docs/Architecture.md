@@ -109,18 +109,34 @@ Nuwa Relay 是一套**讓不同 AI 平台上的助理互相聯絡、回覆與合
 | **MailTrigger** | Relay 背後使用的受管理訊息郵件傳送與收件確認服務；使用者不直接操作 | 不負責驗證某個 Bot 是否已處理訊息 |
 | **Runtime Lease** | 確認目前哪個執行端有權使用一個 Session 的獨占授權 | 不可由另一個 Gateway 或模型猜測／接管 |
 
-## 6. Gateway 可以帶安裝，但不能跨越身分授權
+## 6. 接入單位是平台；同事名單由使用者之後決定
 
-實際導入時，**先在兩個平台各建立一位專用 Gateway 助理**。它可以閱讀 Nuwa Skill、指引連接 MCP 和平台 Webhook，隨後擔任那間辦公室的交換機。接著再建立小晴、大熊等真正工作的助理。
+正確的預期體驗不是「先建立名為小晴、大熊的兩個 Agent，再替每個 Agent 裝 MCP 和 Webhook」。
 
-不過「它是 Gateway」**不代表它自動擁有同辦公室其他助理的授權**。
+應該是：
 
-- Gateway 自己經 OAuth 取得的 Agent／Session，是**交換機本身**的身份。
-- 真正收訊的小晴、大熊各有自己的 Agent／Session 和授權。收件者的路由、Wake 綁定及對原生 Bot／Thread 的轉送，必須由有權的收件 Session 及受信任的整合層確認。
-- 現行 MCP Skill 提供 `agentAddressEnsureIdentity`、`relayProvisionAgentMailbox`、`relayBeginWakePairing`、`relayWakeSubscription` 等模型可用的工具；**它沒有通用的 Gateway Route／Native Thread 管理工具**。Gateway 路由仍屬 Relay V2 的 recipient-authorized 私密控制介面。
-- 因此「建立 Gateway 並貼上 Prompt」可以開始**引導安裝**，但在平台接線、收件 Session 授權、原生 Thread 確認完成前，不得宣稱「自動來電已完全打通」。
+1. 在每個要接入的 AI 平台先建立**一位專用 Nuwa 接線助理**，閱讀官方 Skill，協助安裝 Nuwa MCP 與平台 Webhook；若平台已安裝過則直接沿用。
+2. 使用者**之後**才指定真正工作的同事要加入通訊名單。接線助理應由平台可信來源取得目標 Bot ID、執行受委派的地址／路由登記，將訊息送入收件者的原生對話。
+3. 同一辦公室的同事共用已配置的安全接收入口，不因新增同事反覆安裝 Skill／MCP／Webhook。
+4. 真正同事以**自己的身份**使用通訊工具發話與回覆；接線助理不能冒充同事。
 
-這個限制是重要設計邊界，不是要在新手首頁要求使用者了解的實作細節。使用者只需要知道：**如果某步還做不到，交換機應告訴他下一個必須批准或配置的地方，而不能假裝成功。**
+**小晴、大熊只是架構比喻與測試示例，不應寫入任何可以直接貼給新使用者的 Gateway 安裝 Prompt。**
+
+### 已實作的與仍缺少的能力
+
+現行 Relay API 的 `PUT /v2/gateway-route` 是**由收件 Session 擁有的單一 Bot 路由**。同一收件者與不同寄件者的原生對話可以用 `gateway-conversations` 分別綁定。MCP Skill 可用 `agentAddressEnsureIdentity` 設定**目前 OAuth Grant 自己**的 Agent/Session，可找同事、發訊、回覆，以及進行**目前 Session**的 Wake 配對。
+
+這**不等於**一位 Gateway 已有權代表整個辦公室註冊多個同事、替他們配置各自的收件身份，或共用單一 Wake Target。這些需要：
+
+- V2 Organization/Agent/Session 模型下**可稽核、可撤銷的 Gateway 名單管理委派**；
+- 能由受權 Gateway 建立／查詢／移除「實際同事地址 ↔ 平台原生 Bot ID」的路由；
+- 共用的經驗證 Wake 接收入口及各同事的受權映射；
+- 若多個平台內部 Bot 共用 Nuwa MCP，仍要能**驗證是哪位同事發話**，不能把 Gateway 的 OAuth Grant 當成所有人的寄件身份；
+- OpenMausBot 首次原生 Thread 的可信收據觀察和私密回填。
+
+**上述統一登記流程目前尚未在 MCP Skill 或 Relay 的公開管理契約中完整落地。** 不能僅靠 Prompt 宣稱完成；更不能繞過其他同事的授權。詳細現況及預期驗收見 [Gateway 導入功能差距](GatewayOnboardingGap.md)。
+
+一般使用者網站應先展示「同事 A ↔ Nuwa ↔ 同事 B」的簡單圖；只有使用者切換到進階內容時才展示 Gateway 的內部轉接。
 
 ## 7. 兩種平台對原生對話的處理不同
 

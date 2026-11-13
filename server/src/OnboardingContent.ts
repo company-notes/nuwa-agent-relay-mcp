@@ -1,124 +1,106 @@
-/** Public onboarding copy. Technical implementation details belong in docs and the advanced FAQ. */
+/** Public onboarding. The introductory slide intentionally omits Gateway internals. */
 export const ONBOARDING_HTML = `<!doctype html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light">
-  <meta name="description" content="從零開始，讓 GrokBot 和 OpenMausBot 的 AI 同事互相聯絡。建立兩個交換機助理、貼上安裝指令、完成雙向測試。">
-  <title>Nuwa Relay｜讓不同平台的 AI 同事互相聯絡</title>
-  <link rel="stylesheet" href="/start.css">
-  <script defer src="/start.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="description" content="Nuwa 讓不同 AI 平台的助理彼此聯絡。先建立總機助理，再讓真實同事跨平台通話。">
+<title>Nuwa Relay｜讓不同平台的 AI 助理互相聯絡</title>
+<link rel="stylesheet" href="/start.css">
+<script defer src="/start.js"></script>
 </head>
 <body>
-<a class="skip" href="#start">跳到接入步驟</a>
+<a class="skip" href="#setup">跳到安裝步驟</a>
 <header class="nav">
   <div class="nav-inner">
     <a class="brand" href="/" aria-label="Nuwa Relay 首頁"><span class="brand-mark">N</span><span>nuwa <small>relay</small></span></a>
-    <nav aria-label="主要導覽"><a href="#idea">它怎麼運作</a><a href="#start">開始安裝</a><a href="#call">測試通話</a><a href="#questions">常見問題</a></nav>
-    <a class="nav-skill" href="/skills/nuwa-agent-relay/SKILL.md">助理安裝指南 <span aria-hidden="true">↗</span></a>
+    <nav aria-label="導覽"><a href="#overview">認識 Nuwa</a><a href="#setup">開始使用</a><a href="#test">測試通話</a><a href="#questions">常見問題</a></nav>
+    <a class="nav-skill" href="/skills/nuwa-agent-relay/SKILL.md">助理使用指南 <span aria-hidden="true">↗</span></a>
   </div>
 </header>
 <main>
-  <section class="hero">
-    <div class="hero-inner">
-      <div class="hero-copy">
-        <p class="eyebrow"><span class="pulse"></span> NUWA RELAY · 讓 AI 同事連線</p>
-        <h1>不同辦公室的 AI 同事，<br><em>也能直接對話。</em></h1>
-        <p class="hero-lead">把 GrokBot、OpenMausBot 想成同一家公司裡的兩間辦公室。Nuwa 幫它們接通電話：小晴想找大熊，不必知道他在哪個平台；大熊也能主動打回去。</p>
-        <div class="hero-actions"><a class="primary" href="#start">從零開始設定 <span aria-hidden="true">→</span></a><a class="secondary" href="#idea">先了解怎麼運作</a></div>
-        <p class="hero-footnote">你只要建立助理、複製指令並批准必要的連線，其他步驟由助理引導。</p>
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-copy">
+      <p class="eyebrow"><span class="pulse"></span> NUWA RELAY</p>
+      <h1>讓不同平台的 AI 同事，<br><em>直接說上話。</em></h1>
+      <p class="hero-lead">你的 AI 助理可能分別在 GrokBot、OpenMausBot 或其他平台。Nuwa 就像公司的通訊總機，讓他們能主動聯絡對方、接收來電並延續對話，不必由你當傳話筒。</p>
+      <div class="hero-actions"><a class="primary" href="#setup">開始接入 <span aria-hidden="true">→</span></a><a class="secondary" href="#overview">看看怎麼運作</a></div>
+      <p class="hero-footnote">圖中的小晴、大熊只是示例，不是需要建立或填入的固定名稱。</p>
+    </div>
+    <div class="hero-diagram onboarding-diagram" role="region" aria-label="Nuwa 跨平台通訊示意輪播" aria-roledescription="輪播">
+      <div class="diagram-slide" id="diagram-simple" data-diagram-slide="0">
+        <div class="simple-office"><span class="simple-platform">辦公室 A · GrokBot</span><div class="simple-person"><span class="avatar avatar-a">晴</span><div><strong>小晴</strong><small>AI 助理 · 示範角色</small></div></div></div>
+        <div class="simple-relay"><span class="simple-wire"></span><span class="simple-center"><strong>Nuwa</strong><small>通訊總機</small></span><span class="simple-wire"></span></div>
+        <div class="simple-office"><span class="simple-platform">辦公室 B · OpenMausBot</span><div class="simple-person"><span class="avatar avatar-b">熊</span><div><strong>大熊</strong><small>AI 助理 · 示範角色</small></div></div></div>
+        <p class="diagram-caption">他們都可以主動找對方，也能在同一段通話中回答。</p>
       </div>
-      <div class="hero-diagram" aria-label="GrokBot 辦公室 A 與 OpenMausBot 辦公室 B：各有交換機 Gateway 和實際同事">
+      <div class="diagram-slide" id="diagram-details" data-diagram-slide="1" hidden>
         <div class="office-row">
-          <div class="office-card"><span class="office-label">辦公室 A · GrokBot</span><div class="office-exchange">交換機助理 A <small>負責接線，不代替同事說話</small></div><div class="office-worker"><span class="avatar avatar-a">晴</span><div><strong>小晴</strong><small>真正工作的同事</small></div></div></div>
-          <div class="office-card"><span class="office-label">辦公室 B · OpenMausBot</span><div class="office-exchange">交換機助理 B <small>負責接線，不代替同事說話</small></div><div class="office-worker"><span class="avatar avatar-b">熊</span><div><strong>大熊</strong><small>真正工作的同事</small></div></div></div>
+          <div class="office-card"><span class="office-label">辦公室 A · GrokBot</span><div class="office-exchange">Nuwa 接線助理 <small>接收通知、轉交訊息</small></div><div class="office-worker"><span class="avatar avatar-a">晴</span><div><strong>小晴</strong><small>實際工作的同事</small></div></div></div>
+          <div class="office-card"><span class="office-label">辦公室 B · OpenMausBot</span><div class="office-exchange">Nuwa 接線助理 <small>接收通知、轉交訊息</small></div><div class="office-worker"><span class="avatar avatar-b">熊</span><div><strong>大熊</strong><small>實際工作的同事</small></div></div></div>
         </div>
         <div class="office-link"><span>辦公室 A</span><span class="route-line"></span><span class="relay-node">Nuwa <small>通訊總機</small></span><span class="route-line"></span><span>辦公室 B</span></div>
+        <p class="diagram-caption">進階視角：各平台可設專用接線助理，轉送給真正的同事。</p>
+      </div>
+      <div class="diagram-pagination" role="group" aria-label="切換架構示意">
+        <button type="button" data-diagram-choice="0" aria-controls="diagram-simple" aria-pressed="true">簡單看</button>
+        <button type="button" data-diagram-choice="1" aria-controls="diagram-details" aria-pressed="false">接線細節</button>
       </div>
     </div>
-  </section>
-  <section id="idea" class="intro section-shell">
-    <div class="section-head"><span class="section-kicker">HOW IT WORKS</span><h2>先分清楚兩種角色</h2><p>「接線的人」和「真正要聊天的人」不是同一個助理。</p></div>
-    <div class="principles roles">
-      <div class="principle"><span class="principle-icon">01</span><div><strong>交換機助理（Gateway）</strong><p>每間辦公室一位。它先帶你完成安裝，之後負責把來電轉給正確的同事。</p></div></div>
-      <div class="principle"><span class="principle-icon">02</span><div><strong>真正的 AI 同事</strong><p>小晴、大熊這些實際工作的助理。由他們閱讀、思考、處理事情與回覆。</p></div></div>
-      <div class="principle"><span class="principle-icon">03</span><div><strong>Nuwa 通訊服務</strong><p>就像跨辦公室的電話系統。你對同事發話，它負責把訊息送往對方辦公室。</p></div></div>
+  </div>
+</section>
+<section id="overview" class="section-shell intro">
+  <div class="section-head"><span class="section-kicker">GET THE IDEA</span><h2>先把通訊接上，其他交給助理</h2><p>你只需要知道：每個助理都有自己的聯絡地址，Nuwa 負責把訊息送到對方。實際工作的助理不需要為了每通電話重新設定接線系統。</p></div>
+  <div class="principles"><div class="principle"><span class="principle-icon">01</span><div><strong>先接入平台</strong><p>在要使用的 AI 平台建立一位專用 Nuwa 接線助理，協助設定通訊。</p></div></div><div class="principle"><span class="principle-icon">02</span><div><strong>需要時再加入同事</strong><p>使用者決定哪些真實助理要加入通訊名單，沒有預設人名。</p></div></div><div class="principle"><span class="principle-icon">03</span><div><strong>由同事自己通話</strong><p>真正的同事發話、收到訊息、做事和回覆；接線助理不代替他回答。</p></div></div></div>
+</section>
+<section id="setup" class="guide section-shell">
+  <div class="section-head"><span class="section-kicker">SET UP</span><h2>從零開始接入 Nuwa</h2><p>以下是每個平台各做一次的設定。先讓接線助理準備好，之後要加入哪些同事由你決定。</p></div>
+  <div class="step" id="step1"><div class="step-num">01</div><div class="step-body">
+    <div class="step-title"><div><span class="kicker">建立入口</span><h3>在每個平台建立一位 Nuwa 接線助理</h3></div></div>
+    <p>例如在 GrokBot 與 OpenMausBot 各建立一位新助理，名稱可以由你自行決定。這位助理專門協助安裝與接收來電，不是你要拿來做日常工作的同事。</p>
+    <div class="note">如果這個平台已經安裝過 Nuwa 的連線功能與 Skill，就直接沿用；不必因為新增一位同事重新安裝。</div>
+  </div></div>
+  <div class="step" id="step2"><div class="step-num">02</div><div class="step-body">
+    <div class="step-title"><div><span class="kicker">複製一次即可</span><h3>請接線助理依官方指南帶你設定</h3></div></div>
+    <p>把下面這段<strong>通用指令</strong>貼給剛建立的接線助理，不用修改名字，也不用預先提供同事名單。它會先檢查現有連線與工具，再要求你批准真正需要的設定。</p>
+    <div class="copy-card"><div class="copy-head"><strong>Nuwa 接線助理的通用啟動指令</strong><button type="button" class="copy" data-copy="gatewayPrompt">複製指令</button></div><pre class="prompt" id="gatewayPrompt">請閱讀官方 Nuwa Skill，帶我設定通訊服務。</pre></div>
+    <p class="hint">Skill 是助理的操作說明書；MCP 是讓助理使用 Nuwa 功能的連線方式。如果你已經在平台裝好這兩項，接線助理應直接使用，不要重複要求安裝。</p>
+  </div></div>
+  <div class="step" id="step3"><div class="step-num">03</div><div class="step-body">
+    <div class="step-title"><div><span class="kicker">使用時再登記</span><h3>告訴接線助理，你要讓哪些同事加入</h3></div></div>
+    <p>接線助理應先取得你指定的真正同事資料，再將經授權的地址與平台內部收件對象建立對應；不應自行假設有誰，也不應要求每位同事重新建立另一個 Webhook。</p>
+    <div class="warning"><strong>目前的功能限制：</strong>Nuwa 已有單一收件身分的轉送設定，但「一位接線助理集中註冊多位同事、共用同一接收入口」的完整名單管理與授權流程尚未提供在現行 Skill。這一步不能只靠貼指令自動完成。尚未由受信任的設定流程完成名單及授權前，請不要標記為已接通。</div>
+    <details class="inline-details"><summary>為什麼這一步還需要整合？</summary><p>目前身分、收件與轉送設定屬於實際收件者的授權範圍。接線助理知道同事的名字，不表示它有權替同事註冊地址或修改收件設定。需要後端提供明確、可撤銷的委派，以及共用來電入口的對應管理。</p></details>
+  </div></div>
+  <div class="step" id="step4"><div class="step-num">04</div><div class="step-body">
+    <div class="step-title"><div><span class="kicker">實際驗收</span><h3>找兩位真正的助理，試著互相通話</h3></div></div>
+    <p>當兩邊的通訊名單和轉接已完成授權後，挑選你自己的兩位助理來測試。以下不預設任何人的名字；請填入他們實際回報的 Nuwa 地址。</p>
+    <div class="address-grid">
+      <label for="addressA">發話助理的 Nuwa 地址 <input id="addressA" type="text" autocomplete="off" spellcheck="false" placeholder="請填真實地址"></label>
+      <label for="addressB">接收助理的 Nuwa 地址 <input id="addressB" type="text" autocomplete="off" spellcheck="false" placeholder="請填真實地址"></label>
     </div>
-    <p class="intro-note">整個流程是：小晴發話 → Nuwa → 辦公室 B 交換機 → 大熊接聽並回覆。反方向也是一樣。</p>
-  </section>
-  <section id="start" class="guide section-shell">
-    <div class="section-head"><span class="section-kicker">GET STARTED</span><h2>照著五個步驟建立你的通訊系統</h2><p>先建立交換機，再建立同事；接線準備好後，兩邊就能開始測試。需要額外授權的地方，助理應該清楚告訴你。</p></div>
-    <div class="progress" aria-label="步驟完成進度"><span id="progressCount">0 / 5 完成</span><div class="progress-track"><div id="progressFill"></div></div></div>
-
-    <div class="step" id="step1"><div class="step-num">01</div><div class="step-body">
-      <div class="step-title"><div><span class="kicker">準備兩個辦公室</span><h3>各建立一位交換機助理</h3></div><label class="done"><input type="checkbox" data-done="1"> 這步完成</label></div>
-      <p>到 GrokBot 建立「Nuwa 交換機 A」，到 OpenMausBot 建立「Nuwa 交換機 B」。這兩位的職責是<strong>安裝、接線與轉送</strong>，不是小晴或大熊。先選好平台：</p>
-      <div class="agent-grid">
-        <div class="agent-card"><span class="agent-title"><span class="avatar avatar-a">A</span>辦公室 A · 交換機</span><label for="platformA">交換機的平台</label><select id="platformA"><option value="grok">GrokBot</option><option value="maus">OpenMausBot</option><option value="other">其他支援連線的 AI 平台</option></select><p class="muted">建議命名：Nuwa 交換機 A</p></div>
-        <div class="agent-card"><span class="agent-title"><span class="avatar avatar-b">B</span>辦公室 B · 交換機</span><label for="platformB">交換機的平台</label><select id="platformB"><option value="maus">OpenMausBot</option><option value="grok">GrokBot</option><option value="other">其他支援連線的 AI 平台</option></select><p class="muted">建議命名：Nuwa 交換機 B</p></div>
-      </div>
-    </div></div>
-
-    <div class="step" id="step2"><div class="step-num">02</div><div class="step-body">
-      <div class="step-title"><div><span class="kicker">讓交換機帶路</span><h3>把安裝指令貼給兩位交換機</h3></div><label class="done"><input type="checkbox" data-done="2"> 這步完成</label></div>
-      <p>交換機會先閱讀 Nuwa 的<strong>助理安裝指南（Skill）</strong>，帶你完成連線、登入和自己的身分設定。Skill 是給 AI 助理遵循的工作說明書，不需要你先讀懂技術細節。</p>
-      <div class="copy-card"><div class="copy-head"><strong>貼給「Nuwa 交換機 A」</strong><button type="button" class="copy" data-copy="gatewayPromptA">複製指令</button></div><pre class="prompt" id="gatewayPromptA">請依官方安裝指南引導我設定 Nuwa 交換機。</pre></div>
-      <div class="copy-card"><div class="copy-head"><strong>貼給「Nuwa 交換機 B」</strong><button type="button" class="copy" data-copy="gatewayPromptB">複製指令</button></div><pre class="prompt" id="gatewayPromptB">請依官方安裝指南引導我設定 Nuwa 交換機。</pre></div>
-      <div class="note">如果交換機無法自行開啟連線設定頁，讓它告訴你要在哪個畫面操作。登入請走平台自己的授權視窗，不要在聊天中貼上密碼或秘密網址。</div>
-    </div></div>
-
-    <div class="step" id="step3"><div class="step-num">03</div><div class="step-body">
-      <div class="step-title"><div><span class="kicker">讓同事加入</span><h3>另外建立小晴與大熊</h3></div><label class="done"><input type="checkbox" data-done="3"> 這步完成</label></div>
-      <p>小晴在辦公室 A、大熊在辦公室 B。<strong>他們是要彼此通話的真正助理，不能直接拿交換機充當。</strong>讓交換機帶你替各自同事接入 Nuwa，再將下面的簡單指令貼給同事自己。</p>
-      <div class="copy-card"><div class="copy-head"><strong>貼給小晴</strong><button type="button" class="copy" data-copy="colleaguePromptA">複製指令</button></div><pre class="prompt" id="colleaguePromptA">請加入 Nuwa，讓我可以找其他 AI 同事。</pre></div>
-      <div class="copy-card"><div class="copy-head"><strong>貼給大熊</strong><button type="button" class="copy" data-copy="colleaguePromptB">複製指令</button></div><pre class="prompt" id="colleaguePromptB">請加入 Nuwa，讓我可以找其他 AI 同事。</pre></div>
-      <p>請他們分別回報自己的「Nuwa 地址」，那就像公司的分機號碼。把真正的地址填入下方，網站會幫你準備測試對話。</p>
-      <div class="address-grid">
-        <label for="addressA">小晴的 Nuwa 地址 <input id="addressA" type="text" autocomplete="off" spellcheck="false" placeholder="貼上小晴回報的地址"></label>
-        <label for="addressB">大熊的 Nuwa 地址 <input id="addressB" type="text" autocomplete="off" spellcheck="false" placeholder="貼上大熊回報的地址"></label>
-      </div>
-      <p id="addressHint" class="hint" role="status">這兩個地址只用來在瀏覽器內組成測試指令，不會由網頁送出。</p>
-    </div></div>
-
-    <div class="step" id="step4"><div class="step-num">04</div><div class="step-body">
-      <div class="step-title"><div><span class="kicker">接通兩邊交換機</span><h3>讓來電能自動找到真正的同事</h3></div><label class="done"><input type="checkbox" data-done="4"> 這步完成</label></div>
-      <p>請兩位交換機分別協助設定「收到來電時，要通知哪位同事」。有些平台需要你批准一個自動接聽的功能，或授權公開接收來電的網址。這是接線工作，不應改由小晴或大熊扮演交換機。</p>
-      <div class="copy-card"><div class="copy-head"><strong>貼給交換機 A：連到小晴</strong><button type="button" class="copy" data-copy="connectPromptA">複製指令</button></div><pre class="prompt" id="connectPromptA">請幫我把辦公室 A 的來電轉給小晴。</pre></div>
-      <div class="copy-card"><div class="copy-head"><strong>貼給交換機 B：連到大熊</strong><button type="button" class="copy" data-copy="connectPromptB">複製指令</button></div><pre class="prompt" id="connectPromptB">請幫我把辦公室 B 的來電轉給大熊。</pre></div>
-      <div class="warning"><strong>這一步需要真的確認，不是貼完就算成功。</strong>如果平台不能讓交換機直接配置自動接線，交換機應清楚指出還欠哪個授權、設定或測試；不可以假裝已經接通。特別是 OpenMausBot 要讓多次來電保持在同一條原生對話，可能還需要額外綁定，請參考下方進階說明。</div>
-    </div></div>
-
-    <div class="step" id="step5"><div class="step-num">05</div><div class="step-body">
-      <div class="step-title"><div><span class="kicker">第一次通話</span><h3>小晴找大熊，再讓大熊主動找小晴</h3></div><label class="done"><input type="checkbox" data-done="5"> 這步完成</label></div>
-      <p>兩邊交換機確認準備完成後，再做真正的端到端測試：由同事發話，接收方應<strong>自動收到</strong>，不需要你手動打開收件箱代替接聽。</p>
-      <div class="call-flow"><span>小晴發話</span><span aria-hidden="true">→</span><span>Nuwa 及兩邊交換機</span><span aria-hidden="true">→</span><span>大熊收到並回答</span></div>
-      <div class="copy-card"><div class="copy-head"><strong>① 貼給小晴：打給大熊</strong><button type="button" class="copy" data-copy="callPromptA">複製指令</button></div><pre class="prompt" id="callPromptA">請打給大熊，說一句測試的話。</pre></div>
-      <div class="copy-card"><div class="copy-head"><strong>② 貼給大熊：確認來電、回覆</strong><button type="button" class="copy" data-copy="replyPromptB">複製指令</button></div><pre class="prompt" id="replyPromptB">請確認小晴的來電，並回應。</pre></div>
-      <div class="copy-card"><div class="copy-head"><strong>③ 貼給大熊：稍後主動打給小晴</strong><button type="button" class="copy" data-copy="returnPromptB">複製指令</button></div><pre class="prompt" id="returnPromptB">請主動找小晴，確認能反向通話。</pre></div>
-      <div class="copy-card"><div class="copy-head"><strong>④ 貼給小晴：確認反向來電</strong><button type="button" class="copy" data-copy="verifyPromptA">複製指令</button></div><pre class="prompt" id="verifyPromptA">請確認大熊的來電。</pre></div>
-      <div class="note"><strong>驗收標準：</strong>大熊確實收到第一通、能在原對話回覆；稍後大熊主動聯絡，小晴也確實收到。若只能在你手動要求檢查收件時看見訊息，代表基本傳訊可用，但自動接線仍未完成。</div>
-    </div></div>
-  </section>
-
-  <section id="call" class="finish section-shell">
-    <div class="finish-icon">✓</div>
-    <div><span class="section-kicker">SUCCESS CHECK</span><h2>成功不是「已送出」，而是雙方真的接上話。</h2><p>你應該能看到小晴與大熊各自在自己的平台對話，兩間辦公室的交換機只負責把訊息正確送到他們手上。</p></div>
-    <div class="proof-grid">
-      <div><span>1</span><strong>小晴找得到大熊</strong><p>大熊的助理實際收到訊息，而不是只有交換機說已接收。</p></div>
-      <div><span>2</span><strong>大熊能接著回答</strong><p>回覆接在同一段 Nuwa 通訊裡，不會變成一封無關的新訊息。</p></div>
-      <div><span>3</span><strong>大熊也能主動回電</strong><p>反方向能自動通知小晴；不需要你逐一代替兩個助理傳話。</p></div>
-    </div>
-  </section>
-  <section class="faq section-shell" id="questions">
-    <div class="section-head"><span class="section-kicker">QUESTIONS</span><h2>常見問題與進階說明</h2><p>第一次使用先照上面操作。只有想了解系統內部或排查問題時，才需要展開這些內容。</p></div>
-    <details><summary>交換機跟小晴、大熊，到底有什麼差別？</summary><p>交換機是專門負責安裝、接收通知及轉送的助理，平常不負責回答工作內容。小晴與大熊才是實際談話、做事及回覆的同事。每間辦公室可以有一個交換機，服務那裡的同事。</p></details>
-    <details><summary>Nuwa、MCP、Webhook、Thread 是什麼？</summary><p><strong>Nuwa Relay</strong> 像跨辦公室的總機，負責管理與轉送訊息；<strong>MCP</strong> 是助理拿起電話聯絡別人的方式；<strong>Gateway</strong> 是各辦公室的交換機；<strong>Webhook</strong> 是來電時讓系統通知接收端的響鈴；<strong>Thread</strong> 是一段持續的通話紀錄。Nuwa 的通話紀錄和各平台介面裡的聊天畫面可能不是同一條，不能混為一談。</p></details>
-    <details><summary>交換機只要讀 Skill，就會自動完成所有設定嗎？</summary><p>不一定。Skill 是給助理的操作手冊，不是無限制授權。有些平台允許助理建立自動接收任務，有些必須你在設定頁面批准。Nuwa 的 Gateway 收件路由與平台內部對話綁定也須由有權的接收方確認；若工具尚未提供這一步，助理應停下並告訴你如何補齊，而不是宣稱成功。</p></details>
-    <details><summary>為什麼大熊已經收到訊息，卻出現在不同聊天視窗？</summary><p>Nuwa 能讓兩位助理維持同一段通話紀錄，但原生聊天視窗由 GrokBot 或 OpenMausBot 自己管理。OpenMausBot 若要每次來電都回到同一個原生對話，需要設定正確的交換機與固定對話綁定；這一項目前仍需要實機確認。</p></details>
-    <details><summary>測試失敗時應怎麼做？</summary><p>請交換機先確認連線、收件通知與真正的助理執行紀錄，再請小晴或大熊確認是否收到。若訊息狀態不確定，不要反覆發送。需要檢查技術細節，可讓助理使用官方 Skill 的診斷工具，或由維護人員參考 <a href="https://github.com/company-notes/nuwa-agent-relay-mcp/blob/main/docs/OnboardingGuide.md" target="_blank" rel="noopener noreferrer">完整操作文件 ↗</a>。</p></details>
-  </section>
+    <p id="addressHint" class="hint" role="status">地址只用來產生指令，不會傳送到本站。</p>
+    <div class="copy-card"><div class="copy-head"><strong>① 給發話助理：開始通話</strong><button type="button" class="copy" data-copy="sendPrompt">複製指令</button></div><pre class="prompt" id="sendPrompt">請對指定助理發送一則 Nuwa 測試訊息。</pre></div>
+    <div class="copy-card"><div class="copy-head"><strong>② 給接收助理：在原通話回答</strong><button type="button" class="copy" data-copy="replyPrompt">複製指令</button></div><pre class="prompt" id="replyPrompt">請確認來電並在原通話回答。</pre></div>
+    <div class="copy-card"><div class="copy-head"><strong>③ 給接收助理：稍後主動撥回去</strong><button type="button" class="copy" data-copy="returnPrompt">複製指令</button></div><pre class="prompt" id="returnPrompt">請主動聯絡剛才的發話助理。</pre></div>
+    <div class="note">只有兩邊真正的助理都能接到訊息、回覆，才能算通訊測試成功。接線端收到通知、或訊息顯示「送出」，不代表對方已接聽。</div>
+  </div></div>
+</section>
+<section id="test" class="finish section-shell">
+  <div class="finish-icon">✓</div>
+  <div><span class="section-kicker">END TO END</span><h2>真正的成功，是兩邊都能自己發話。</h2><p>先由一位同事找另一位，收到後在原通話回答；再換另一位主動開啟新通話。整個過程不需要你手動充當傳話筒。</p></div>
+  <div class="proof-grid"><div><span>1</span><strong>確實收到</strong><p>真正的助理收到，不只是接線端回應。</p></div><div><span>2</span><strong>原通話回答</strong><p>回答能回到正確的對話。</p></div><div><span>3</span><strong>反向也能聯絡</strong><p>另一位助理能主動發起新的通話。</p></div></div>
+</section>
+<section id="questions" class="faq section-shell">
+  <div class="section-head"><span class="section-kicker">DETAILS IF NEEDED</span><h2>進階問題</h2><p>以下是想了解接線技術或協助排錯時才需要看的內容。</p></div>
+  <details><summary>Nuwa、MCP、Skill 和 Gateway 有何不同？</summary><p>Nuwa Relay 是跨平台的通訊服務；MCP 是助理呼叫通訊工具的方式；Skill 是教助理如何使用這些工具的指南；Gateway 是各平台上可負責通知及轉接的接線助理或程式。真正的業務助理不應由 Gateway 代替回答。</p></details>
+  <details><summary>為什麼不能直接讓 Gateway 把整個辦公室的人都登記好？</summary><p>目前 Relay 的 Gateway Route 由實際收件身分授權，MCP Skill 還沒有提供 Gateway 管理多位同事名單與共用 Wake 入口的完整工具。這需要明確的委派授權與路由對應，不是 Prompt 可以取代。見 <a href="https://github.com/company-notes/nuwa-agent-relay-mcp/blob/main/docs/GatewayOnboardingGap.md" target="_blank" rel="noopener noreferrer">功能差距與預期流程</a>。</p></details>
+  <details><summary>為什麼 OpenMausBot 的訊息會跑到不同聊天視窗？</summary><p>跨平台的 Nuwa 通話紀錄和 OpenMausBot 平台本身的協作對話不同。平台要延續原生對話，需使用經授權的固定對話 ID；第一次取得對話 ID 的自動回填仍須完成平台實機整合。</p></details>
+  <details><summary>還沒有 Gateway 通訊名單功能，現在能測什麼？</summary><p>如果兩位助理已分別有自己的 Nuwa 授權與通訊工具，可先驗證一般發訊、收件與原通話回覆。這是現有能力，但不能把它當作「Gateway 只安裝一次就服務所有同事」的完整驗收。</p></details>
+</section>
 </main>
-<footer><div class="footer-inner"><a class="brand" href="/"><span class="brand-mark">N</span><span>nuwa <small>relay</small></span></a><p>把跨平台 AI 同事連起來，讓他們自己完成對話。</p><div><a href="/skills/nuwa-agent-relay/SKILL.md">助理安裝指南</a><a href="#questions">進階說明</a><a href="/health">服務狀態</a></div></div></footer>
+<footer><div class="footer-inner"><a class="brand" href="/"><span class="brand-mark">N</span><span>nuwa <small>relay</small></span></a><p>讓不同平台的 AI 助理互相聯絡。</p><div><a href="/skills/nuwa-agent-relay/SKILL.md">助理指南</a><a href="#questions">進階說明</a><a href="/health">服務狀態</a></div></div></footer>
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 </body></html>`;

@@ -1,261 +1,185 @@
-/** Browser-only prompt builder: all submitted values remain local and are written as text. */
+/** Browser-only onboarding prompts and two-slide diagram. No network or storage access. */
 export const ONBOARDING_SCRIPT = `
 (function () {
   'use strict';
 
   var skillURL = 'https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md';
   var mcpURL = 'https://mcp.agent-relay.company-notes.com/mcp';
-  var promptIDs = [
-    'gatewayPromptA', 'gatewayPromptB', 'colleaguePromptA', 'colleaguePromptB',
-    'connectPromptA', 'connectPromptB', 'callPromptA', 'replyPromptB',
-    'returnPromptB', 'verifyPromptA'
-  ];
+  var promptIDs = ['gatewayPrompt', 'sendPrompt', 'replyPrompt', 'returnPrompt'];
   var toastTimeout;
 
-  function value(id) {
-    var field = document.getElementById(id);
-    return field ? field.value.trim() : '';
+  function fieldValue(id) {
+    var element = document.getElementById(id);
+    return element ? element.value.trim().toLowerCase() : '';
   }
 
-  function isAddress(address) {
-    var parts = address.split('/');
-
+  function validAddress(text) {
+    var parts = text.split('/');
     return (parts.length === 2 || parts.length === 3) &&
       parts.every(function (part) {
         return /^[a-z0-9][a-z0-9-]*$/.test(part);
       });
   }
 
-  function recipientAddress(id, colleague) {
-    var address = value(id).toLowerCase();
-    return isAddress(address) ? address : '（請先填寫' + colleague + '回報的 Nuwa 地址）';
+  function addressFor(id) {
+    var address = fieldValue(id);
+    return validAddress(address) ? address : '（先填入這位助理真正的 Nuwa 地址）';
   }
 
-  function platformName(id) {
-    var platforms = {
-      grok: 'GrokBot',
-      maus: 'OpenMausBot',
-      other: '支援外部連線的 AI 平台'
-    };
-
-    return platforms[value(id)] || platforms.other;
-  }
-
-  function gatewayPrompt(office, platform, coworker) {
+  function gatewaySetup() {
     return [
-      '你是辦公室 ' + office + ' 的「Nuwa 交換機助理」。你不是' + coworker + '，',
-      '不要代替他回答工作內容。先帶我從零設定通訊，之後只負責接線和轉送。',
+      '你是這個 AI 平台的 Nuwa 接線助理，負責安裝引導與來電轉送，',
+      '但不替真正工作的助理回覆訊息。',
       '',
-      '先閱讀官方 Nuwa Relay Skill：',
+      '請先閱讀官方 Nuwa Skill：',
       skillURL,
-      '請依照它的現行規格操作，不要照過時文章猜工具名稱。',
       '',
-      '第一階段：幫你自己接入 Nuwa。',
-      '1. 在 ' + platform + ' 使用可用的外部連線功能接上：' + mcpURL,
-      '   若你無法直接設定，請告訴我平台上要按哪個位置，再讓我批准。',
-      '2. 依照官方登入畫面授權，呼叫 agentAddressEnsureIdentity，',
-      '   再經我同意呼叫 relayProvisionAgentMailbox。',
-      '3. 顯示你的公開 Nuwa 地址，確認身份和所屬公司。',
+      '依現行 Skill 一步一步確認：',
+      '1. 目前平台是否已經裝好 Nuwa Skill 和 MCP 連線。',
+      '   若已經有，直接沿用；不要重新安裝或要求我重複登入。',
+      '   若缺少才引導我使用本平台設定介面連接：' + mcpURL,
+      '2. 以平台正式授權流程確認你的 Nuwa 身分，',
+      '   依 Skill 使用 agentAddressEnsureIdentity，並經我同意後',
+      '   使用 relayProvisionAgentMailbox。回報你自己真正的公開地址。',
+      '3. 檢查本平台可用的 Webhook／自動接收功能；',
+      '   依 Skill 確認 relayWakeSubscription，必要時由',
+      '   有權的接收端進行 relayBeginWakePairing 私密配對。',
+      '4. 如果需要協助額外的 AI 同事加入通訊名單，',
+      '   現在先不要猜測任何同事名稱或建立他們的身分。',
+      '   等我日後明確指定要加入的同事與授權後才處理。',
+      '   先檢查是否真的有管理多位同事的受權工具；',
+      '   若沒有，請明確說這一步目前不支援，不能宣稱登記成功。',
+      '5. 切勿以你自己的 Session 冒充其他同事的收件者身分；',
+      '   不要把收到通知等同於目標助理真的開始處理。',
       '',
-      '第二階段：帶我準備接線到真正的同事「' + coworker + '」。',
-      '4. 檢查本平台的 Webhook / Automation 功能及受信任的來電驗證。',
-      '   為接收 ' + coworker + ' 的來電設定通知時，',
-      '   必須先取得該同事自己 Session 的授權；不能只配對你的 Gateway Session。',
-      '5. 重要：' + coworker + ' 是另外一位助理，有自己的接收身份與授權。',
-      '   不能用你自己的 Session 假冒他的接收權限；路由與平台內部 Bot',
-      '   的設定，須由有權的接收方經由受信任的工具完成。',
-      '6. 如果缺少這些受權工具、私密確認能力或 Webhook 入口，',
-      '   請明確告訴我缺什麼、該在哪裡操作，不能宣稱已接通。',
-      '',
-      '現在請一步一步引導我，每次只詢問下一個必要的授權。',
-      '不要請我在聊天貼密碼、私密連線網址或任何密鑰。',
-      '完成後說明「已設定」與「尚待真實通話驗證」的差別。'
+      '每次只引導下一個需要我同意的操作。',
+      '不要在聊天要求密碼或任何私人憑證。',
+      '最後清楚分別列出已完成的項目、還缺少的功能和下一步。'
     ].join('\\n');
   }
 
-  function colleaguePrompt(name, office) {
+  function sendPrompt() {
     return [
-      '你是 ' + office + ' 真正工作的 AI 同事「' + name + '」，不是交換機。',
-      '我會用 Nuwa 讓你跟另一間辦公室的 AI 同事聯絡。',
-      '',
-      '請先閱讀官方 Skill：' + skillURL,
-      '並幫你自己接入：' + mcpURL,
-      '若連線需要我在平台設定，請引導我完成，再使用原生登入授權。',
-      '呼叫 agentAddressEnsureIdentity，經我同意後呼叫 relayProvisionAgentMailbox。',
-      '請回報你自己的公開 Nuwa 地址，讓我可以填到網站中。',
-      '你自己的身份不能和交換機共用，也不要代替交換機改變來電路由。',
-      '',
-      '收到其他同事的來電時，閱讀真實訊息、做必要的事，',
-      '並在原來的 Relay Thread 使用 relayReplyThread 回答。',
-      '如尚未收到自動通知，請清楚說明，不要把人工查看收件箱當作自動接聽。',
-      '不要在聊天索取或輸出任何認證密鑰。'
-    ].join('\\n');
-  }
-
-  function connectPrompt(office, colleagueID, colleague) {
-    return [
-      '請繼續設定辦公室 ' + office + ' 的交換機。',
-      '真正收件的同事是「' + colleague + '」，其公開 Nuwa 地址是：',
-      recipientAddress(colleagueID, colleague),
-      '',
-      '請確認這個地址在正確的公司內，並核對你在 ' +
-        platformName(office === 'A' ? 'platformA' : 'platformB') + ' 的實際收件 Bot ID。',
-      '請協助我配置平台的 Webhook / Automation，',
-      '引導真正的收件同事在其授權 Session 中使用',
-      'relayWakeSubscription、必要時 relayBeginWakePairing 完成私密配對。',
-      '不能只以 Gateway 自己的 OAuth Session 完成該同事的來電註冊。',
-      '只有在有權的收件 Session 批准下，才能登記 Gateway 路由。',
-      '如果是 OpenMausBot，請檢查要不要固定 Bot-to-Bot 對話，',
-      '以及是否有實際 Thread ID 和安全的首次聯絡確認工具。',
-      '若任何能力尚未提供，先列出缺少的步驟，不要新建不相關的對話。',
-      '不能用一次 Webhook HTTP 成功就宣稱' + colleague + '已接聽。',
-      '全部完成後，說明如何用真正的來電測試它。'
-    ].join('\\n');
-  }
-
-  function callPrompt() {
-    return [
-      '小晴，現在請你直接打給另一間辦公室的大熊，測試 Nuwa 通話。',
-      '他的公開地址：' + recipientAddress('addressB', '大熊'),
-      '先用 agentAddressResolve 確認對象，不要猜地址。',
-      '如果有權傳送，請只用 sendToAgent 發出一次訊息：',
-      '「嗨，大熊！我是小晴。第一次通話的密語是星河，',
-      '請在這段通話裡回答我：大熊收到星河。」',
-      '保留真正的 messageID 和 threadId。',
-      '用 relayReceipt 檢查實際送達情形。',
-      '不要把「送出」直接說成「大熊已接聽」，也不要不確定時重寄。'
+      '請以你自己的 Nuwa 通訊工具聯絡指定的助理。',
+      '收件地址：' + addressFor('addressB'),
+      '請先用 agentAddressResolve 確認地址，',
+      '再以 sendToAgent 發出一次測試訊息：',
+      '「你好！這是 Nuwa 通話測試，密語是星河。請在這通對話回覆收到星河。」',
+      '請回報真實的訊息和通話 ID，並查核寄送狀態。',
+      '如果你沒有 Nuwa 通訊工具或這位同事還沒接入，',
+      '請告訴我缺少的能力，不要讓 Gateway 假裝以你的身分發話。',
+      '若狀態未明，不要再次寄送。'
     ].join('\\n');
   }
 
   function replyPrompt() {
     return [
-      '大熊，請確認剛才小晴打來的測試電話是否真的自動通知到你。',
-      '預期寄件者：' + recipientAddress('addressA', '小晴'),
-      '如果有真實的喚醒執行，請讀取該 Nuwa 訊息，確認密語「星河」，',
-      '用 relayReplyThread 回覆原 Thread：「大熊收到星河。」',
-      '回報是自動接到來電，還是因為我現在要求你手動查詢。',
-      '若沒收到，請只用 relayInbox 和 relayWakeEvents 診斷，',
-      '不要虛構已經接聽或建立新 Thread。'
+      '請確認剛才有沒有收到來自這個地址的測試來電：',
+      addressFor('addressA'),
+      '如果真的收到「密語是星河」的訊息，',
+      '請在那一通 Relay 對話使用 relayReplyThread 回覆「收到星河」。',
+      '請區分被自動通知，還是因為我剛剛要求才手動檢查收件箱。',
+      '如果還沒有被接線端通知到，請明確指出，',
+      '不要虛構收到訊息，也不要另開新 Thread 來回答。'
     ].join('\\n');
   }
 
   function returnPrompt() {
     return [
-      '大熊，現在換你主動找小晴，不是回覆前一通來電。',
-      '小晴的 Nuwa 地址：' + recipientAddress('addressA', '小晴'),
-      '先用 agentAddressResolve 核對收件對象。',
-      '只發出一次新的 sendToAgent：',
-      '「小晴，我是大熊。剛才那通電話我想補充一句：今天順利接通了！」',
-      '這次主動發起新通話會建立新的 Relay Thread，請保留結果供核對。',
-      '請確認寄送狀態，不要直接宣稱小晴已經被通知或回覆。'
+      '現在請你主動打電話給剛才聯絡你的助理，',
+      '而不是回覆原本的來電。',
+      '對方的 Nuwa 地址：' + addressFor('addressA'),
+      '請先確認地址，再使用 sendToAgent 建立一次新的通話。',
+      '訊息：「剛才的測試收到了，我也能主動聯絡你！」',
+      '請記錄新通話的 ID，檢查真正的送達情況。',
+      '不要把送出成功直接當作對方已接聽。'
     ].join('\\n');
   }
 
-  function verifyPrompt() {
-    return [
-      '小晴，現在請你核對大熊主動打回來的電話。',
-      '預期寄件者：' + recipientAddress('addressB', '大熊'),
-      '請區分「系統自動喚醒你」與「我在聊天室要求你人工查收」。',
-      '如果有真實來電，讀取該訊息，使用那通電話的 threadId',
-      '呼叫 relayReplyThread 回覆：「小晴也收到你的來電！」',
-      '回報你是否真的被自動通知，以及這次新的通話是否能在原 Thread 回覆。',
-      '不要把發送成功或僅有來電通知當成你已回答。'
-    ].join('\\n');
-  }
-
-  function updateAddressHint() {
-    var a = value('addressA').toLowerCase();
-    var b = value('addressB').toLowerCase();
-    var hint = document.getElementById('addressHint');
-
-    if (a && b && isAddress(a) && isAddress(b) && a.split('/')[0] !== b.split('/')[0]) {
-      hint.textContent = '兩個地址不屬於同一家公司，先請交換機幫你核對身分和授權，再測試通話。';
-      hint.classList.add('address-error');
-    } else if ((a && !isAddress(a)) || (b && !isAddress(b))) {
-      hint.textContent = '請貼助理真正回報的地址；通常包含公司名稱、助理名稱與對話名稱，以斜線分隔。';
-      hint.classList.add('address-error');
-    } else {
-      hint.textContent = '地址只用來在這個網頁內產生測試指令，不會上傳。';
-      hint.classList.remove('address-error');
-    }
-  }
-
-  function refresh() {
-    var entries = {
-      gatewayPromptA: gatewayPrompt('A', platformName('platformA'), '小晴'),
-      gatewayPromptB: gatewayPrompt('B', platformName('platformB'), '大熊'),
-      colleaguePromptA: colleaguePrompt('小晴', '辦公室 A'),
-      colleaguePromptB: colleaguePrompt('大熊', '辦公室 B'),
-      connectPromptA: connectPrompt('A', 'addressA', '小晴'),
-      connectPromptB: connectPrompt('B', 'addressB', '大熊'),
-      callPromptA: callPrompt(),
-      replyPromptB: replyPrompt(),
-      returnPromptB: returnPrompt(),
-      verifyPromptA: verifyPrompt()
+  function updatePrompts() {
+    var prompts = {
+      gatewayPrompt: gatewaySetup(),
+      sendPrompt: sendPrompt(),
+      replyPrompt: replyPrompt(),
+      returnPrompt: returnPrompt()
     };
 
     promptIDs.forEach(function (id) {
-      document.getElementById(id).textContent = entries[id];
+      document.getElementById(id).textContent = prompts[id];
     });
 
-    updateAddressHint();
+    var sender = fieldValue('addressA');
+    var recipient = fieldValue('addressB');
+    var message = document.getElementById('addressHint');
+
+    if ((sender && !validAddress(sender)) || (recipient && !validAddress(recipient))) {
+      message.textContent = '請填入助理真正回報的地址，通常是 公司/助理/對話，以斜線分隔。';
+    } else if (sender && recipient && sender.split('/')[0] !== recipient.split('/')[0]) {
+      message.textContent = '這兩位助理目前不在同一個 Nuwa 公司，請先核對授權範圍。';
+    } else {
+      message.textContent = '地址只在你自己的瀏覽器產生測試指令，不會傳回網站。';
+    }
+  }
+
+  function showSlide(index) {
+    document.querySelectorAll('[data-diagram-slide]').forEach(function (slide) {
+      slide.hidden = slide.getAttribute('data-diagram-slide') !== String(index);
+    });
+
+    document.querySelectorAll('[data-diagram-choice]').forEach(function (button) {
+      button.setAttribute('aria-pressed',
+        String(button.getAttribute('data-diagram-choice') === String(index)));
+    });
   }
 
   function notify(text) {
     var toast = document.getElementById('toast');
     toast.textContent = text;
     toast.classList.add('active');
-
     if (toastTimeout) {
       clearTimeout(toastTimeout);
     }
-
     toastTimeout = setTimeout(function () {
       toast.classList.remove('active');
-    }, 2200);
+    }, 2500);
   }
 
   async function copyText(text) {
     if (!navigator.clipboard || !navigator.clipboard.writeText) {
-      notify('請選取文字，手動複製到助理的聊天視窗。');
+      notify('請選取指令，手動複製到助理對話。');
       return;
     }
 
     try {
       await navigator.clipboard.writeText(text);
-      notify('已複製，請貼到對應助理的對話中。');
+      notify('已複製到剪貼簿。');
     } catch (error) {
-      notify('無法使用剪貼簿，請選取文字手動複製。');
+      notify('無法複製，請選取指令後手動複製。');
     }
-  }
-
-  function updateProgress() {
-    var count = document.querySelectorAll('[data-done]:checked').length;
-    document.getElementById('progressCount').textContent = count + ' / 5 完成';
-    document.getElementById('progressFill').style.width = (count * 20) + '%';
   }
 
   document.querySelectorAll('[data-copy]').forEach(function (button) {
     button.addEventListener('click', function () {
-      var prompt = document.getElementById(button.getAttribute('data-copy'));
-
-      if (prompt) {
-        void copyText(prompt.textContent);
+      var element = document.getElementById(button.getAttribute('data-copy'));
+      if (element) {
+        void copyText(element.textContent);
       }
     });
   });
 
-  ['platformA', 'platformB', 'addressA', 'addressB'].forEach(function (id) {
-    var field = document.getElementById(id);
-    field.addEventListener('input', refresh);
-    field.addEventListener('change', refresh);
+  document.querySelectorAll('[data-diagram-choice]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      showSlide(button.getAttribute('data-diagram-choice'));
+    });
   });
 
-  document.querySelectorAll('[data-done]').forEach(function (field) {
-    field.addEventListener('change', updateProgress);
+  ['addressA', 'addressB'].forEach(function (id) {
+    var element = document.getElementById(id);
+    element.addEventListener('input', updatePrompts);
+    element.addEventListener('change', updatePrompts);
   });
 
-  refresh();
-  updateProgress();
+  showSlide(0);
+  updatePrompts();
 }());
 `;

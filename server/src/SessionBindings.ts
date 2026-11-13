@@ -187,6 +187,29 @@ export class SessionBindings {
       : { bound: false };
   }
 
+  private async updateOwnDisplayName(
+    client: AddressAPIClient, row: BindingRow, displayName: string,
+  ): Promise<void> {
+    const own = await client.resolve(row.canonicalAddress) as {
+      id?: string; agentId?: string; canonical?: string;
+    };
+
+    if (!own || own.id !== row.sessionID ||
+        own.canonical !== row.canonicalAddress || !own.agentId) {
+      throw new APIError(409, 'binding_identity_mismatch',
+        'The authorized Agent/Session no longer matches this private binding.');
+    }
+
+    const updated = await client.setAgentDisplayName(own.agentId, displayName) as {
+      id?: string; displayName?: string;
+    };
+
+    if (!updated || updated.id !== own.agentId || updated.displayName !== displayName) {
+      throw new APIError(502, 'agent_display_name_update_invalid',
+        'Agent Address did not confirm the requested display name.');
+    }
+  }
+
   async ensure(
     authorization: string, agentDisplayName?: string,
   ): Promise<Record<string, unknown>> {
@@ -204,9 +227,15 @@ export class SessionBindings {
           'The bound Session Organization is no longer authorized.');
       }
 
-      return SessionBindings.publicResult(
-        await this.renew(client, key, existing, status.organization.slug), false,
-      );
+      const renewed = await this.renew(client, key, existing, status.organization.slug);
+
+      if (agentDisplayName) {
+        // This is the current OAuth grant's own Session, never a Gateway
+        // acting on a different colleague's identity.
+        await this.updateOwnDisplayName(client, renewed, agentDisplayName);
+      }
+
+      return SessionBindings.publicResult(renewed, false);
     }
 
     if (!status.organization) {

@@ -56,7 +56,10 @@ const skill = await request('/skills/nuwa-agent-relay/SKILL.md');
 assert.equal(skill.status, 200, 'Skill installation entrypoint must remain reachable.');
 const skillText = await skill.text();
 assert.match(skillText, /agentAddressEnsureIdentity/);
-assert.match(skillText, /agentAddressFindByName/);
+assert.match(skillText, /sendToAgent/);
+assert.match(skillText, /no Gateway name lookup/);
+assert.doesNotMatch(skillText, /agentAddressFindByName/,
+  'Name resolution must not add a second MCP tool call.');
 assert.doesNotMatch(skillText, /human provides the Session ID|access token and loses the binding/i);
 
 const metadata = await request('/.well-known/oauth-protected-resource/mcp');

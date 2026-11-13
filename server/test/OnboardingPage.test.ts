@@ -202,6 +202,7 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
     assert.doesNotMatch(prompt,
       /sendToAgent|relayReplyThread|Message ID|Thread ID|Webhook|company\/alice|company\/bob/);
   }
+
   assert.equal(slides[0].hidden, false);
   assert.equal(slides[1].hidden, true);
 

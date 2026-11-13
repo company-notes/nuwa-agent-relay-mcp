@@ -124,6 +124,7 @@ export class RemoteMCPScenario {
   organizationExists = true;
   resumeCount = 0;
   claimCount = 0;
+  readonly displayNameUpdates: Array<{ agentID: string; name: string; principal: string }> = [];
   registerOrganizationCount = 0;
   heartbeatCount = 0;
   releaseCount = 0;
@@ -271,6 +272,44 @@ export class RemoteMCPScenario {
           this.activeLeases.delete(sessionID);
 
           return Response.json({ ok: true, data: { id: sessionID } });
+        }
+
+        if (url.pathname === '/v2/account/addresses' && init?.method === 'GET') {
+          const canonical = url.searchParams.get('address');
+          const agent = canonical?.match(/^nuwa\/(?:reviewer-([ab])|xiaoqing)\/main$/);
+
+          if (!agent) {
+            return Response.json({ ok: false, error: { code: 'not_found' } }, { status: 404 });
+          }
+
+          const owner = canonical?.includes('reviewer-b/') ? 'b' : 'a';
+          return Response.json({ ok: true, data: {
+            id: owner === 'b' ? SESSION_B : SESSION_A,
+            agentId: 'agent-' + owner,
+            canonical,
+          } });
+        }
+
+        const agentNameMatch = url.pathname.match(/^\/v2\/account\/agents\/(agent-[ab])$/);
+
+        if (agentNameMatch && init?.method === 'PATCH') {
+          const ownAgentID = 'agent-' + principal[0];
+
+          if (agentNameMatch[1] !== ownAgentID) {
+            return Response.json({ ok: false, error: { code: 'forbidden' } }, {
+              status: 403,
+            });
+          }
+
+          assert.equal(typeof body?.agentDisplayName, 'string');
+          const name = String(body?.agentDisplayName);
+          this.displayNameUpdates.push({
+            agentID: ownAgentID, name, principal: principal[0],
+          });
+
+          return Response.json({ ok: true, data: {
+            id: ownAgentID, displayName: name,
+          } });
         }
 
         if (url.pathname === '/v2/account/agents') {

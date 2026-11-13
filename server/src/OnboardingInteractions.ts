@@ -104,7 +104,7 @@ export const ONBOARDING_SCRIPT = `
       '引導真正的收件同事在其授權 Session 中使用',
       'relayWakeSubscription、必要時 relayBeginWakePairing 完成私密配對。',
       '不能只以 Gateway 自己的 OAuth Session 完成該同事的來電註冊。',
-      '只有在有權的收件 Session 批准下，才能登記 Gateway 路由。'
+      '只有在有權的收件 Session 批准下，才能登記 Gateway 路由。',
       '如果是 OpenMausBot，請檢查要不要固定 Bot-to-Bot 對話，',
       '以及是否有實際 Thread ID 和安全的首次聯絡確認工具。',
       '若任何能力尚未提供，先列出缺少的步驟，不要新建不相關的對話。',

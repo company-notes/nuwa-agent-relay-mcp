@@ -12,16 +12,19 @@ export class GatewayTools extends MCPToolSet {
 
   install(): void {
     this.register('relayGatewayTeammates',
-      'List this Gateway Session\'s proposed and approved coworkers. ' +
-      'Only call from the dedicated Gateway Agent; this does not reveal private credentials.',
+      'List this Gateway Session\'s proposed and approved coworkers, including pending approvals. ' +
+      'Use after office-wide discovery to report who is actually active; do not equate discovery ' +
+      'or an invitation with a working receiving route. Does not reveal credentials.',
       {},
       () => this.client.call('GET', '/v2/gateway-teammates'));
 
     this.register('relayGatewayInviteTeammate',
-      'On explicit user request, propose adding an existing coworker to this office Gateway. ' +
-      'The Gateway must already have a verified Wake subscription and know the real platform Bot ID. ' +
-      'This only creates a pending invitation; the coworker must approve using its own Session. ' +
-      'Never invent a recipient address or Bot ID, or claim that an invitation means automatic delivery.',
+      'On user-authorized office-wide setup, propose each real, verified local coworker without ' +
+      'asking the user to type a manual roster; this tool invites ONE coworker per call. ' +
+      'Match the recipient canonical address to an authoritative platform-native Bot ID. ' +
+      'A verified Gateway Wake is required. The invitation remains pending until the coworker ' +
+      'approves from its OWN Session. Never assume directory membership grants consent, invent IDs, ' +
+      'or claim automatic delivery before the actual recipient Bot runs.',
       {
         recipientAddress: z.string().min(3).max(255),
         recipientBotID: z.string().regex(/^[A-Za-z0-9._:-]{1,192}$/),
@@ -48,9 +51,9 @@ export class GatewayTools extends MCPToolSet {
       () => this.client.call('GET', '/v2/gateway-invitation'));
 
     this.register('relayGatewayApproveInvitation',
-      'Only after the human owner explicitly authorizes it, approve this coworker\'s ' +
-      'pending shared office Gateway invitation. The current Session owns this approval. ' +
-      'Do not call from the Gateway Session to approve a different coworker.',
+      'Approve this coworker\'s pending Gateway invitation only with explicit authorization ' +
+      'from the actual coworker Session owner. Office-wide discovery or owner consent for the ' +
+      'Gateway does not approve another Session. Never call from Gateway on behalf of a coworker.',
       {},
       () => this.client.call('PUT', '/v2/gateway-invitation'));
 

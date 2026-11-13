@@ -2,6 +2,15 @@
 
 這份文件給負責把 Nuwa 接到 GrokBot／OpenMausBot 的維護者。先讀 [Nuwa 的辦公室電話架構](Architecture.md)，再依 [從零開始安裝](OnboardingGuide.md) 完成兩間辦公室的交換機與真實同事。
 
+## 可用能力與尚未成立的前提
+
+本文件描述的是**最終應驗收的真實通話情境**，不是只要貼上 Gateway Prompt 就能自動完成的現況。
+
+- 每個平台只需一次共用的 Skill/MCP 接入和受信任的 Webhook 接收入口；**不應要求每一位真正同事重新安裝整個通訊系統**。
+- 加入哪些同事是使用者日後決定的事。需有一套在 V2 Session 授權模型下安全登記同事與原生 Bot ID、共用接收入口並管理轉送的機制。
+- **現行 MCP Skill 沒有 Gateway 通訊名單管理工具；Relay 只有 recipient Session-scoped Gateway Route，不是完整的 Gateway 共用名單。** 這是目前 E2E 的阻斷條件，見 [GatewayOnboardingGap](GatewayOnboardingGap.md)。
+- 若平台共用同一套 MCP，仍不可讓多位同事都冒用 Gateway 的寄件身份。真正的送訊身份需要可信來源證明。
+
 ## 目標和前提
 
 我們要證明的是**兩位真實 AI 同事能經兩個 Gateway 自動互相聯絡**，不是只證明伺服器接受了 HTTP 請求。

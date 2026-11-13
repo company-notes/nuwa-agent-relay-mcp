@@ -74,8 +74,11 @@ Gateway's address.
    and provider receiver/run limitations. Tell the user only about the
    remaining permissions or manual actions, not technical secrets.
 7. Re-run discovery when new colleagues arrive, when explicitly requested.
-   Use `relayGatewayRemoveTeammate` and `relayGatewayDeclineInvitation`
-   for authorized removal or revocation.
+   Use `relayGatewayRemoveTeammate` with the real platform `recipientName`
+   to remove exactly one selected coworker. Relay refreshes the authorized
+   directory for this destructive action; no extra name-lookup MCP call or
+   internal Nuwa address is required. Use `relayGatewayDeclineInvitation`
+   for a coworker's own authorized revocation.
 
 **Platform modes:** Use `threadMode: "platform"` if the provider manages
 its own native conversation. Use `threadMode: "explicit"` and

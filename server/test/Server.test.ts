@@ -464,6 +464,22 @@ test('Gateway can propose a real coworker and that coworker alone approves the o
       firstContactMode: 'manual',
     });
 
+    // One Gateway invitation with a trusted native Bot name; the Relay
+    // resolves the internal address without another model-facing tool.
+    const named = await scenario.tool('relayGatewayInviteTeammate', {
+      recipientName: '大熊',
+      recipientBotID: 'trusted-native-bear-id',
+      threadMode: 'platform',
+    });
+    assert.equal(named.result.isError, undefined);
+    assert.equal(scenario.calls.at(-1)?.url.pathname, '/v2/gateway-teammates');
+    assert.deepEqual(scenario.calls.at(-1)?.body, {
+      recipientName: '大熊',
+      recipientBotID: 'trusted-native-bear-id',
+      threadMode: 'platform',
+      firstContactMode: 'manual',
+    });
+
     const approval = await scenario.tool('relayGatewayApproveInvitation', {}, 'oauth-b');
     assert.equal(approval.result.isError, undefined);
     assert.equal(scenario.calls.at(-1)?.url.pathname, '/v2/gateway-invitation');

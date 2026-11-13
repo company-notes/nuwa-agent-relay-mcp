@@ -91,43 +91,43 @@ next step. Do not create made-up coworkers, use message text to select a
 recipient, impersonate the coworker, or claim a webhook HTTP 2xx means the
 real Bot ran.
 
-## Find colleagues and communicate by their everyday names
+## Communicate by the coworker's everyday name
 
-**The human uses the name shown in GrokBot, OpenMausBot or the other AI platform**,
-such as “請找大熊說話”. Never ask the human to look up a canonical Agent Address
-just to send a normal message. Internal Agent/Session addresses are a routing
-detail for the MCP tools, not a user-facing contact field.
+**Users name colleagues as they appear in GrokBot, OpenMausBot or their
+own platform** (for example, “請找大熊說話”), not by canonical Nuwa
+Agent Address. Do not ask for internal addresses in a normal conversation.
 
-1. When the user names a colleague, call `agentAddressFindByName` with that
-   **exact visible name**. It checks only registered names in your authorized
-   Nuwa Organization. A `found` result provides a verified canonical address;
-   use it internally as `sendToAgent.to`. Do not send the plain display name
-   in the `to` parameter or synthesize a slug from Chinese or platform names.
-2. If it returns `not_found` or `not_ready`, tell the user that the intended
-   Bot has not been matched or completed registration. If it returns `ambiguous`,
-   ask which colleague is intended; **do not pick the first**. The Organization
-   directory has no reliable provider office label or native Bot ID, so a
-   display name alone is not always sufficient to distinguish identical names.
-3. A platform Bot's visible name only matches the Nuwa directory when that
-   actual Agent registered the corresponding `agentDisplayName` or handle.
-   During the Bot's own authorized installation, pass its real known display
-   name to `agentAddressEnsureIdentity`; never create or take over another
-   Agent because a display name matches.
-4. Once the confirmed recipient is known, use `sendToAgent` to start a **new**
-   Relay Thread and keep its returned `threadId`. Reply in the existing
-   Thread using `relayReplyThread` and use `relayMessage(contextLimit: 8)`
-   if previous context is needed. A new `sendToAgent` opens a different
-   Relay Thread, even when speaking with the same colleague.
-5. Use `relaySendHandoff` to delegate, `relayAgentInbox` to view unclaimed
-   Agent-level Handoffs, `relayAcceptHandoff` for the intended Session, and
-   `relayReplyHandoff` within the accepted Thread.
-6. Use `relayReceipt`, `relayInbox` and `relayWakeEvents` when investigating
-   delivery; do not resend uncertain messages without checking for duplication.
+1. To start a call, invoke `sendToAgent` **once**, passing the visible
+   colleague name as its `to` value. The Relay resolves the name
+   deterministically inside that same request against the caller's authorized
+   Organization directory. There is **no preliminary name lookup MCP tool,
+   no Gateway name lookup and no second LLM routing decision**.
+2. If the name is unregistered, ambiguous or lacks a default Session, Relay
+   rejects the send before writing a message. Tell the user what happened,
+   and ask which real colleague is intended if necessary. Never invent a
+   canonical address, guess a match or automatically resend.
+3. The native platform display name must have been registered as that
+   Agent's `agentDisplayName` (or matched its handle). When initializing
+   **the actual colleague** through `agentAddressEnsureIdentity`, provide
+   that Agent's existing platform display name if known. A Gateway cannot
+   claim or impersonate the colleague merely because the name matches.
+4. For technical users who know a canonical address, `sendToAgent`
+   continues to support direct addressing without a name-directory query.
+   A successful send returns a new Relay `threadId`. To reply to an existing
+   conversation use `relayReplyThread` with that saved Thread ID; **no name
+   lookup or new Thread creation** is necessary. Use `relayMessage` with
+   `contextLimit: 8` when context is needed.
+5. For task delegation use `relaySendHandoff`, `relayAgentInbox`,
+   `relayAcceptHandoff` and `relayReplyHandoff` as appropriate.
+   Use `relayReceipt`, `relayInbox` and `relayWakeEvents` for
+   delivery diagnostics, and do not blindly retry uncertain sends.
 
-For advanced work, `agentAddressListAgents`, `agentAddressListSessions` and
-`agentAddressResolve` still expose the authorized directory and address lookup;
-they do not by themselves prove that the intended native Bot is registered
-at the Gateway or that it has been automatically awakened.
+Agent Address's `agentAddressListAgents`, `agentAddressListSessions` and
+`agentAddressResolve` remain available for **setup and administration**,
+not for an extra look-up step on ordinary calls. Registration in the
+Organization directory does not by itself prove a platform-native Bot is
+connected to a Gateway. Actual provider dispatch still uses the verified
+recipient Bot ID and recipient-specific native conversation binding.
 
 ## Optional automatic receiving (Wake)
 

@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/server';
 import * as z from 'zod/v4';
 
 import { AddressAPIClient } from './APIClients';
+import { ColleagueDirectory } from './ColleagueDirectory';
 import { MCPToolSet } from './ToolSet';
 
 export class AddressTools extends MCPToolSet {
@@ -38,6 +39,15 @@ export class AddressTools extends MCPToolSet {
       'List available Sessions for one known Agent. A Session address identifies a conversation.',
       { agentID },
       (value) => this.client.listSessions(value.agentID as string));
+
+    this.register('agentAddressFindByName',
+      'Find a real coworker by the name visible in GrokBot, OpenMausBot or another platform, ' +
+      'without asking the user to know a Nuwa Agent Address. Exact matches only within the ' +
+      'authorized Organization directory. If ambiguous, ask the user to distinguish coworkers; ' +
+      'if not found or not ready, do not guess a name-to-address mapping or send. ' +
+      'A platform display name is not proof of a registered recipient or permission to route.',
+      { name: z.string().trim().min(1).max(120) },
+      ({ name }) => new ColleagueDirectory(this.client).find(name as string));
 
     this.register('agentAddressResolve',
       'Resolve an Organization/Agent/Session address or an Agent shorthand to its Default Session.',

@@ -2,6 +2,20 @@
 
 Nuwa Relay connects AI Agents across platforms without requiring them to know each other's internal Bot process or chat implementation. **Agent Address** owns immutable Organization/Agent/Session identities and exclusive Runtime Leases. **Relay API** owns Message/Thread/Handoff records and verified notifications. **Remote MCP** provides the AI-facing tools; **Studio** provides a local Python MCP adapter.
 
+## Public step-by-step onboarding
+
+Open the [Nuwa onboarding homepage](https://mcp.agent-relay.company-notes.com/)
+or the [direct guide](https://mcp.agent-relay.company-notes.com/start).
+It walks a new user through creating two GrokBot/OpenMausBot Agents, copying
+per-Agent Skill-first instructions, native OAuth, automatic Agent/Session
+identity, managed mailboxes, a real A→B→A Relay Thread test, and optional
+provider Webhook/Wake. See [Guide acceptance and limitations](docs/OnboardingGuide.md).
+
+The guide distinguishes successful Relay messaging from a verified Bot
+Automation run and reuse of a platform-native UI Thread. Those latter
+stages require real provider acceptance, and may require a dedicated
+OpenMausBot Gateway Bot plus recipient-authorized native Thread binding.
+
 ## Start with the Skill
 
 The normal GrokBot/OpenMausBot flow is intentionally simple:
@@ -44,4 +58,4 @@ See [Operations](docs/Operations.md) for resource details, deployment troublesho
 
 The real OAuth grant refresh scenario is tested through the Agent Address OAuth provider on a local Worker/D1. MCP server tests cover encrypted binding, correct Session isolation and private Runtime forwarding through actual MCP HTTP with controlled external services; CI also runs a real local D1 lifecycle. Production HTTP smoke checks Skill and OAuth authorization without creating accounts or sending email.
 
-**Human acceptance still needed:** a GrokBot/OpenMausBot client must complete real OAuth, call Ensure automatically, provision a mailbox, send a true A→B→A email and trigger the correct receiving Bot. A successful CI or HTTP 200 cannot certify provider UI Thread continuity; Gateway PR #23 remains separate until its own integration tests.
+**Human acceptance still needed:** a GrokBot/OpenMausBot client must complete real OAuth, call Ensure automatically, provision a mailbox, send a true A→B→A email and trigger the correct receiving Bot. The Relay Gateway control plane has been merged, but an HTTP 200 or passing CI cannot certify platform-native UI Thread continuity or a real provider execution.

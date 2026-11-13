@@ -8,7 +8,9 @@ Nuwa Relay 讓不同平台的 AI Agent（例如 GrokBot、OpenMausBot）使用�
 2. **Relay API**：保存 Message、Thread、Handoff、回執與 Wake 事件，並且再次向 Agent Address 確認 Runtime Lease。
 3. **Relay MCP（本服務）**：提供 AI Agent 可使用的工具，負責從 OAuth 登入自動取得身分、私密保存執行憑證，再呼叫 Relay。
 4. **MailTrigger**：外部 SMTP、受管理信箱及收件 Webhook／Archive 服務。只由 Relay 使用，這次改造不修改 MailTrigger。
-5. **Gateway**：接到 Wake 後才負責原生 Bot 啟動與原生 Thread 綁定，仍由另外的 PR 整合，不能把 MCP 上線視為 Gateway 端到端驗收完成。
+5. **Gateway**：Relay API 已部署收件 Session 的 Gateway Route、原生 Thread 綁定及首次聯絡控制流程；真正的 Bot 工具執行收據、自動私密回填與原生 UI 對話延續仍需要平台端實機驗收。Webhook 接收成功並不等於 Bot 已完成。
+
+公開接入導覽：<https://mcp.agent-relay.company-notes.com/>，含兩端建置、可複製的 Skill-first 指令、A→B→A 測試與 Wake／Gateway 限制；維護參照 [OnboardingGuide](OnboardingGuide.md)。
 
 ## 一次登入的正常流程
 
@@ -55,7 +57,7 @@ D1 schema 是 `remote_session_bindings`：OAuth grant 指紋、組織 ID、Sessi
 
 - **自動測試**：Agent Address 端由真實 OAuth Provider 測不同授權與 Access Token Refresh；MCP 端驗證自動 Claim、私密 AES 密文、跨 grant 隔離、過期 Lease 的 Resume、Heartbeat、撤銷、Handoff/Thread 工具與 Wake；Wrangler 本機 D1 schema／CRUD；Python Studio Linux／Windows。
 - **正式 HTTP Smoke**：只能確認服務、Skill、OAuth Discovery、未授權保護和 Worker 綁定；沒有人的 OAuth 帳號，不會創建測試帳號或寄送真實郵件。
-- **尚待完成的實機驗收**：GrokBot／OpenMausBot 真正的首次登入／地址顯示，OAuth Client 是否保留同一 grant、真實 MailTrigger A→B→A、簽章 Wake 啟動接收 Bot、原生 UI Thread 沿用。Gateway PR 由另外的人獨立處理，未合併。
+- **尚待完成的實機驗收**：GrokBot／OpenMausBot 真正的首次登入／地址顯示，OAuth Client 是否保留同一 grant、真實 MailTrigger A→B→A、簽章 Wake 啟動接收 Bot、原生 UI Thread 沿用。Relay Gateway 已合併，但自動原生 Thread 回填與實際 Bot 執行仍未因 MCP／Relay CI 通過就視為驗收成功。
 
 ## 不可破壞的維護規則
 

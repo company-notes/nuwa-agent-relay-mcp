@@ -7,6 +7,7 @@ import { OAuthResourceServer } from './OAuthResourceServer';
 import { Logger } from './Logger';
 import { SessionBindings } from './SessionBindings';
 import { SessionBindingController } from './SessionBindingController';
+import { OnboardingPage } from './OnboardingPage';
 
 export class HTTPMCPApplication {
   private static readonly logger = Logger.forModule('mcp');
@@ -14,6 +15,12 @@ export class HTTPMCPApplication {
 
   async handle(request: Request): Promise<Response> {
     const url = new URL(request.url);
+
+    const onboarding = OnboardingPage.response(url.pathname, request.method);
+
+    if (onboarding) {
+      return onboarding;
+    }
 
     if (url.pathname === '/health' && request.method === 'GET') {
       return Response.json({ ok: true, data: { service: 'nuwa-agent-relay-mcp' } });

@@ -61,7 +61,7 @@ export const ONBOARDING_SCRIPT = `
       '4. 檢查本平台的 Webhook / Automation 功能及受信任的來電驗證。',
       '   為接收 ' + coworker + ' 的來電設定通知時，',
       '   必須先取得該同事自己 Session 的授權；不能只配對你的 Gateway Session。',
-      '5. 重要：' + coworker + ' 是另外一位助理，有自己的接收身份與授權。'
+      '5. 重要：' + coworker + ' 是另外一位助理，有自己的接收身份與授權。',
       '   不能用你自己的 Session 假冒他的接收權限；路由與平台內部 Bot',
       '   的設定，須由有權的接收方經由受信任的工具完成。',
       '6. 如果缺少這些受權工具、私密確認能力或 Webhook 入口，',

@@ -179,6 +179,8 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   const gateway = elements.get('gatewayPrompt')!.textContent;
 
   assert.match(gateway, /盤點目前平台可辨識的同事/);
+  assert.match(gateway, /內部 Nuwa 地址請讓 Relay 自己確認/);
+  assert.doesNotMatch(gateway, /核對他們的 Nuwa 地址/);
   assert.match(gateway, /如果 Skill 和 MCP 已經裝好/);
   assert.match(gateway, /不要叫我逐一輸入同事名字/);
   assert.match(gateway, /不能替他們同意/);

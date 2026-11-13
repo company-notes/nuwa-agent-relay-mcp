@@ -58,9 +58,10 @@ export const ONBOARDING_SCRIPT = `
       '3. 顯示你的公開 Nuwa 地址，確認身份和所屬公司。',
       '',
       '第二階段：帶我準備接線到真正的同事「' + coworker + '」。',
-      '4. 檢查本平台的 Webhook / Automation 功能、受信任的來電驗證與通知配置。',
-      '   依 Skill 使用 relayWakeSubscription、必要時使用 relayBeginWakePairing。',
-      '5. 重要：' + coworker + ' 是另外一位助理，有自己的接收身份與授權。',
+      '4. 檢查本平台的 Webhook / Automation 功能及受信任的來電驗證。',
+      '   為接收 ' + coworker + ' 的來電設定通知時，',
+      '   必須先取得該同事自己 Session 的授權；不能只配對你的 Gateway Session。',
+      '5. 重要：' + coworker + ' 是另外一位助理，有自己的接收身份與授權。'
       '   不能用你自己的 Session 假冒他的接收權限；路由與平台內部 Bot',
       '   的設定，須由有權的接收方經由受信任的工具完成。',
       '6. 如果缺少這些受權工具、私密確認能力或 Webhook 入口，',
@@ -99,8 +100,11 @@ export const ONBOARDING_SCRIPT = `
       '',
       '請確認這個地址在正確的公司內，並核對你在 ' +
         platformName(office === 'A' ? 'platformA' : 'platformB') + ' 的實際收件 Bot ID。',
-      '請協助我配置平台的 Webhook / Automation 和 Nuwa Wake 的私密配對。',
-      '只有在有權的收件 Session 批准下，才能登記 Gateway 路由。',
+      '請協助我配置平台的 Webhook / Automation，',
+      '引導真正的收件同事在其授權 Session 中使用',
+      'relayWakeSubscription、必要時 relayBeginWakePairing 完成私密配對。',
+      '不能只以 Gateway 自己的 OAuth Session 完成該同事的來電註冊。',
+      '只有在有權的收件 Session 批准下，才能登記 Gateway 路由。'
       '如果是 OpenMausBot，請檢查要不要固定 Bot-to-Bot 對話，',
       '以及是否有實際 Thread ID 和安全的首次聯絡確認工具。',
       '若任何能力尚未提供，先列出缺少的步驟，不要新建不相關的對話。',

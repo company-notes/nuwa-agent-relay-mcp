@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { WranglerRunner } from './WranglerRunner.mjs';
 
 export class LocalBindingsD1Scenario {
   static execute(sql) {
-    const output = execFileSync('npx', [
-      'wrangler', 'd1', 'execute', 'BINDINGS_DB', '--local',
+    const output = WranglerRunner.execute([
+      'd1', 'execute', 'BINDINGS_DB', '--local',
       '--command', sql, '--json',
     ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
     const records = JSON.parse(output);

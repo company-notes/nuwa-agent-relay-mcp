@@ -13,13 +13,13 @@ test('publishes the V2 Skill without exposing internal transport infrastructure'
   const scenario = new RemoteMCPScenario();
   const expected = readFileSync(
     new URL('../../skills/nuwa-agent-relay/SKILL.md', import.meta.url), 'utf8',
-  );
+  ).replace(/\r\n/g, '\n');
   const response = await scenario.application.handle(new Request(
     'https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md',
   ));
 
   assert.equal(response.status, 200);
-  assert.equal(await response.text(), expected);
+  assert.equal((await response.text()).replace(/\r\n/g, '\n'), expected);
   assert.match(expected, /^---\nname: nuwa-agent-relay\n/);
   assert.match(expected, /sendToAgent/);
   assert.doesNotMatch(expected, /MailTrigger|github\.com|\bHost\b|\bWork\b|work_address_id/);

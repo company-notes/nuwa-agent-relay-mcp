@@ -53,10 +53,10 @@ export const ONBOARDING_HTML = `<!doctype html>
 </section>
 <section id="overview" class="section-shell intro">
   <div class="section-head"><span class="section-kicker">GET THE IDEA</span><h2>先把通訊接上，其他交給助理</h2><p>你只需要知道：每個助理都有自己的聯絡地址，Nuwa 負責把訊息送到對方。實際工作的助理不需要為了每通電話重新設定接線系統。</p></div>
-  <div class="principles"><div class="principle"><span class="principle-icon">01</span><div><strong>先接入平台</strong><p>在要使用的 AI 平台建立一位專用 Nuwa 接線助理，協助設定通訊。</p></div></div><div class="principle"><span class="principle-icon">02</span><div><strong>需要時再加入同事</strong><p>使用者決定哪些真實助理要加入通訊名單，沒有預設人名。</p></div></div><div class="principle"><span class="principle-icon">03</span><div><strong>由同事自己通話</strong><p>真正的同事發話、收到訊息、做事和回覆；接線助理不代替他回答。</p></div></div></div>
+  <div class="principles"><div class="principle"><span class="principle-icon">01</span><div><strong>先接入平台</strong><p>在要使用的 AI 平台建立一位專用 Nuwa 接線助理，協助設定通訊。</p></div></div><div class="principle"><span class="principle-icon">02</span><div><strong>預設連接辦公室同事</strong><p>接線助理會盤點現有同事、確認接線設定；需要授權時再引導你核准，不必手工填寫整份名單。</p></div></div><div class="principle"><span class="principle-icon">03</span><div><strong>由同事自己通話</strong><p>真正的同事發話、收到訊息、做事和回覆；接線助理不代替他回答。</p></div></div></div>
 </section>
 <section id="setup" class="guide section-shell">
-  <div class="section-head"><span class="section-kicker">SET UP</span><h2>從零開始接入 Nuwa</h2><p>以下是每個平台各做一次的設定。先讓接線助理準備好，之後要加入哪些同事由你決定。</p></div>
+  <div class="section-head"><span class="section-kicker">SET UP</span><h2>從零開始接入 Nuwa</h2><p>每個平台只要設定一次。接線助理會先盤點現有同事，你不用逐一登記名字；需要授權或確認設定時，它會再告訴你。</p></div>
   <div class="step" id="step1"><div class="step-num">01</div><div class="step-body">
     <div class="step-title"><div><span class="kicker">建立入口</span><h3>在每個平台建立一位 Nuwa 接線助理</h3></div></div>
     <p>例如在 GrokBot 與 OpenMausBot 各建立一位新助理，名稱可以由你自行決定。這位助理專門協助安裝與接收來電，不是你要拿來做日常工作的同事。</p>
@@ -64,28 +64,23 @@ export const ONBOARDING_HTML = `<!doctype html>
   </div></div>
   <div class="step" id="step2"><div class="step-num">02</div><div class="step-body">
     <div class="step-title"><div><span class="kicker">複製一次即可</span><h3>請接線助理依官方指南帶你設定</h3></div></div>
-    <p>把下面這段<strong>通用指令</strong>貼給剛建立的接線助理，不用修改名字，也不用預先提供同事名單。它會先檢查現有連線與工具，再要求你批准真正需要的設定。</p>
+    <p>把下面這段指令直接貼給接線助理。不必填入任何示例人名，它會檢查現有設定、盤點能辨識的同事，再引導你完成必要的授權。</p>
     <div class="copy-card"><div class="copy-head"><strong>Nuwa 接線助理的通用啟動指令</strong><button type="button" class="copy" data-copy="gatewayPrompt">複製指令</button></div><pre class="prompt" id="gatewayPrompt">請閱讀官方 Nuwa Skill，帶我設定通訊服務。</pre></div>
     <p class="hint">Skill 是助理的操作說明書；MCP 是讓助理使用 Nuwa 功能的連線方式。如果你已經在平台裝好這兩項，接線助理應直接使用，不要重複要求安裝。</p>
   </div></div>
   <div class="step" id="step3"><div class="step-num">03</div><div class="step-body">
-    <div class="step-title"><div><span class="kicker">使用時再登記</span><h3>告訴接線助理，你要讓哪些同事加入</h3></div></div>
-    <p>接線助理應先取得你指定的真正同事資料，再將經授權的地址與平台內部收件對象建立對應；不應自行假設有誰，也不應要求每位同事重新建立另一個 Webhook。</p>
-    <div class="warning"><strong>目前的功能限制：</strong>Nuwa 已有單一收件身分的轉送設定，但「一位接線助理集中註冊多位同事、共用同一接收入口」的完整名單管理與授權流程尚未提供在現行 Skill。這一步不能只靠貼指令自動完成。尚未由受信任的設定流程完成名單及授權前，請不要標記為已接通。</div>
-    <details class="inline-details"><summary>為什麼這一步還需要整合？</summary><p>目前身分、收件與轉送設定屬於實際收件者的授權範圍。接線助理知道同事的名字，不表示它有權替同事註冊地址或修改收件設定。需要後端提供明確、可撤銷的委派，以及共用來電入口的對應管理。</p></details>
-  </div></div>
-  <div class="step" id="step4"><div class="step-num">04</div><div class="step-body">
-    <div class="step-title"><div><span class="kicker">實際驗收</span><h3>找兩位真正的助理，試著互相通話</h3></div></div>
-    <p>當兩邊的通訊名單和轉接已完成授權後，挑選你自己的兩位助理來測試。以下不預設任何人的名字；請填入他們實際回報的 Nuwa 地址。</p>
+    <div class="step-title"><div><span class="kicker">實際驗收</span><h3>找兩位助理，直接測試通話</h3></div></div>
+    <p>當兩邊的接線助理確認通訊已準備好，找你真正的兩位助理測試。只需填一次地址，下面每段指令就會自動填入，複製即可傳給對應的助理。</p>
     <div class="address-grid">
-      <label for="addressA">發話助理的 Nuwa 地址 <input id="addressA" type="text" autocomplete="off" spellcheck="false" placeholder="請填真實地址"></label>
-      <label for="addressB">接收助理的 Nuwa 地址 <input id="addressB" type="text" autocomplete="off" spellcheck="false" placeholder="請填真實地址"></label>
+      <label for="addressA">助理 A 的 Nuwa 地址 <input id="addressA" type="text" autocomplete="off" spellcheck="false" placeholder="例如 company/alice/main"></label>
+      <label for="addressB">助理 B 的 Nuwa 地址 <input id="addressB" type="text" autocomplete="off" spellcheck="false" placeholder="例如 company/bob/main"></label>
     </div>
-    <p id="addressHint" class="hint" role="status">地址只用來產生指令，不會傳送到本站。</p>
-    <div class="copy-card"><div class="copy-head"><strong>① 給發話助理：開始通話</strong><button type="button" class="copy" data-copy="sendPrompt">複製指令</button></div><pre class="prompt" id="sendPrompt">請對指定助理發送一則 Nuwa 測試訊息。</pre></div>
-    <div class="copy-card"><div class="copy-head"><strong>② 給接收助理：在原通話回答</strong><button type="button" class="copy" data-copy="replyPrompt">複製指令</button></div><pre class="prompt" id="replyPrompt">請確認來電並在原通話回答。</pre></div>
-    <div class="copy-card"><div class="copy-head"><strong>③ 給接收助理：稍後主動撥回去</strong><button type="button" class="copy" data-copy="returnPrompt">複製指令</button></div><pre class="prompt" id="returnPrompt">請主動聯絡剛才的發話助理。</pre></div>
-    <div class="note">只有兩邊真正的助理都能接到訊息、回覆，才能算通訊測試成功。接線端收到通知、或訊息顯示「送出」，不代表對方已接聽。</div>
+    <p id="addressHint" class="hint" role="status">填入兩位助理的地址，指令就會直接顯示好，不需要再修改一次。</p>
+    <div class="copy-card"><div class="copy-head"><strong>① 給助理 A：找助理 B</strong><button type="button" class="copy" data-copy="sendPrompt">複製指令</button></div><pre class="prompt" id="sendPrompt">填入上面的兩個地址，就能直接複製。</pre></div>
+    <div class="copy-card"><div class="copy-head"><strong>② 給助理 B：在原本的對話回答</strong><button type="button" class="copy" data-copy="replyPrompt">複製指令</button></div><pre class="prompt" id="replyPrompt">填入上面的兩個地址，就能直接複製。</pre></div>
+    <div class="copy-card"><div class="copy-head"><strong>③ 給助理 B：主動找助理 A</strong><button type="button" class="copy" data-copy="returnPrompt">複製指令</button></div><pre class="prompt" id="returnPrompt">填入上面的兩個地址，就能直接複製。</pre></div>
+    <div class="copy-card"><div class="copy-head"><strong>④ 給助理 A：回答第二通電話</strong><button type="button" class="copy" data-copy="verifyPrompt">複製指令</button></div><pre class="prompt" id="verifyPrompt">填入上面的兩個地址，就能直接複製。</pre></div>
+    <div class="note">測試通過要看到兩位助理都真的收到並回答；單純顯示「已送出」，不代表對方接聽成功。</div>
   </div></div>
 </section>
 <section id="test" class="finish section-shell">
@@ -96,9 +91,9 @@ export const ONBOARDING_HTML = `<!doctype html>
 <section id="questions" class="faq section-shell">
   <div class="section-head"><span class="section-kicker">DETAILS IF NEEDED</span><h2>進階問題</h2><p>以下是想了解接線技術或協助排錯時才需要看的內容。</p></div>
   <details><summary>Nuwa、MCP、Skill 和 Gateway 有何不同？</summary><p>Nuwa Relay 是跨平台的通訊服務；MCP 是助理呼叫通訊工具的方式；Skill 是教助理如何使用這些工具的指南；Gateway 是各平台上可負責通知及轉接的接線助理或程式。真正的業務助理不應由 Gateway 代替回答。</p></details>
-  <details><summary>為什麼不能直接讓 Gateway 把整個辦公室的人都登記好？</summary><p>目前 Relay 的 Gateway Route 由實際收件身分授權，MCP Skill 還沒有提供 Gateway 管理多位同事名單與共用 Wake 入口的完整工具。這需要明確的委派授權與路由對應，不是 Prompt 可以取代。見 <a href="https://github.com/company-notes/nuwa-agent-relay-mcp/blob/main/docs/GatewayOnboardingGap.md" target="_blank" rel="noopener noreferrer">功能差距與預期流程</a>。</p></details>
+  <details><summary>是否能一口氣讓目前所有同事都接入？</summary><p>這是我們希望提供的預設體驗。現在 Nuwa 已能讓一位接線助理共用接收入口，也能列出組織內的助理並提出接線邀請；不過，要正確找出「屬於這個辦公室」的原生助理、確認平台 Bot ID，以及由各助理授權接線，仍不能全部自動完成。接線助理會協助盤點並告訴你剩下的授權，不能假裝所有同事已上線。詳見 <a href="https://github.com/company-notes/nuwa-agent-relay-mcp/blob/main/docs/GatewayOnboardingGap.md" target="_blank" rel="noopener noreferrer">接線功能限制</a>。</p></details>
   <details><summary>為什麼 OpenMausBot 的訊息會跑到不同聊天視窗？</summary><p>跨平台的 Nuwa 通話紀錄和 OpenMausBot 平台本身的協作對話不同。平台要延續原生對話，需使用經授權的固定對話 ID；第一次取得對話 ID 的自動回填仍須完成平台實機整合。</p></details>
-  <details><summary>還沒有 Gateway 通訊名單功能，現在能測什麼？</summary><p>如果兩位助理已分別有自己的 Nuwa 授權與通訊工具，可先驗證一般發訊、收件與原通話回覆。這是現有能力，但不能把它當作「Gateway 只安裝一次就服務所有同事」的完整驗收。</p></details>
+  <details><summary>如果有同事還沒有接通，能先測試嗎？</summary><p>可以先使用已取得 Nuwa 地址與通訊工具的兩位助理測試發訊、收件與回覆。但只有實際平台也能自動通知並轉給正確助理時，才表示接線功能真正完成。</p></details>
 </section>
 </main>
 <footer><div class="footer-inner"><a class="brand" href="/"><span class="brand-mark">N</span><span>nuwa <small>relay</small></span></a><p>讓不同平台的 AI 助理互相聯絡。</p><div><a href="/skills/nuwa-agent-relay/SKILL.md">助理指南</a><a href="#questions">進階說明</a><a href="/health">服務狀態</a></div></div></footer>

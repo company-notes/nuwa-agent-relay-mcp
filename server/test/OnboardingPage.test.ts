@@ -69,13 +69,16 @@ test('homepage first shows two AI coworkers and Nuwa, with optional Gateway deta
   assert.match(html, /小晴、大熊只是示例/);
 });
 
-test('user-facing setup has one name-independent Gateway prompt and no fictional roster', () => {
+test('office-wide setup does not ask the user to register each coworker by hand', () => {
   assert.match(ONBOARDING_HTML, /id="gatewayPrompt"/);
   assert.doesNotMatch(ONBOARDING_HTML, /id="gatewayPromptA"/);
   assert.doesNotMatch(ONBOARDING_HTML, /id="colleaguePromptA"/);
   assert.match(ONBOARDING_HTML, /如果這個平台已經安裝過/);
-  assert.match(ONBOARDING_HTML, /尚未提供在現行 Skill/);
-  assert.match(ONBOARDING_HTML, /同事.*加入/);
+  assert.match(ONBOARDING_HTML, /預設連接辦公室同事/);
+  assert.match(ONBOARDING_HTML, /不用逐一登記名字/);
+  assert.match(ONBOARDING_HTML, /id="verifyPrompt"/);
+  assert.doesNotMatch(ONBOARDING_HTML, /告訴接線助理，你要讓哪些同事加入/);
+  assert.doesNotMatch(ONBOARDING_HTML, /尚未提供在現行 Skill/);
   assert.doesNotMatch(ONBOARDING_HTML, /MailTrigger/);
 });
 
@@ -96,12 +99,13 @@ test('real HTTP routes keep Skill and OAuth protected', async () => {
   }
 
   assert.doesNotThrow(() => new Script(ONBOARDING_SCRIPT));
-  assert.match(ONBOARDING_SCRIPT, /agentAddressEnsureIdentity/);
-  assert.match(ONBOARDING_SCRIPT, /relayProvisionAgentMailbox/);
-  assert.match(ONBOARDING_SCRIPT, /relayWakeSubscription/);
-  assert.match(ONBOARDING_SCRIPT, /relayBeginWakePairing/);
-  assert.match(ONBOARDING_SCRIPT, /relayReplyThread/);
-  assert.match(ONBOARDING_SCRIPT, /先不要猜測任何同事名稱/);
+  assert.match(ONBOARDING_SCRIPT, /Nuwa 助理指南/);
+  assert.match(ONBOARDING_SCRIPT, /如果 Skill 和 MCP 已經裝好/);
+  assert.match(ONBOARDING_SCRIPT, /預設希望目前所有符合資格的同事都能接線/);
+  assert.match(ONBOARDING_SCRIPT, /密語是星河/);
+  assert.match(ONBOARDING_SCRIPT, /密語是月光/);
+  assert.doesNotMatch(ONBOARDING_SCRIPT,
+    /agentAddressEnsureIdentity|relayProvisionAgentMailbox|relayWakeSubscription|relayReplyThread/);
   assert.doesNotMatch(ONBOARDING_SCRIPT, /MailTrigger|relayRegisterWake|relayVerifyWake|remote-bind/);
   assert.doesNotMatch(ONBOARDING_SCRIPT, /(?:fetch|XMLHttpRequest|sendBeacon)\s*\(/);
 
@@ -117,7 +121,7 @@ test('real HTTP routes keep Skill and OAuth protected', async () => {
 
 test('generic setup message is reusable and actual addresses drive the bidirectional test', () => {
   const ids = ['gatewayPrompt', 'sendPrompt', 'replyPrompt', 'returnPrompt',
-    'addressA', 'addressB', 'addressHint', 'toast'];
+    'verifyPrompt', 'addressA', 'addressB', 'addressHint', 'toast'];
   const elements = new Map(ids.map((id) => [id, fakeElement()]));
   elements.get('addressA')!.value = 'company/alice/main';
   elements.get('addressB')!.value = 'company/bob/main';
@@ -127,6 +131,7 @@ test('generic setup message is reusable and actual addresses drive the bidirecti
   const buttons = [fakeElement({ 'data-diagram-choice': '0' }),
     fakeElement({ 'data-diagram-choice': '1' })];
   const copy = fakeElement({ 'data-copy': 'gatewayPrompt' });
+  const copySend = fakeElement({ 'data-copy': 'sendPrompt' });
   const copyCalls: string[] = [];
 
   runInNewContext(ONBOARDING_SCRIPT, {
@@ -150,7 +155,7 @@ test('generic setup message is reusable and actual addresses drive the bidirecti
         }
 
         if (selector === '[data-copy]') {
-          return [copy];
+          return [copy, copySend];
         }
 
         return [];
@@ -169,16 +174,31 @@ test('generic setup message is reusable and actual addresses drive the bidirecti
 
   const gateway = elements.get('gatewayPrompt')!.textContent;
 
-  assert.match(gateway, /先不要猜測任何同事名稱/);
-  assert.match(gateway, /已經裝好 Nuwa Skill 和 MCP/);
-  assert.match(gateway, /管理多位同事的受權工具/);
-  assert.match(gateway, /你自己的 Session/);
+  assert.match(gateway, /盤點目前平台可辨識的同事/);
+  assert.match(gateway, /如果 Skill 和 MCP 已經裝好/);
+  assert.match(gateway, /不要叫我逐一輸入同事名字/);
+  assert.match(gateway, /不能替他們同意/);
   assert.doesNotMatch(gateway, /小晴|大熊|Cosmo|nuwa\/xiaoqing|MailTrigger/);
 
-  assert.match(elements.get('sendPrompt')!.textContent, /company\/bob\/main/);
-  assert.match(elements.get('replyPrompt')!.textContent, /company\/alice\/main/);
-  assert.match(elements.get('replyPrompt')!.textContent, /relayReplyThread/);
-  assert.match(elements.get('returnPrompt')!.textContent, /新的通話/);
+  const send = elements.get('sendPrompt')!.textContent;
+  const reply = elements.get('replyPrompt')!.textContent;
+  const returned = elements.get('returnPrompt')!.textContent;
+  const verify = elements.get('verifyPrompt')!.textContent;
+
+  assert.match(send, /「bob」助理/);
+  assert.match(send, /company\/bob\/main/);
+  assert.match(send, /密語是星河/);
+  assert.match(reply, /「alice」助理/);
+  assert.match(reply, /company\/alice\/main/);
+  assert.match(reply, /收到星河/);
+  assert.match(returned, /「alice」助理/);
+  assert.match(returned, /新的對話/);
+  assert.match(returned, /密語是月光/);
+  assert.match(verify, /「bob」助理/);
+  assert.match(verify, /收到月光/);
+  for (const prompt of [send, reply, returned, verify]) {
+    assert.doesNotMatch(prompt, /sendToAgent|relayReplyThread|Message ID|Thread ID|Webhook/);
+  }
   assert.equal(slides[0].hidden, false);
   assert.equal(slides[1].hidden, true);
 
@@ -188,5 +208,25 @@ test('generic setup message is reusable and actual addresses drive the bidirecti
   assert.equal(buttons[1].attributes.get('aria-pressed'), 'true');
 
   copy.callbacks.get('click')?.();
+  copySend.callbacks.get('click')?.();
   assert.equal(copyCalls[0], gateway);
+  assert.equal(copyCalls[1], send);
+
+  // Updating one address refreshes the copied prompt; no second manual edit.
+  elements.get('addressB')!.value = 'company/carol/main';
+  elements.get('addressB')!.callbacks.get('input')?.();
+  const updated = elements.get('sendPrompt')!.textContent;
+  assert.match(updated, /「carol」助理/);
+  assert.match(updated, /company\/carol\/main/);
+  assert.doesNotMatch(updated, /company\/bob\/main/);
+
+  copySend.callbacks.get('click')?.();
+  assert.equal(copyCalls[2], updated);
+
+  // An invalid or self-referential address must not copy a broken instruction.
+  elements.get('addressB')!.value = 'company/alice/main';
+  elements.get('addressB')!.callbacks.get('input')?.();
+  copySend.callbacks.get('click')?.();
+  assert.equal(copyCalls.length, 3);
+  assert.match(elements.get('addressHint')!.textContent, /兩位不同助理/);
 });

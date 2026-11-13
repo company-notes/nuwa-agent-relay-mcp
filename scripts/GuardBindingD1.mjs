@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { WranglerRunner } from './WranglerRunner.mjs';
 import { fileURLToPath } from 'node:url';
 
 export class BindingDatabaseGuard {
@@ -41,8 +41,8 @@ export class BindingDatabaseGuard {
   }
 
   static verifyRemote(requireMigrated = false) {
-    const output = execFileSync('npx', [
-      'wrangler', 'd1', 'execute', 'BINDINGS_DB', '--remote',
+    const output = WranglerRunner.execute([
+      'd1', 'execute', 'BINDINGS_DB', '--remote',
       '--config', '.wrangler.deploy.jsonc', '--command', "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
       '--json',
     ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });

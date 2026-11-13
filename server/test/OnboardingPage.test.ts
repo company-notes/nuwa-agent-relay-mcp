@@ -8,7 +8,42 @@ import { RemoteMCPScenario } from './BindingScenario';
 
 const origin = 'https://mcp.agent-relay.company-notes.com';
 
-test('new visitor first understands the product and distinguishes two Gateways from coworkers', async () => {
+type FakeElement = {
+  value: string;
+  textContent: string;
+  hidden: boolean;
+  attributes: Map<string, string>;
+  callbacks: Map<string, () => void>;
+  classList: { add(name: string): void; remove(name: string): void };
+  addEventListener(event: string, handler: () => void): void;
+  getAttribute(name: string): string | null;
+  setAttribute(name: string, value: string): void;
+};
+
+function fakeElement(attributes: Record<string, string> = {}): FakeElement {
+  const stored = new Map(Object.entries(attributes));
+  const callbacks = new Map<string, () => void>();
+
+  return {
+    value: '',
+    textContent: '',
+    hidden: false,
+    attributes: stored,
+    callbacks,
+    classList: { add() {}, remove() {} },
+    addEventListener(event, handler) {
+      callbacks.set(event, handler);
+    },
+    getAttribute(name) {
+      return stored.get(name) || null;
+    },
+    setAttribute(name, value) {
+      stored.set(name, value);
+    },
+  };
+}
+
+test('homepage first shows two AI coworkers and Nuwa, with optional Gateway details', async () => {
   const scenario = new RemoteMCPScenario();
   const response = await scenario.application.handle(new Request(origin + '/'));
 
@@ -17,46 +52,40 @@ test('new visitor first understands the product and distinguishes two Gateways f
   assert.match(response.headers.get('content-security-policy') || '', /script-src 'self'/);
   assert.doesNotMatch(response.headers.get('content-security-policy') || '', /unsafe-inline/);
 
-  const page = await response.text();
+  const html = await response.text();
+  const intro = html.slice(0, html.indexOf('data-diagram-slide="1"'));
 
-  assert.equal(page, ONBOARDING_HTML);
-  assert.match(page, /不同辦公室的 AI 同事/);
-  assert.match(page, /辦公室 A · GrokBot/);
-  assert.match(page, /辦公室 B · OpenMausBot/);
-  assert.match(page, /交換機助理 A/);
-  assert.match(page, /交換機助理 B/);
-  assert.match(page, /真正工作的同事/);
-  assert.match(page, /不能直接拿交換機充當/);
-  assert.match(page, /小晴主動找大熊|小晴找大熊/);
-  assert.match(page, /大熊主動找小晴/);
-  assert.match(page, /id="gatewayPromptA"/);
-  assert.match(page, /id="gatewayPromptB"/);
-  assert.match(page, /id="colleaguePromptA"/);
-  assert.match(page, /id="colleaguePromptB"/);
-  assert.match(page, /id="connectPromptA"/);
-  assert.match(page, /id="connectPromptB"/);
-  assert.match(page, /id="returnPromptB"/);
-  assert.match(page, /skills\/nuwa-agent-relay\/SKILL\.md/);
+  assert.equal(html, ONBOARDING_HTML);
+  assert.match(intro, /GrokBot/);
+  assert.match(intro, /OpenMausBot/);
+  assert.match(intro, /小晴/);
+  assert.match(intro, /大熊/);
+  assert.match(intro, /通訊總機/);
+  assert.doesNotMatch(intro, /Gateway|交換機|MailTrigger|Runtime Token|Resume Token/);
+  assert.match(html, /id="diagram-simple"/);
+  assert.match(html, /id="diagram-details" data-diagram-slide="1" hidden/);
+  assert.match(html, /data-diagram-choice="0"/);
+  assert.match(html, /data-diagram-choice="1"/);
+  assert.match(html, /小晴、大熊只是示例/);
 });
 
-test('homepage stays focused on the user; internal jargon is only in expanded FAQ', () => {
-  const introductoryText = ONBOARDING_HTML.slice(0, ONBOARDING_HTML.indexOf('id="questions"'));
-
-  assert.doesNotMatch(introductoryText, /MailTrigger|Runtime Token|Resume Token|Relay Server/);
+test('user-facing setup has one name-independent Gateway prompt and no fictional roster', () => {
+  assert.match(ONBOARDING_HTML, /id="gatewayPrompt"/);
+  assert.doesNotMatch(ONBOARDING_HTML, /id="gatewayPromptA"/);
+  assert.doesNotMatch(ONBOARDING_HTML, /id="colleaguePromptA"/);
+  assert.match(ONBOARDING_HTML, /如果這個平台已經安裝過/);
+  assert.match(ONBOARDING_HTML, /尚未提供在現行 Skill/);
+  assert.match(ONBOARDING_HTML, /同事.*加入/);
   assert.doesNotMatch(ONBOARDING_HTML, /MailTrigger/);
-  assert.match(ONBOARDING_HTML, /<details>/);
-  assert.match(ONBOARDING_HTML, /MCP、Webhook、Thread 是什麼/);
-  assert.match(ONBOARDING_HTML, /沒有.*宣稱|不能.*宣稱|不可以假裝/);
-  assert.doesNotMatch(ONBOARDING_HTML, /<input[^>]+type="password"/);
 });
 
-test('public page assets are self-hosted and the protected MCP endpoints remain unchanged', async () => {
+test('real HTTP routes keep Skill and OAuth protected', async () => {
   const scenario = new RemoteMCPScenario();
 
   for (const [path, type, marker] of [
     ['/start', 'text/html', 'Nuwa Relay'],
-    ['/start.css', 'text/css', '.office-row'],
-    ['/start.js', 'text/javascript', 'gatewayPrompt'],
+    ['/start.css', 'text/css', '.diagram-pagination'],
+    ['/start.js', 'text/javascript', 'gatewaySetup'],
   ]) {
     const response = await scenario.application.handle(new Request(origin + path));
 
@@ -69,86 +98,95 @@ test('public page assets are self-hosted and the protected MCP endpoints remain 
   assert.doesNotThrow(() => new Script(ONBOARDING_SCRIPT));
   assert.match(ONBOARDING_SCRIPT, /agentAddressEnsureIdentity/);
   assert.match(ONBOARDING_SCRIPT, /relayProvisionAgentMailbox/);
+  assert.match(ONBOARDING_SCRIPT, /relayWakeSubscription/);
   assert.match(ONBOARDING_SCRIPT, /relayBeginWakePairing/);
   assert.match(ONBOARDING_SCRIPT, /relayReplyThread/);
-  assert.doesNotMatch(ONBOARDING_SCRIPT, /MailTrigger/);
-  assert.doesNotMatch(ONBOARDING_SCRIPT, /relayRegisterWake|relayVerifyWake|remote-bind/);
+  assert.match(ONBOARDING_SCRIPT, /先不要猜測任何同事名稱/);
+  assert.doesNotMatch(ONBOARDING_SCRIPT, /MailTrigger|relayRegisterWake|relayVerifyWake|remote-bind/);
   assert.doesNotMatch(ONBOARDING_SCRIPT, /(?:fetch|XMLHttpRequest|sendBeacon)\s*\(/);
 
-  const unauthenticatedMCP = await scenario.application.handle(new Request(origin + '/mcp', {
-    method: 'POST', body: '{}',
-  }));
-  assert.equal(unauthenticatedMCP.status, 401);
-
-  const privateBinding = await scenario.application.handle(new Request(
-    origin + '/session-bindings',
-  ));
-  assert.equal(privateBinding.status, 401);
-
-  const postToSite = await scenario.application.handle(new Request(origin + '/', {
+  assert.equal((await scenario.application.handle(new Request(origin + '/mcp', {
     method: 'POST',
-  }));
-  assert.equal(postToSite.status, 404);
+    body: '{}',
+  }))).status, 401);
 
-  const unknown = await scenario.application.handle(new Request(origin + '/start/unknown'));
-  assert.equal(unknown.status, 404);
+  assert.equal((await scenario.application.handle(new Request(origin + '/session-bindings'))).status, 401);
+  assert.equal((await scenario.application.handle(new Request(origin + '/', { method: 'POST' }))).status, 404);
+  assert.equal((await scenario.application.handle(new Request(origin + '/unknown-onboarding'))).status, 404);
 });
 
-test('copied instructions initialize separate Gateways and coworkers and preserve call direction', () => {
-  const ids = [
-    'gatewayPromptA', 'gatewayPromptB', 'colleaguePromptA', 'colleaguePromptB',
-    'connectPromptA', 'connectPromptB', 'callPromptA', 'replyPromptB',
-    'returnPromptB', 'verifyPromptA', 'addressHint', 'progressCount', 'progressFill',
-    'platformA', 'platformB', 'addressA', 'addressB',
-  ];
+test('generic setup message is reusable and actual addresses drive the bidirectional test', () => {
+  const ids = ['gatewayPrompt', 'sendPrompt', 'replyPrompt', 'returnPrompt',
+    'addressA', 'addressB', 'addressHint', 'toast'];
+  const elements = new Map(ids.map((id) => [id, fakeElement()]));
+  elements.get('addressA')!.value = 'company/alice/main';
+  elements.get('addressB')!.value = 'company/bob/main';
 
-  const fields = new Map(ids.map((id) => [id, {
-    value: '',
-    textContent: '',
-    style: { width: '' },
-    classList: { add() {}, remove() {} },
-    addEventListener() {},
-  }]));
-  fields.get('platformA')!.value = 'grok';
-  fields.get('platformB')!.value = 'maus';
-  fields.get('addressA')!.value = 'nuwa/xiaoqing/main';
-  fields.get('addressB')!.value = 'nuwa/bear/main';
-
-  const document = {
-    getElementById(id: string) {
-      const field = fields.get(id);
-
-      if (!field) {
-        throw Error('Unexpected onboarding selector ' + id);
-      }
-
-      return field;
-    },
-    querySelectorAll() {
-      return [];
-    },
-  };
+  const slides = [fakeElement({ 'data-diagram-slide': '0' }),
+    fakeElement({ 'data-diagram-slide': '1' })];
+  const buttons = [fakeElement({ 'data-diagram-choice': '0' }),
+    fakeElement({ 'data-diagram-choice': '1' })];
+  const copy = fakeElement({ 'data-copy': 'gatewayPrompt' });
+  const copyCalls: string[] = [];
 
   runInNewContext(ONBOARDING_SCRIPT, {
-    document,
-    setTimeout() { return 1; },
+    document: {
+      getElementById(id: string) {
+        const result = elements.get(id);
+
+        if (!result) {
+          throw Error('Unexpected DOM id: ' + id);
+        }
+
+        return result;
+      },
+      querySelectorAll(selector: string) {
+        if (selector === '[data-diagram-slide]') {
+          return slides;
+        }
+
+        if (selector === '[data-diagram-choice]') {
+          return buttons;
+        }
+
+        if (selector === '[data-copy]') {
+          return [copy];
+        }
+
+        return [];
+      },
+    },
+    navigator: {
+      clipboard: {
+        writeText: async (value: string) => {
+          copyCalls.push(value);
+        },
+      },
+    },
     clearTimeout() {},
-    navigator: {},
+    setTimeout() { return 1; },
   });
 
-  const text = (id: string) => fields.get(id)!.textContent;
+  const gateway = elements.get('gatewayPrompt')!.textContent;
 
-  assert.match(text('gatewayPromptA'), /你是辦公室 A 的「Nuwa 交換機助理」/);
-  assert.match(text('gatewayPromptB'), /你不是大熊/);
-  assert.match(text('gatewayPromptA'), /不是小晴/);
-  assert.match(text('colleaguePromptA'), /真正工作的 AI 同事「小晴」/);
-  assert.match(text('colleaguePromptB'), /真正工作的 AI 同事「大熊」/);
-  assert.match(text('connectPromptA'), /不能只以 Gateway 自己的 OAuth Session/);
-  assert.match(text('connectPromptB'), /有權的收件 Session/);
-  assert.match(text('callPromptA'), /nuwa\/bear\/main/);
-  assert.match(text('replyPromptB'), /relayReplyThread/);
-  assert.match(text('returnPromptB'), /新的 Relay Thread/);
-  assert.match(text('returnPromptB'), /nuwa\/xiaoqing\/main/);
-  assert.match(text('verifyPromptA'), /自動喚醒/);
-  assert.match(text('gatewayPromptA'), /不能宣稱已接通/);
+  assert.match(gateway, /先不要猜測任何同事名稱/);
+  assert.match(gateway, /已經裝好 Nuwa Skill 和 MCP/);
+  assert.match(gateway, /管理多位同事的受權工具/);
+  assert.match(gateway, /你自己的 Session/);
+  assert.doesNotMatch(gateway, /小晴|大熊|Cosmo|nuwa\/xiaoqing|MailTrigger/);
+
+  assert.match(elements.get('sendPrompt')!.textContent, /company\/bob\/main/);
+  assert.match(elements.get('replyPrompt')!.textContent, /company\/alice\/main/);
+  assert.match(elements.get('replyPrompt')!.textContent, /relayReplyThread/);
+  assert.match(elements.get('returnPrompt')!.textContent, /新的通話/);
+  assert.equal(slides[0].hidden, false);
+  assert.equal(slides[1].hidden, true);
+
+  buttons[1].callbacks.get('click')?.();
+  assert.equal(slides[0].hidden, true);
+  assert.equal(slides[1].hidden, false);
+  assert.equal(buttons[1].attributes.get('aria-pressed'), 'true');
+
+  copy.callbacks.get('click')?.();
+  assert.equal(copyCalls[0], gateway);
 });

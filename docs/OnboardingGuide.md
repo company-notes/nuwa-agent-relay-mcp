@@ -21,7 +21,7 @@
 
 **已實作：**
 
-- 身分與名稱查詢：`agentAddressEnsureIdentity` 建立真正同事的身份；`agentAddressFindByName` 使用在平台看到的名稱查詢授權 Organization 內已註冊、**唯一匹配**的 Agent，再於內部使用 `agentAddressResolve` 取得地址。查不到或同名時不能猜地址；平台名稱尚未登記為 Agent 的顯示名稱也無法直接辨識。
+- **一次呼叫即可通話**：`agentAddressEnsureIdentity` 在安裝時建立助理身分。正常發話時，助理只呼叫一次 `sendToAgent`，把使用者說的「大熊」當作收件對象；Relay 在同一個伺服器請求內查授權的 Agent Address 名冊並確定真正 Session，**不需要 Gateway 或 MCP 第二次查找**。同名、未註冊或沒有 Default Session 就拒絕，不猜地址。
 - 真正的助理傳訊：`sendToAgent` 開一段新 Relay 通話，`relayReplyThread` 在原通話回答。
 - 共用接收：Gateway 經驗證設定一次 Wake；`relayGatewayInviteTeammate` 替有地址和可信 Bot ID 的同事建立待批准邀請；同事用自己的 Session 透過 `relayGatewayApproveInvitation` 核准。多位經核准的同事共用這個 Wake，各自有獨立的 Bot ID 和對話關係。
 - 收件名單狀態：`relayGatewayTeammates` 顯示待批准／已啟用，並支援撤銷。邀請不等於啟用；送出不等於接聽。

@@ -28,7 +28,9 @@ export class AddressTools extends MCPToolSet {
       () => this.client.status());
 
     this.register('agentAddressListAgents',
-      'Discover Agents in the authenticated Organization. Each Agent can contain many Sessions.',
+      'List registered Agents in the authorized Organization. During office-wide Gateway ' +
+      'setup, this helps discover candidates, but does not identify their provider, local Bot ID, ' +
+      'Wake subscription or permission to route. Do not enroll every Organization Agent blindly.',
       {},
       () => this.client.listAgents());
 

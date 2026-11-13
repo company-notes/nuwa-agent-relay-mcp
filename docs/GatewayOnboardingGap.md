@@ -22,10 +22,12 @@
 **原生 Bot 顯示名稱**，不是 `organization/agent/session` 內部地址。
 公開網頁只收兩個顯示名稱，讓助理生成簡單的雙向測試對話。
 
-`agentAddressFindByName` 會在當前已授權 Organization 的 Agent Address
-名冊中按顯示名稱或 handle 精確查找，再由現有地址解析服務確認唯一對象。
-它**不會**自行將中文字轉成任意 slug，也不會在同名、未註冊或缺乏
-Default Session 時發送。實際傳訊仍使用內部解析後的 canonical address。
+發話助理只呼叫一次 `sendToAgent(to: "大熊")`；Relay 在同一個
+請求內用已授權 Organization 的 Agent Address 名冊，以顯示名稱或
+handle 精確找出唯一收件 Session ID。沒有額外 MCP 工具、Gateway 查找、
+LLM 推理或第二次地址解析服務呼叫。Relay **不會**把中文字猜成 slug，
+也不會在同名、未註冊或缺乏 Default Session 時發送。轉送所需的
+canonical address 在 Relay 內部依權威名冊組合。
 
 這只能完成**已註冊名稱到 Nuwa 身分**的查詢，不等於已能從 GrokBot
 或 OpenMausBot 的原生 Bot 名稱查到所有平台 Bot ID，或證明 Gateway

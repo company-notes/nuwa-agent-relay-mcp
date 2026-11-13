@@ -411,3 +411,49 @@ test('HTTP transport rejects redirects and escaped cross-origin paths', async ()
   await assert.rejects(client.request('GET', '//attacker.invalid/private'), /relative/);
   await assert.rejects(client.request('GET', '/\\attacker.invalid/private'), /escaped/);
 });
+
+test('Gateway can propose a real coworker and that coworker alone approves the office route', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const schemas = JSON.stringify(await scenario.toolSchemas());
+    assert.match(schemas, /relayGatewayInviteTeammate/);
+    assert.match(schemas, /relayGatewayApproveInvitation/);
+    assert.doesNotMatch(schemas, /runtimeToken|resumeToken|signingSecret|bearerToken/);
+
+    const proposal = await scenario.tool('relayGatewayInviteTeammate', {
+      recipientAddress: 'nuwa/colleague/main',
+      recipientBotID: 'platform-recipient-id',
+      threadMode: 'platform',
+    });
+    assert.equal(proposal.result.isError, undefined);
+    assert.equal(scenario.calls.at(-1)?.url.pathname, '/v2/gateway-teammates');
+    assert.equal(scenario.calls.at(-1)?.url.searchParams.get('session_id'), SESSION_A);
+    assert.deepEqual(scenario.calls.at(-1)?.body, {
+      recipientAddress: 'nuwa/colleague/main',
+      recipientBotID: 'platform-recipient-id',
+      threadMode: 'platform',
+      firstContactMode: 'manual',
+    });
+
+    const approval = await scenario.tool('relayGatewayApproveInvitation', {}, 'oauth-b');
+    assert.equal(approval.result.isError, undefined);
+    assert.equal(scenario.calls.at(-1)?.url.pathname, '/v2/gateway-invitation');
+    assert.equal(scenario.calls.at(-1)?.url.searchParams.get('session_id'), SESSION_B);
+    assert.equal(scenario.calls.at(-1)?.headers.get('authorization'), 'Bearer oauth-b');
+
+    const roster = await scenario.tool('relayGatewayTeammates', {});
+    assert.equal(roster.result.isError, undefined);
+    assert.equal(scenario.calls.at(-1)?.url.pathname, '/v2/gateway-teammates');
+
+    const removal = await scenario.tool('relayGatewayRemoveTeammate', {
+      recipientAddress: 'nuwa/colleague/main',
+    });
+    assert.equal(removal.result.isError, undefined);
+    assert.equal(scenario.calls.at(-1)?.url.searchParams.get('recipient_address'),
+      'nuwa/colleague/main');
+  } finally {
+    scenario.restore();
+  }
+});

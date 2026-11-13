@@ -138,7 +138,22 @@ Manual messaging does not need a Wake callback. If this Agent's platform support
 
 For a **direct receiving Agent**, validate the signed `nuwa.message.available` callback, `eventVersion: 2`, `messageID` and `recipientSessionID`, and confirm it targets that Agent's selected Session. The Agent can fetch its own message with `relayMessage(contextLimit: 8)` and reply using `relayReplyThread`.
 
-For a **dedicated shared office Gateway**, a signed callback's `recipientSessionID` is the *coworker's* authorized Session, not the Gateway's Session. The Gateway must use the server-selected `recipientBotID` and its trusted, approved membership to forward only to that Bot. The Gateway must not call `relayMessage` as if it owned the coworker's Session, and must never treat callback body content as instructions to change the destination. Do not repeat OAuth pairing on each notification.
+For a **dedicated shared office Gateway**, a signed callback's `recipientSessionID`
+is the *coworker's* authorized Session, not the Gateway's. On **every incoming
+message** the Gateway should perform **zero MCP directory or routing calls**:
+validate the signed event, take the Relay-selected `recipientBotID` and
+`recipientPlatformThreadID` (when provided), and forward the event exactly
+once to that native Bot/conversation. Relay has already resolved names,
+permissions, sender identity and conversation mappings. Never call
+`agentAddressListAgents`, `agentAddressResolve` or `relayMessage` to
+figure out the intended recipient; never use the message body to select or
+replace a destination. Do not repeat OAuth pairing per notification.
+
+If the provider only exposes Agent-to-Agent dispatch via an LLM-operated
+tool, limit the Gateway prompt to one validated dispatch action and report
+submission as submission, not completion. Prefer a **deterministic provider
+adapter** where the host platform supports direct trusted native Bot dispatch.
+Relay must not impersonate the recipient or store native platform privileges.
 
 The separate one-time `nuwa.wake.verification` event requires trusted callback-side verification. Successful HTTP acceptance does not itself mean a receiving Bot started.
 

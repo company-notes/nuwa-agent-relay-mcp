@@ -69,6 +69,23 @@ h1 em { font-style: normal; color: #b6e8ce; }
 .node small { display: block; font-size: 13px; font-weight: 600; }
 .diagram-note { color: #d3eedc; font-size: 12px; text-align: center; margin-top: 24px; }
 .tick { color: #b6eb9f; } .separator { margin: 0 6px; }
+.office-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.office-card { border: 1px solid #7aa18e; background: rgba(255,255,255,.1); border-radius: 15px; padding: 16px; min-width: 0; }
+.office-label { display: block; color: #d0f0dc; font-size: 12px; font-weight: 800; margin-bottom: 12px; }
+.office-exchange { background: #c8f2d5; color: #1a4b37; border-radius: 9px; padding: 12px; font-size: 13px; font-weight: 850; }
+.office-exchange small { display: block; color: #527462; font-size: 10px; font-weight: 600; }
+.office-worker { display: flex; align-items: center; gap: 9px; margin-top: 14px; background: #fff; color: #193331; padding: 12px; border-radius: 10px; }
+.office-worker .avatar { width: 34px; height: 34px; border-radius: 10px; }
+.office-worker strong { display: block; font-size: 14px; }
+.office-worker small { display: block; color: #688077; font-size: 11px; }
+.office-link { display: flex; align-items: center; justify-content: space-between; gap: 5px; margin-top: 20px; color: #c6e6d9; font-size: 11px; font-weight: 700; }
+.route-line { border-top: 2px dashed #a0dcbf; flex: 1; min-width: 12px; }
+.relay-node { display: grid; place-content: center; text-align: center; background: #c7f1a7; color: #254631; border-radius: 12px; width: 94px; min-height: 65px; font-size: 17px; font-weight: 900; line-height: 1.1; }
+.relay-node small { display: block; font-size: 11px; margin-top: 4px; font-weight: 750; }
+.intro { padding-top: 76px; }
+.intro .principles { margin: 0; padding: 0; position: static; }
+.intro-note { padding: 19px 22px; border-radius: 12px; background: #e5f1e8; color: #285b45; font-weight: 750; font-size: 14px; margin-top: 17px; }
+.address-error { color: #a25620!important; }
 .principles { max-width: 1220px; margin: -39px auto 0; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); position: relative; z-index: 2; padding: 0 28px; gap: 12px; }
 .principle { background: white; display: flex; gap: 14px; padding: 20px; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 10px 45px rgba(34,67,53,.055); }
 .principle-icon { color: var(--green); font-size: 12px; font-weight: 900; background: #e3f5e9; border-radius: 9px; width: 33px; height: 33px; flex: 0 0 33px; display: grid; place-items: center; }
@@ -157,6 +174,16 @@ footer { border-top: 1px solid var(--line); background: #edf4ec; padding: 28px; 
   .step-num { width: 40px; height: 40px; }
 }
 @media (max-width: 620px) {
+  .office-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .office-card { padding: 10px; }
+  .office-label { font-size: 10px; }
+  .office-exchange { padding: 8px; font-size: 12px; }
+  .office-worker { padding: 7px; gap: 5px; }
+  .office-worker .avatar { width: 25px; height: 25px; font-size: 11px; }
+  .office-worker strong { font-size: 12px; }
+  .office-worker small { font-size: 9px; }
+  .intro { padding-top: 57px; }
+
   .nav-inner { padding: 10px 17px; } .nav-skill { padding: 8px 12px; }
   .hero-inner { padding: 55px 20px 95px; gap: 34px; }
   .hero-lead { font-size: 15px; }

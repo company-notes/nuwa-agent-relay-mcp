@@ -572,6 +572,13 @@ test('Gateway can propose a real coworker and that coworker alone approves the o
     assert.equal(removal.result.isError, undefined);
     assert.equal(scenario.calls.at(-1)?.url.searchParams.get('recipient_address'),
       'nuwa/colleague/main');
+
+    const namedRemoval = await scenario.tool('relayGatewayRemoveTeammate', {
+      recipientName: '大熊',
+    });
+    assert.equal(namedRemoval.result.isError, undefined);
+    assert.equal(scenario.calls.at(-1)?.url.searchParams.get('recipient_name'), '大熊');
+    assert.equal(scenario.calls.at(-1)?.url.searchParams.has('recipient_address'), false);
   } finally {
     scenario.restore();
   }

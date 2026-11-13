@@ -210,9 +210,9 @@ export class SessionBindings {
     }
   }
 
-  async ensure(
+  private async ensureBound(
     authorization: string, agentDisplayName?: string,
-  ): Promise<Record<string, unknown>> {
+  ): Promise<{ key: string; row: BindingRow; created: boolean }> {
     const client = this.address(authorization);
     const key = await this.principal(client);
     await this.tokenCipher.requireKey();
@@ -235,7 +235,7 @@ export class SessionBindings {
         await this.updateOwnDisplayName(client, renewed, agentDisplayName);
       }
 
-      return SessionBindings.publicResult(renewed, false);
+      return { key, row: renewed, created: false };
     }
 
     if (!status.organization) {
@@ -292,8 +292,16 @@ export class SessionBindings {
       }
 
       return {
-        bound: true, created: true, sessionID: created.session.id,
-        canonical: created.session.canonical, expiresAt: created.leaseExpiresAt,
+        key,
+        row: {
+          sessionID: created.session.id,
+          organizationID: status.organization.id,
+          canonicalAddress: created.session.canonical,
+          encryptedRuntimeToken: encryptedRuntime,
+          encryptedResumeToken: encryptedResume,
+          expiresAt: created.leaseExpiresAt,
+        },
+        created: true,
       };
     } catch (error) {
       if (created.runtimeToken && created.session?.id) {
@@ -306,6 +314,14 @@ export class SessionBindings {
 
       throw error;
     }
+  }
+
+  async ensure(
+    authorization: string, agentDisplayName?: string,
+  ): Promise<Record<string, unknown>> {
+    const bound = await this.ensureBound(authorization, agentDisplayName);
+
+    return SessionBindings.publicResult(bound.row, bound.created);
   }
 
   async resume(
@@ -386,12 +402,11 @@ export class SessionBindings {
   }
 
   async authorize(authorization: string): Promise<BoundSession> {
-    await this.ensure(authorization);
-    const client = this.address(authorization);
-    const key = await this.principal(client);
-    const row = await this.row(key);
+    // Reuse the verified grant and renewed binding from the same operation.
+    // Reading the grant and binding a second time adds latency but no authority.
+    const { key, row } = await this.ensureBound(authorization);
 
-    if (!row || row.expiresAt <= new Date().toISOString()) {
+    if (row.expiresAt <= new Date().toISOString()) {
       throw new APIError(403, 'session_binding_required',
         'This OAuth grant has no authorized Session Runtime.');
     }

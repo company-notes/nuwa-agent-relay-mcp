@@ -41,11 +41,20 @@ export class GatewayTools extends MCPToolSet {
         }));
 
     this.register('relayGatewayRemoveTeammate',
-      'On explicit user request, revoke an approved or pending office Gateway coworker by ' +
-      'their real public canonical address. This cancels pending notifications and native Thread bindings.',
-      { recipientAddress: z.string().min(3).max(255) },
-      ({ recipientAddress }) => this.client.call('DELETE', '/v2/gateway-teammates',
-        undefined, { recipient_address: recipientAddress as string }));
+      'On explicit user request, remove ONE approved or pending coworker by recipientName, ' +
+      'the real platform Bot display name. Relay resolves that name freshly and requires ' +
+      'a unique authorized identity; do not look it up with another MCP tool. ' +
+      'Alternatively use a verified recipientAddress. Provide exactly one of the two. ' +
+      'This cancels pending notifications and native Thread bindings.',
+      {
+        recipientName: z.string().trim().min(1).max(120).optional(),
+        recipientAddress: z.string().trim().min(3).max(255).optional(),
+      },
+      ({ recipientName, recipientAddress }) => this.client.call(
+        'DELETE', '/v2/gateway-teammates', undefined, {
+          ...(recipientName ? { recipient_name: recipientName } : {}),
+          ...(recipientAddress ? { recipient_address: recipientAddress } : {}),
+        }));
 
     this.register('relayGatewayInvitation',
       'Check whether this coworker Session has a pending or active office Gateway invitation. ' +

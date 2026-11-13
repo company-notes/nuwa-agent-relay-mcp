@@ -35,7 +35,9 @@ export class ColleagueDirectory {
     const directory = await this.client.listAgents();
 
     if (!Array.isArray(directory) || directory.some((entry) =>
-      !entry || typeof entry !== 'object' || typeof entry.handle !== 'string')) {
+      !entry || typeof entry !== 'object' || typeof entry.handle !== 'string' ||
+      entry.displayName != null && typeof entry.displayName !== 'string' ||
+      entry.defaultSessionHandle != null && typeof entry.defaultSessionHandle !== 'string')) {
       throw new APIError(502, 'invalid_agent_directory',
         'The authorized Agent directory returned invalid data.');
     }
@@ -88,6 +90,12 @@ export class ColleagueDirectory {
     const session = await this.client.resolve(
       organization + '/' + agent.handle,
     ) as ResolvedSession;
+
+    if (typeof session?.canonical !== 'string' ||
+        !session.canonical.startsWith(organization + '/' + agent.handle + '/')) {
+      throw new APIError(502, 'invalid_recipient_identity',
+        'The directory and resolved coworker identity do not agree.');
+    }
 
     return {
       status: 'found',

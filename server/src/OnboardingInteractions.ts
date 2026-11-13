@@ -5,7 +5,7 @@ export const ONBOARDING_SCRIPT = `
 
   var skillURL = 'https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md';
   var mcpURL = 'https://mcp.agent-relay.company-notes.com/mcp';
-  var promptIDs = ['gatewayPrompt', 'sendPrompt', 'replyPrompt', 'returnPrompt'];
+  var promptIDs = ['gatewayPrompt', 'sendPrompt', 'replyPrompt', 'returnPrompt', 'verifyPrompt'];
   var toastTimeout;
 
   function fieldValue(id) {
@@ -26,73 +26,73 @@ export const ONBOARDING_SCRIPT = `
     return validAddress(address) ? address : '（先填入這位助理真正的 Nuwa 地址）';
   }
 
+  function colleagueName(id) {
+    var address = fieldValue(id);
+    return validAddress(address) ? address.split('/')[1] : '另一位';
+  }
+
+  function addressesReady() {
+    var sender = fieldValue('addressA');
+    var recipient = fieldValue('addressB');
+
+    return validAddress(sender) && validAddress(recipient) &&
+      sender.split('/')[0] === recipient.split('/')[0] &&
+      sender !== recipient;
+  }
+
   function gatewaySetup() {
     return [
-      '你是這個 AI 平台的 Nuwa 接線助理，負責安裝引導與來電轉送，',
-      '但不替真正工作的助理回覆訊息。',
+      '請幫我把這個 AI 平台接上 Nuwa，讓辦公室目前的 AI 同事都能互相聯絡，',
+      '也能接到其他平台的來電。你是接線助理，負責設定與轉接，不代替同事回答。',
       '',
-      '請先閱讀官方 Nuwa Skill：',
-      skillURL,
+      '請先閱讀官方 Nuwa 助理指南：' + skillURL,
+      '檢查這個平台是否已連上 Nuwa：' + mcpURL,
+      '如果 Skill 和 MCP 已經裝好，直接沿用，不要重複安裝。',
       '',
-      '依現行 Skill 一步一步確認：',
-      '1. 目前平台是否已經裝好 Nuwa Skill 和 MCP 連線。',
-      '   若已經有，直接沿用；不要重新安裝或要求我重複登入。',
-      '   若缺少才引導我使用本平台設定介面連接：' + mcpURL,
-      '2. 以平台正式授權流程確認你的 Nuwa 身分，',
-      '   依 Skill 使用 agentAddressEnsureIdentity，並經我同意後',
-      '   使用 relayProvisionAgentMailbox。回報你自己真正的公開地址。',
-      '3. 檢查本平台可用的 Webhook／自動接收功能；',
-      '   依 Skill 確認 relayWakeSubscription，必要時由',
-      '   有權的接收端進行 relayBeginWakePairing 私密配對。',
-      '4. 如果需要協助額外的 AI 同事加入通訊名單，',
-      '   現在先不要猜測任何同事名稱或建立他們的身分。',
-      '   等我日後明確指定要加入的同事與授權後才處理。',
-      '   先檢查是否真的有管理多位同事的受權工具；',
-      '   若沒有，請明確說這一步目前不支援，不能宣稱登記成功。',
-      '5. 切勿以你自己的 Session 冒充其他同事的收件者身分；',
-      '   不要把收到通知等同於目標助理真的開始處理。',
+      '請盤點目前平台可辨識的同事，核對他們的 Nuwa 地址及平台內部收件對象。',
+      '預設希望目前所有符合資格的同事都能接線，不要叫我逐一輸入同事名字。',
+      '請依照指南設定一次共用的收件入口，並處理能合法設定的接線對應。',
+      '若需要同事本人的授權，請逐一交由有權的助理批准，不能替他們同意。',
+      '如果平台無法自動查到同事或還沒有完成授權，請清楚列出缺口，',
+      '不要把「已找到同事」當成「已接通」。',
       '',
-      '每次只引導下一個需要我同意的操作。',
-      '不要在聊天要求密碼或任何私人憑證。',
-      '最後清楚分別列出已完成的項目、還缺少的功能和下一步。'
+      '請每次只引導我完成下一個必要的設定，不要要求我貼密碼或私密憑證。'
     ].join('\\n');
   }
 
   function sendPrompt() {
     return [
-      '請以你自己的 Nuwa 通訊工具聯絡指定的助理。',
-      '收件地址：' + addressFor('addressB'),
-      '請先用 agentAddressResolve 確認地址，',
-      '再以 sendToAgent 發出一次測試訊息：',
-      '「你好！這是 Nuwa 通話測試，密語是星河。請在這通對話回覆收到星河。」',
-      '請回報真實的訊息和通話 ID，並查核寄送狀態。',
-      '如果你沒有 Nuwa 通訊工具或這位同事還沒接入，',
-      '請告訴我缺少的能力，不要讓 Gateway 假裝以你的身分發話。',
-      '若狀態未明，不要再次寄送。'
+      '請透過 Nuwa 跟另一間辦公室的「' + colleagueName('addressB') +
+        '」助理聊一下（地址：' + addressFor('addressB') + '）。',
+      '告訴對方：「你好！來測試一下通話，密語是星河。請回答我密語。」',
+      '請只發一次，若尚未送出就告訴我。'
     ].join('\\n');
   }
 
   function replyPrompt() {
     return [
-      '請確認剛才有沒有收到來自這個地址的測試來電：',
-      addressFor('addressA'),
-      '如果真的收到「密語是星河」的訊息，',
-      '請在那一通 Relay 對話使用 relayReplyThread 回覆「收到星河」。',
-      '請區分被自動通知，還是因為我剛剛要求才手動檢查收件箱。',
-      '如果還沒有被接線端通知到，請明確指出，',
-      '不要虛構收到訊息，也不要另開新 Thread 來回答。'
+      '剛才「' + colleagueName('addressA') + '」助理（' + addressFor('addressA') +
+        '）打電話給你，密語是星河。',
+      '如果你真的收到，請直接在剛才那段對話回覆：「收到星河！」',
+      '如果還沒收到，就告訴我，不要猜測。'
     ].join('\\n');
   }
 
   function returnPrompt() {
     return [
-      '現在請你主動打電話給剛才聯絡你的助理，',
-      '而不是回覆原本的來電。',
-      '對方的 Nuwa 地址：' + addressFor('addressA'),
-      '請先確認地址，再使用 sendToAgent 建立一次新的通話。',
-      '訊息：「剛才的測試收到了，我也能主動聯絡你！」',
-      '請記錄新通話的 ID，檢查真正的送達情況。',
-      '不要把送出成功直接當作對方已接聽。'
+      '現在換你主動聯絡另一間辦公室的「' + colleagueName('addressA') +
+        '」助理（地址：' + addressFor('addressA') + '）。',
+      '開一段新的對話，告訴對方：「我也能主動打給你！這次的密語是月光。」',
+      '請對方收到後回覆密語。'
+    ].join('\\n');
+  }
+
+  function verifyPrompt() {
+    return [
+      '「' + colleagueName('addressB') + '」助理（' + addressFor('addressB') +
+        '）剛才主動聯絡你，密語是月光。',
+      '如果你真的收到，請直接在那段對話回覆：「收到月光！」',
+      '如果還沒收到，就告訴我。'
     ].join('\\n');
   }
 
@@ -101,7 +101,8 @@ export const ONBOARDING_SCRIPT = `
       gatewayPrompt: gatewaySetup(),
       sendPrompt: sendPrompt(),
       replyPrompt: replyPrompt(),
-      returnPrompt: returnPrompt()
+      returnPrompt: returnPrompt(),
+      verifyPrompt: verifyPrompt()
     };
 
     promptIDs.forEach(function (id) {
@@ -115,9 +116,13 @@ export const ONBOARDING_SCRIPT = `
     if ((sender && !validAddress(sender)) || (recipient && !validAddress(recipient))) {
       message.textContent = '請填入助理真正回報的地址，通常是 公司/助理/對話，以斜線分隔。';
     } else if (sender && recipient && sender.split('/')[0] !== recipient.split('/')[0]) {
-      message.textContent = '這兩位助理目前不在同一個 Nuwa 公司，請先核對授權範圍。';
+      message.textContent = '兩位助理的地址不在同一個 Nuwa 組織，請先確認。';
+    } else if (sender && recipient && sender === recipient) {
+      message.textContent = '請填入兩位不同助理的地址。';
+    } else if (addressesReady()) {
+      message.textContent = '四段測試指令都已填好地址，直接複製即可，不必再改。';
     } else {
-      message.textContent = '地址只在你自己的瀏覽器產生測試指令，不會傳回網站。';
+      message.textContent = '請填入兩位助理的地址；網頁只會在本機組成指令，不會上傳。';
     }
   }
 
@@ -161,9 +166,16 @@ export const ONBOARDING_SCRIPT = `
   document.querySelectorAll('[data-copy]').forEach(function (button) {
     button.addEventListener('click', function () {
       var element = document.getElementById(button.getAttribute('data-copy'));
-      if (element) {
-        void copyText(element.textContent);
+      if (!element) {
+        return;
       }
+
+      if (button.getAttribute('data-copy') !== 'gatewayPrompt' && !addressesReady()) {
+        notify('請先填入同一組織中兩位不同助理的有效 Nuwa 地址。');
+        return;
+      }
+
+      void copyText(element.textContent);
     });
   });
 

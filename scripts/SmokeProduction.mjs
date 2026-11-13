@@ -34,7 +34,14 @@ assert.equal(guide.status, 200, 'The guide should have a direct shareable URL.')
 
 const prompts = await request('/start.js');
 assert.equal(prompts.status, 200, 'Onboarding copyable prompts must load.');
-assert.match(await prompts.text(), /agentAddressEnsureIdentity/);
+const promptText = await prompts.text();
+assert.match(promptText, /function gatewaySetup/);
+assert.match(promptText, /function verifyPrompt/);
+assert.match(promptText, /預設希望目前所有符合資格的同事都能接線/);
+assert.match(promptText, /密語是星河/);
+assert.match(promptText, /密語是月光/);
+assert.doesNotMatch(promptText, /relayReplyThread|relayProvisionAgentMailbox/,
+  'Public user prompts should not expose internal tool implementation details.');
 
 const styles = await request('/start.css');
 assert.equal(styles.status, 200, 'The guide stylesheet must load.');

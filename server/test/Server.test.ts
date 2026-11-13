@@ -145,6 +145,54 @@ test('Skill-first OAuth alone privately creates one persistent Agent/Session and
   }
 });
 
+test('an existing coworker restores its own identity and updates its native display name only during setup', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const first = await scenario.tool('agentAddressEnsureIdentity', {});
+    const original = JSON.parse(first.result.content[0].text) as {
+      sessionID: string; canonical: string;
+    };
+    assert.equal(first.result.isError, undefined);
+    assert.equal(scenario.displayNameUpdates.length, 0);
+
+    const updated = await scenario.tool('agentAddressEnsureIdentity', {
+      agentDisplayName: '大熊',
+    });
+    const same = JSON.parse(updated.result.content[0].text) as {
+      sessionID: string; canonical: string; created: boolean;
+    };
+    assert.equal(updated.result.isError, undefined);
+    assert.equal(same.sessionID, original.sessionID);
+    assert.equal(same.canonical, original.canonical);
+    assert.equal(same.created, false);
+    assert.equal(scenario.claimCount, 1);
+    assert.deepEqual(scenario.displayNameUpdates, [{
+      agentID: 'agent-a', name: '大熊', principal: 'a',
+    }]);
+
+    const secondGrant = await scenario.tool('agentAddressEnsureIdentity', {}, 'oauth-b');
+    assert.equal(secondGrant.result.isError, undefined);
+    const renamedOther = await scenario.tool('agentAddressEnsureIdentity', {
+      agentDisplayName: '小晴',
+    }, 'oauth-b');
+    assert.equal(renamedOther.result.isError, undefined);
+    assert.deepEqual(scenario.displayNameUpdates.at(-1), {
+      agentID: 'agent-b', name: '小晴', principal: 'b',
+    });
+    assert.equal(scenario.displayNameUpdates[0].agentID, 'agent-a');
+
+    const sent = await scenario.tool('sendToAgent', {
+      to: '大熊', message: 'Normal call should not rename any Agent.',
+    });
+    assert.equal(sent.result.isError, undefined);
+    assert.equal(scenario.displayNameUpdates.length, 2);
+  } finally {
+    scenario.restore();
+  }
+});
+
 test('first OAuth login automatically creates a personal Organization when none exists', async () => {
   const scenario = new RemoteMCPScenario();
   scenario.organizationExists = false;

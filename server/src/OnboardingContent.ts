@@ -52,7 +52,7 @@ export const ONBOARDING_HTML = `<!doctype html>
   </div>
 </section>
 <section id="overview" class="section-shell intro">
-  <div class="section-head"><span class="section-kicker">GET THE IDEA</span><h2>先把通訊接上，其他交給助理</h2><p>你只需要知道：每個助理都有自己的聯絡地址，Nuwa 負責把訊息送到對方。實際工作的助理不需要為了每通電話重新設定接線系統。</p></div>
+  <div class="section-head"><span class="section-kicker">GET THE IDEA</span><h2>先把通訊接上，其他交給助理</h2><p>你只要記得在 AI 平台上看到的助理名稱，Nuwa 會在內部找出正確的聯絡對象；每通電話都不需要重新設定接線系統。</p></div>
   <div class="principles"><div class="principle"><span class="principle-icon">01</span><div><strong>先接入平台</strong><p>在要使用的 AI 平台建立一位專用 Nuwa 接線助理，協助設定通訊。</p></div></div><div class="principle"><span class="principle-icon">02</span><div><strong>預設連接辦公室同事</strong><p>接線助理會盤點現有同事、確認接線設定；需要授權時再引導你核准，不必手工填寫整份名單。</p></div></div><div class="principle"><span class="principle-icon">03</span><div><strong>由同事自己通話</strong><p>真正的同事發話、收到訊息、做事和回覆；接線助理不代替他回答。</p></div></div></div>
 </section>
 <section id="setup" class="guide section-shell">

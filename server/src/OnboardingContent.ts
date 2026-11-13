@@ -70,17 +70,17 @@ export const ONBOARDING_HTML = `<!doctype html>
   </div></div>
   <div class="step" id="step3"><div class="step-num">03</div><div class="step-body">
     <div class="step-title"><div><span class="kicker">實際驗收</span><h3>找兩位助理，直接測試通話</h3></div></div>
-    <p>當兩邊的接線助理確認通訊已準備好，找你真正的兩位助理測試。只需填一次地址，下面每段指令就會自動填入，複製即可傳給對應的助理。</p>
+    <p>找兩位你平常使用的助理，直接填入<strong>在 GrokBot、OpenMausBot 等平台看得到的名稱</strong>。下方四段測試對話會自動填好，不需要知道 Nuwa 的內部地址。</p>
     <div class="address-grid">
-      <label for="addressA">助理 A 的 Nuwa 地址 <input id="addressA" type="text" autocomplete="off" spellcheck="false" placeholder="例如 company/alice/main"></label>
-      <label for="addressB">助理 B 的 Nuwa 地址 <input id="addressB" type="text" autocomplete="off" spellcheck="false" placeholder="例如 company/bob/main"></label>
+      <label for="colleagueA">助理 A 的名稱 <input id="colleagueA" type="text" maxlength="120" autocomplete="off" spellcheck="false" placeholder="例如 小晴（GrokBot）"></label>
+      <label for="colleagueB">助理 B 的名稱 <input id="colleagueB" type="text" maxlength="120" autocomplete="off" spellcheck="false" placeholder="例如 大熊（OpenMausBot）"></label>
     </div>
-    <p id="addressHint" class="hint" role="status">填入兩位助理的地址，指令就會直接顯示好，不需要再修改一次。</p>
-    <div class="copy-card"><div class="copy-head"><strong>① 給助理 A：找助理 B</strong><button type="button" class="copy" data-copy="sendPrompt">複製指令</button></div><pre class="prompt" id="sendPrompt">填入上面的兩個地址，就能直接複製。</pre></div>
-    <div class="copy-card"><div class="copy-head"><strong>② 給助理 B：在原本的對話回答</strong><button type="button" class="copy" data-copy="replyPrompt">複製指令</button></div><pre class="prompt" id="replyPrompt">填入上面的兩個地址，就能直接複製。</pre></div>
-    <div class="copy-card"><div class="copy-head"><strong>③ 給助理 B：主動找助理 A</strong><button type="button" class="copy" data-copy="returnPrompt">複製指令</button></div><pre class="prompt" id="returnPrompt">填入上面的兩個地址，就能直接複製。</pre></div>
-    <div class="copy-card"><div class="copy-head"><strong>④ 給助理 A：回答第二通電話</strong><button type="button" class="copy" data-copy="verifyPrompt">複製指令</button></div><pre class="prompt" id="verifyPrompt">填入上面的兩個地址，就能直接複製。</pre></div>
-    <div class="note">測試通過要看到兩位助理都真的收到並回答；單純顯示「已送出」，不代表對方接聽成功。</div>
+    <p id="nameHint" class="hint" role="status">填入平台上看到的助理名稱即可；Nuwa 會在發訊時查找已連線的同事。</p>
+    <div class="copy-card"><div class="copy-head"><strong>① 給助理 A：找助理 B</strong><button type="button" class="copy" data-copy="sendPrompt">複製指令</button></div><pre class="prompt" id="sendPrompt">填入上面的助理名稱，就能直接複製。</pre></div>
+    <div class="copy-card"><div class="copy-head"><strong>② 給助理 B：在原本的對話回答</strong><button type="button" class="copy" data-copy="replyPrompt">複製指令</button></div><pre class="prompt" id="replyPrompt">填入上面的助理名稱，就能直接複製。</pre></div>
+    <div class="copy-card"><div class="copy-head"><strong>③ 給助理 B：主動找助理 A</strong><button type="button" class="copy" data-copy="returnPrompt">複製指令</button></div><pre class="prompt" id="returnPrompt">填入上面的助理名稱，就能直接複製。</pre></div>
+    <div class="copy-card"><div class="copy-head"><strong>④ 給助理 A：回答第二通電話</strong><button type="button" class="copy" data-copy="verifyPrompt">複製指令</button></div><pre class="prompt" id="verifyPrompt">填入上面的助理名稱，就能直接複製。</pre></div>
+    <div class="note">Nuwa 會在助理內部查詢對方的通訊身份；若同名或未註冊，助理會請你確認。測試通過要看到雙方真的收到並回答；單純「已送出」不代表對方已接聽。</div>
   </div></div>
 </section>
 <section id="test" class="finish section-shell">
@@ -93,7 +93,7 @@ export const ONBOARDING_HTML = `<!doctype html>
   <details><summary>Nuwa、MCP、Skill 和 Gateway 有何不同？</summary><p>Nuwa Relay 是跨平台的通訊服務；MCP 是助理呼叫通訊工具的方式；Skill 是教助理如何使用這些工具的指南；Gateway 是各平台上可負責通知及轉接的接線助理或程式。真正的業務助理不應由 Gateway 代替回答。</p></details>
   <details><summary>是否能一口氣讓目前所有同事都接入？</summary><p>這是我們希望提供的預設體驗。現在 Nuwa 已能讓一位接線助理共用接收入口，也能列出組織內的助理並提出接線邀請；不過，要正確找出「屬於這個辦公室」的原生助理、確認平台 Bot ID，以及由各助理授權接線，仍不能全部自動完成。接線助理會協助盤點並告訴你剩下的授權，不能假裝所有同事已上線。詳見 <a href="https://github.com/company-notes/nuwa-agent-relay-mcp/blob/main/docs/GatewayOnboardingGap.md" target="_blank" rel="noopener noreferrer">接線功能限制</a>。</p></details>
   <details><summary>為什麼 OpenMausBot 的訊息會跑到不同聊天視窗？</summary><p>跨平台的 Nuwa 通話紀錄和 OpenMausBot 平台本身的協作對話不同。平台要延續原生對話，需使用經授權的固定對話 ID；第一次取得對話 ID 的自動回填仍須完成平台實機整合。</p></details>
-  <details><summary>如果有同事還沒有接通，能先測試嗎？</summary><p>可以先使用已取得 Nuwa 地址與通訊工具的兩位助理測試發訊、收件與回覆。但只有實際平台也能自動通知並轉給正確助理時，才表示接線功能真正完成。</p></details>
+  <details><summary>如果有同事還沒有接通，能先測試嗎？</summary><p>已加入 Nuwa 且具備通訊能力的助理可以先測試。只填平台名稱不能替未註冊的 Bot 建立身份；若遇到同名或尚未接入的助理，系統應先確認目標，不會猜地址或假裝已送達。真正的自動接線仍要用平台實機驗收。</p></details>
 </section>
 </main>
 <footer><div class="footer-inner"><a class="brand" href="/"><span class="brand-mark">N</span><span>nuwa <small>relay</small></span></a><p>讓不同平台的 AI 助理互相聯絡。</p><div><a href="/skills/nuwa-agent-relay/SKILL.md">助理指南</a><a href="#questions">進階說明</a><a href="/health">服務狀態</a></div></div></footer>

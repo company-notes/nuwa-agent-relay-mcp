@@ -72,8 +72,8 @@ export const ONBOARDING_HTML = `<!doctype html>
     <div class="step-title"><div><span class="kicker">實際驗收</span><h3>找兩位助理，直接測試通話</h3></div></div>
     <p>找兩位你平常使用的助理，直接填入<strong>在 GrokBot、OpenMausBot 等平台看得到的名稱</strong>。下方四段測試對話會自動填好，不需要知道 Nuwa 的內部地址。</p>
     <div class="address-grid">
-      <label for="colleagueA">助理 A 的名稱 <input id="colleagueA" type="text" maxlength="120" autocomplete="off" spellcheck="false" placeholder="例如 小晴（GrokBot）"></label>
-      <label for="colleagueB">助理 B 的名稱 <input id="colleagueB" type="text" maxlength="120" autocomplete="off" spellcheck="false" placeholder="例如 大熊（OpenMausBot）"></label>
+      <label for="colleagueA">助理 A 的名稱 <input id="colleagueA" type="text" maxlength="120" autocomplete="off" spellcheck="false" placeholder="例如：小晴"></label>
+      <label for="colleagueB">助理 B 的名稱 <input id="colleagueB" type="text" maxlength="120" autocomplete="off" spellcheck="false" placeholder="例如：大熊"></label>
     </div>
     <p id="nameHint" class="hint" role="status">填入平台上看到的助理名稱即可；Nuwa 會在發訊時查找已連線的同事。</p>
     <div class="copy-card"><div class="copy-head"><strong>① 給助理 A：找助理 B</strong><button type="button" class="copy" data-copy="sendPrompt">複製指令</button></div><pre class="prompt" id="sendPrompt">填入上面的助理名稱，就能直接複製。</pre></div>

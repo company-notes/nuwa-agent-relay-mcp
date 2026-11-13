@@ -353,67 +353,28 @@ test('directory discovery works without ever claiming a Runtime', async () => {
   }
 });
 
-test('user can call a registered coworker by its GrokBot display name without knowing address', async () => {
+test('one MCP send call passes the familiar Bot name unchanged to Relay for routing', async () => {
   const scenario = new RemoteMCPScenario();
   scenario.install();
 
   try {
-    const lookup = await scenario.tool('agentAddressFindByName', { name: '小晴' });
-    const selected = JSON.parse(lookup.result.content[0].text) as {
-      status: string;
-      canonicalAddress: string;
-      displayName: string;
-    };
-
-    assert.equal(lookup.result.isError, undefined);
-    assert.equal(selected.status, 'found');
-    assert.equal(selected.displayName, '小晴');
-    assert.equal(selected.canonicalAddress, 'nuwa/xiaoqing/main');
-    assert.equal(scenario.claimCount, 0, 'Name lookup must not claim another Session');
-    assert.equal(scenario.calls.length, 0, 'Lookup never sends any Relay message');
-
     const sent = await scenario.tool('sendToAgent', {
-      to: selected.canonicalAddress,
-      message: '你好！密語是星河。',
+      to: '大熊',
+      message: '你好，大熊！密語是星河。',
     });
 
     assert.equal(sent.result.isError, undefined);
-    assert.equal(scenario.calls.length, 1);
+    assert.equal(scenario.calls.length, 1,
+      'Sending by name must not require an additional model-facing MCP tool.');
+    assert.equal(scenario.calls[0].url.pathname, '/v2/messages');
     assert.deepEqual(scenario.calls[0].body, {
-      to: 'nuwa/xiaoqing/main',
-      body: '你好！密語是星河。',
+      to: '大熊',
+      body: '你好，大熊！密語是星河。',
     });
-    assert.doesNotMatch(JSON.stringify(selected), /runtimeToken|resumeToken/);
-  } finally {
-    scenario.restore();
-  }
-});
 
-test('duplicate or unregistered platform Bot names do not guess or send', async () => {
-  const scenario = new RemoteMCPScenario();
-  scenario.install();
-
-  try {
-    const duplicate = await scenario.tool('agentAddressFindByName', { name: '大熊' });
-    const ambiguity = JSON.parse(duplicate.result.content[0].text) as {
-      status: string;
-      matches: Array<{ handle: string }>;
-    };
-
-    assert.equal(ambiguity.status, 'ambiguous');
-    assert.equal(ambiguity.matches.length, 2);
-
-    const absent = await scenario.tool('agentAddressFindByName', { name: '未註冊的助理' });
-    const missing = JSON.parse(absent.result.content[0].text) as { status: string };
-
-    assert.equal(missing.status, 'not_found');
-
-    const notReady = await scenario.tool('agentAddressFindByName', { name: '新人' });
-    const unavailable = JSON.parse(notReady.result.content[0].text) as { status: string };
-
-    assert.equal(unavailable.status, 'not_ready');
-    assert.equal(scenario.calls.length, 0);
-    assert.equal(scenario.claimCount, 0);
+    const schemas = JSON.stringify(await scenario.toolSchemas());
+    assert.doesNotMatch(schemas, /agentAddressFindByName/);
+    assert.match(schemas, /Relay resolves names in/);
   } finally {
     scenario.restore();
   }

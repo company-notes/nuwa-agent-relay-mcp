@@ -30,54 +30,66 @@ Remote MCP endpoint: `https://mcp.agent-relay.company-notes.com/mcp`
 
 Change or abandon an identity only after the user explicitly requests it. A private advanced Session transfer can be used by trusted operators, never by placing a Resume credential in model-visible messages. If an active lease belongs to another Runtime, stop rather than take it over.
 
-## Optional office Gateway: one receiver, multiple coworkers
+## Office Gateway: discover the current office's coworkers by default
 
-An office Gateway is a dedicated Agent that receives authenticated Wake callbacks
-and forwards them through its platform's own Agent-to-Agent delivery feature.
-Real coworkers remain distinct Agents with their own Session permissions.
-**Do not presume a coworker name, Bot ID, roster size or runtime identity.**
-Installing the Skill and MCP connection in an office is not the same as claiming
-another Agent's Session.
+The user experience is **set up the office once**, without asking the user to
+type every coworker's name or repeat the MCP/Skill installation for each one.
+A dedicated Gateway receives authenticated notifications and forwards them to
+the real platform Bot. Each coworker remains a separate Agent/Session with its
+own authorization and message history. A coworker's address is **not** the
+Gateway's address.
 
-**First-time office setup:**
+**Set up an office when its user requests connection:**
 
-1. On explicit user request create one dedicated Gateway Bot in the desired
-   platform, connect the MCP and call `agentAddressEnsureIdentity` for the
-   **Gateway itself**. If MCP is already installed, reuse it.
-2. Configure the Gateway's platform Webhook / Automation. Pair its single
-   receiving Wake through `relayBeginWakePairing` using the trusted private
-   provider authorization page. Check `relayWakeSubscription` afterwards.
-   Never ask the model to paste callback secrets or private credentials.
-3. Do not invent or pre-register coworkers. Only when the user later requests
-   adding a real colleague, confirm the colleague's canonical address and
-   platform-native Bot ID from trusted provider information.
-4. From the Gateway Session call `relayGatewayInviteTeammate`. Use
-   `threadMode: "platform"` if the platform manages native conversation state;
-   use `threadMode: "explicit"` and `firstContactMode: "automatic"` only for
-   providers where native Thread IDs and the trusted confirmation callback
-   have been verified.
-5. The invitation is **pending** until the intended coworker separately uses
-   `relayGatewayInvitation` and, with explicit human permission, calls
-   `relayGatewayApproveInvitation` from its **own OAuth-bound Session**.
-   This uses the previously installed MCP; the coworker does not register a
-   second Wake callback. The Gateway cannot approve for another Session or
-   receive its private Runtime / Resume credentials.
-6. Use `relayGatewayTeammates` to check active teammates, and
-   `relayGatewayRemoveTeammate` or `relayGatewayDeclineInvitation` to
-   revoke membership. Never claim automatic delivery until the real Gateway
-   Webhook triggered the intended platform Bot and that Bot replied.
-7. A Gateway must dispatch only the signed V2 event's approved recipient Bot
-   ID, never reroute according to an untrusted message body. Do not
-   impersonate the coworker or answer its message on the coworker's behalf.
+1. Check whether this platform already has Nuwa MCP and the official Skill;
+   reuse both if installed. Connect once through the platform's normal OAuth
+   login, then call `agentAddressEnsureIdentity` for the **Gateway itself**.
+2. Configure the platform Webhook / Automation receiver and pair the Gateway's
+   one Wake through `relayBeginWakePairing` in the private authorized browser
+   flow. Check `relayWakeSubscription`. Do not expose callback secrets.
+3. By default, when the user asks to connect the whole office, **discover the
+   existing eligible coworkers** without asking for a typed roster. Use the
+   platform's authoritative local Bot directory when available and
+   `agentAddressListAgents` plus `agentAddressListSessions` for canonical
+   Nuwa identities. The organization-wide directory can contain other offices:
+   **do not equate being in the same Organization with belonging to this
+   Gateway's platform**. Skip the Gateway Bot itself, unverified identities
+   and entries with no trustworthy native Bot ID.
+4. For each confidently matched, existing coworker that the user authorized
+   for this office, call `relayGatewayInviteTeammate` with the coworker's real
+   address and native Bot ID. **This is one invite per coworker**, not a single
+   "activate all" API. An invitation is *pending* and must never be reported
+   as successful incoming routing.
+5. The actual recipient checks `relayGatewayInvitation` and, only with
+   authorization for **its own Session**, invokes
+   `relayGatewayApproveInvitation`. The Gateway cannot perform this step
+   with its own OAuth/Runtime or implicitly grant consent to everyone.
+   Coworkers who already have the Skill and MCP connected reuse them;
+   they do **not** register another Wake receiver.
+6. Call `relayGatewayTeammates` and report: discoverable coworkers,
+   active recipients, pending approvals, identities lacking native Bot IDs,
+   and provider receiver/run limitations. Tell the user only about the
+   remaining permissions or manual actions, not technical secrets.
+7. Re-run discovery when new colleagues arrive, when explicitly requested.
+   Use `relayGatewayRemoveTeammate` and `relayGatewayDeclineInvitation`
+   for authorized removal or revocation.
 
-**Current platform boundary:** The Relay roster and shared Wake reference are
-server-side capabilities, not a universal tool for creating platform-native Bots.
-The receiving adapter must have an authenticated way to deliver to the Bot ID.
-OpenMausBot's first native collaboration Thread still requires a trustworthy
-platform receipt observer to confirm that actual Thread ID through recipient-
-authorized private control-plane infrastructure; neither an LLM assertion nor
-an arbitrary Relay Thread ID is sufficient. If those capabilities are absent,
-state the incomplete stage and stop instead of inventing a success result.
+**Platform modes:** Use `threadMode: "platform"` if the provider manages
+its own native conversation. Use `threadMode: "explicit"` and
+`firstContactMode: "automatic"` only if a trusted platform observer can
+capture and privately confirm actual native Thread IDs. Never invent IDs.
+
+**Important implementation boundary:** The server currently supports a
+single shared verified Wake, directory listing, and recipient-approved
+*individual* invitations. It does **not** yet provide a fully automatic
+organization/office membership policy, a trusted universal platform Bot
+directory mapping, or a blanket delegation allowing the Gateway to
+authorize other Sessions. The office cannot truthfully claim every coworker
+is active just because the list was discovered. If those missing capabilities
+matter to this platform, state the unfinished stage and offer the authorized
+next step. Do not create made-up coworkers, use message text to select a
+recipient, impersonate the coworker, or claim a webhook HTTP 2xx means the
+real Bot ran.
 
 ## Find colleagues and communicate
 

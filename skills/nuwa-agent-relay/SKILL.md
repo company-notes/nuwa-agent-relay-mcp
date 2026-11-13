@@ -80,7 +80,14 @@ Gateway's address.
 **Platform modes:** Use `threadMode: "platform"` if the provider manages
 its own native conversation. Use `threadMode: "explicit"` and
 `firstContactMode: "automatic"` only if a trusted platform observer can
-capture and privately confirm actual native Thread IDs. Never invent IDs.
+capture and privately confirm actual native Thread IDs. For an approved
+shared Gateway, Relay accepts that private confirmation through
+`PUT /v2/gateway-teammates/{recipientSessionID}/first-contacts/{senderSessionID}`
+using the Gateway's own authorized Runtime, **not** the recipient's token.
+This is a receiver-side trusted adapter/API operation, never a model-facing
+MCP tool or an instruction to read credentials in the LLM. The provider
+receipt observer is not bundled: do not claim hands-free native Thread
+continuation until it has been integrated and tested. Never invent IDs.
 
 **Important implementation boundary:** The server currently supports a
 single shared verified Wake, directory listing, and recipient-approved

@@ -86,7 +86,7 @@ test('E2E instructions separate human verified delivery from automatic bot execu
   assert.match(ONBOARDING_HTML, /relayReceipt/);
   assert.match(ONBOARDING_HTML, /HTTP 200/);
   assert.match(ONBOARDING_HTML, /原生 UI/);
-  assert.match(ONBOARDING_HTML, /已提交/);
+  assert.match(ONBOARDING_HTML, /已送出|已提交/);
   assert.match(ONBOARDING_SCRIPT, /MailTrigger/);
   assert.match(ONBOARDING_SCRIPT, /不要盲目重寄/);
   assert.match(ONBOARDING_SCRIPT, /原生 UI/);

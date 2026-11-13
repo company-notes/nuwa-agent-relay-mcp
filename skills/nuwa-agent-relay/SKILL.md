@@ -47,19 +47,22 @@ Gateway's address.
 2. Configure the platform Webhook / Automation receiver and pair the Gateway's
    one Wake through `relayBeginWakePairing` in the private authorized browser
    flow. Check `relayWakeSubscription`. Do not expose callback secrets.
-3. By default, when the user asks to connect the whole office, **discover the
-   existing eligible coworkers** without asking for a typed roster. Use the
-   platform's authoritative local Bot directory when available and
-   `agentAddressListAgents` plus `agentAddressListSessions` for canonical
-   Nuwa identities. The organization-wide directory can contain other offices:
-   **do not equate being in the same Organization with belonging to this
-   Gateway's platform**. Skip the Gateway Bot itself, unverified identities
-   and entries with no trustworthy native Bot ID.
-4. For each confidently matched, existing coworker that the user authorized
-   for this office, call `relayGatewayInviteTeammate` with the coworker's real
-   address and native Bot ID. **This is one invite per coworker**, not a single
-   "activate all" API. An invitation is *pending* and must never be reported
-   as successful incoming routing.
+3. When the user asks to connect the whole office, discover existing
+   eligible **native Bots in this platform** from its authoritative local
+   Bot directory when available. Collect each real display name and trusted
+   platform Bot ID. Skip the Gateway Bot itself, unverified or missing IDs.
+   This is an **onboarding operation**, not a per-message Gateway action.
+   Never scan the entire Nuwa Organization as if every Agent worked in the
+   same physical office, and do not call extra Agent Address MCP directory
+   tools to translate each coworker's name.
+4. For each verified platform Bot, call `relayGatewayInviteTeammate` once
+   with `recipientName` (the real native display name) and `recipientBotID`.
+   **Relay** resolves the name to an authorized existing Agent/Session using
+   its own directory lookup. If a verified canonical address is already
+   available, `recipientAddress` may be used instead; specify exactly one
+   name or address. If Relay reports no unique match, stop and report the
+   registration/identity gap rather than inventing an address. An invitation
+   is *pending*, not successful incoming routing.
 5. The actual recipient checks `relayGatewayInvitation` and, only with
    authorization for **its own Session**, invokes
    `relayGatewayApproveInvitation`. The Gateway cannot perform this step

@@ -53,7 +53,7 @@ export const ONBOARDING_SCRIPT = `
         '」助理聊一下。',
       '告訴他：「你好，我們來測試通話，密語是星河。收到後請回覆密語。」',
       '若有同名的助理或找不到人，先問我，不要猜測。'
-    ].join('\\\\n');
+    ].join('\\n');
   }
 
   function replyPrompt() {
@@ -62,7 +62,7 @@ export const ONBOARDING_SCRIPT = `
         '」助理傳來的測試訊息，',
       '請直接在原本的對話回覆：「收到星河！」',
       '如果還沒收到，就告訴我。'
-    ].join('\\\\n');
+    ].join('\\n');
   }
 
   function returnPrompt() {
@@ -71,7 +71,7 @@ export const ONBOARDING_SCRIPT = `
         '」助理聊一下。',
       '告訴他：「換我打給你了！這次密語是月光，請回覆密語。」',
       '若有同名的助理或找不到人，先問我，不要猜測。'
-    ].join('\\\\n');
+    ].join('\\n');
   }
 
   function verifyPrompt() {
@@ -80,7 +80,7 @@ export const ONBOARDING_SCRIPT = `
         '」助理剛才主動打來的電話，',
       '請在那段對話回覆：「收到月光！」',
       '如果還沒收到，就告訴我。'
-    ].join('\\\\n');
+    ].join('\\n');
   }
 
   function updatePrompts() {

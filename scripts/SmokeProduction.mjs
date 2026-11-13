@@ -26,7 +26,7 @@ assert.equal(landing.status, 200, 'Public onboarding homepage must be reachable.
 const landingPage = await landing.text();
 assert.match(landingPage, /GrokBot/);
 assert.match(landingPage, /OpenMausBot/);
-assert.match(landingPage, /start\\.js/);
+assert.ok(landingPage.includes('src="/start.js"'), 'Onboarding script must be referenced.');
 assert.match(landing.headers.get('content-security-policy') || '', /script-src 'self'/);
 
 const guide = await request('/start');

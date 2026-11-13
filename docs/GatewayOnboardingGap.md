@@ -16,6 +16,21 @@
 - **Relay Thread**：跨平台訊息的同一通電話；原通話回覆用 `relayReplyThread`。
 - **Native Thread**：GrokBot／OpenMausBot 自己的協作對話；不是 Relay Thread ID。
 
+## 一般人找同事只用平台名稱
+
+使用者在 GrokBot 或 OpenMausBot 中認得的是「小晴」、「大熊」等
+**原生 Bot 顯示名稱**，不是 `organization/agent/session` 內部地址。
+公開網頁只收兩個顯示名稱，讓助理生成簡單的雙向測試對話。
+
+`agentAddressFindByName` 會在當前已授權 Organization 的 Agent Address
+名冊中按顯示名稱或 handle 精確查找，再由現有地址解析服務確認唯一對象。
+它**不會**自行將中文字轉成任意 slug，也不會在同名、未註冊或缺乏
+Default Session 時發送。實際傳訊仍使用內部解析後的 canonical address。
+
+這只能完成**已註冊名稱到 Nuwa 身分**的查詢，不等於已能從 GrokBot
+或 OpenMausBot 的原生 Bot 名稱查到所有平台 Bot ID，或證明 Gateway
+已替該同事完成接線。這仍屬下方的自動發現／接收端整合缺口。
+
 ## 目前的受權登記與共用 Wake 契約
 
 這部分由 Relay API 的 `GatewayRoster`、`GatewayBindings`、`WakeService`

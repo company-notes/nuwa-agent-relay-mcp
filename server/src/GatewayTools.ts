@@ -50,11 +50,21 @@ export class GatewayTools extends MCPToolSet {
         recipientName: z.string().trim().min(1).max(120).optional(),
         recipientAddress: z.string().trim().min(3).max(255).optional(),
       },
-      ({ recipientName, recipientAddress }) => this.client.call(
-        'DELETE', '/v2/gateway-teammates', undefined, {
-          ...(recipientName ? { recipient_name: recipientName } : {}),
-          ...(recipientAddress ? { recipient_address: recipientAddress } : {}),
-        }));
+      ({ recipientName, recipientAddress }) => {
+        // MCPToolSet exposes validated arguments as unknown; narrow them
+        // before constructing the HTTP client's string-only query values.
+        const query: Record<string, string> = {};
+
+        if (typeof recipientName === 'string') {
+          query.recipient_name = recipientName;
+        }
+
+        if (typeof recipientAddress === 'string') {
+          query.recipient_address = recipientAddress;
+        }
+
+        return this.client.call('DELETE', '/v2/gateway-teammates', undefined, query);
+      });
 
     this.register('relayGatewayInvitation',
       'Check whether this coworker Session has a pending or active office Gateway invitation. ' +

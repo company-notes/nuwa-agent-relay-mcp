@@ -67,7 +67,10 @@ export class RelayTools extends MCPToolSet {
     const { to, body, subject, artifactLinks, threadID } = this.schemas;
 
     this.register('sendToAgent',
-      'Send to an Agent or exact Session address, creating a new Relay Thread. ' +
+      'Send to a canonical Agent or Session address, creating a new Relay Thread. ' +
+      'If the user supplied a familiar Bot name, first call agentAddressFindByName ' +
+      'and use the unique confirmed canonical address; never put a display name ' +
+      'directly in the to field or guess on ambiguous results. ' +
       'Use relayReplyThread to continue a Thread; submission is not delivery.',
       { to, message: body, subject: subject.optional(), artifactLinks },
       ({ to, message, subject, artifactLinks }) =>

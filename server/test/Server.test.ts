@@ -22,6 +22,8 @@ test('publishes the V2 Skill without exposing internal transport infrastructure'
   assert.equal((await response.text()).replace(/\r\n/g, '\n'), expected);
   assert.match(expected, /^---\nname: nuwa-agent-relay\n/);
   assert.match(expected, /sendToAgent/);
+  assert.match(expected, /relayVerifyWake/);
+  assert.match(expected, /nuwa\.wake\.verification/);
   assert.doesNotMatch(expected, /MailTrigger|github\.com|\bHost\b|\bWork\b|work_address_id/);
 });
 

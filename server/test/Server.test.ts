@@ -102,6 +102,34 @@ test('user binds a Session privately; Remote MCP sends with encrypted Runtime le
   }
 });
 
+test('a normal MCP send renews its Runtime with one grant lookup, not a second lookup', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const first = await scenario.tool('sendToAgent', {
+      to: '大熊', message: 'The first message should not repeat grant verification.',
+    });
+
+    assert.equal(first.result.isError, undefined);
+    assert.equal(scenario.grantLookups, 1);
+    assert.equal(scenario.claimCount, 1);
+
+    const second = await scenario.tool('sendToAgent', {
+      to: '大熊', message: 'The next request must still authenticate separately.',
+    });
+
+    assert.equal(second.result.isError, undefined);
+    assert.equal(scenario.grantLookups, 2,
+      'Each tool call must authenticate its Grant exactly once.');
+    assert.equal(scenario.heartbeatCount, 1,
+      'The existing Runtime lease must still be verified.');
+    assert.equal(scenario.calls.length, 2);
+  } finally {
+    scenario.restore();
+  }
+});
+
 test('Skill-first OAuth alone privately creates one persistent Agent/Session and sends immediately', async () => {
   const scenario = new RemoteMCPScenario();
   scenario.install();
@@ -140,6 +168,54 @@ test('Skill-first OAuth alone privately creates one persistent Agent/Session and
     assert.equal(scenario.calls.length, 1);
     assert.equal(scenario.calls[0].url.searchParams.get('session_id'), SESSION_A);
     assert.equal(scenario.calls[0].headers.get('x-nuwa-runtime-token'), RUNTIME_SECRET);
+  } finally {
+    scenario.restore();
+  }
+});
+
+test('an existing coworker restores its own identity and updates its native display name only during setup', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const first = await scenario.tool('agentAddressEnsureIdentity', {});
+    const original = JSON.parse(first.result.content[0].text) as {
+      sessionID: string; canonical: string;
+    };
+    assert.equal(first.result.isError, undefined);
+    assert.equal(scenario.displayNameUpdates.length, 0);
+
+    const updated = await scenario.tool('agentAddressEnsureIdentity', {
+      agentDisplayName: '大熊',
+    });
+    const same = JSON.parse(updated.result.content[0].text) as {
+      sessionID: string; canonical: string; created: boolean;
+    };
+    assert.equal(updated.result.isError, undefined);
+    assert.equal(same.sessionID, original.sessionID);
+    assert.equal(same.canonical, original.canonical);
+    assert.equal(same.created, false);
+    assert.equal(scenario.claimCount, 1);
+    assert.deepEqual(scenario.displayNameUpdates, [{
+      agentID: 'agent-a', name: '大熊', principal: 'a',
+    }]);
+
+    const secondGrant = await scenario.tool('agentAddressEnsureIdentity', {}, 'oauth-b');
+    assert.equal(secondGrant.result.isError, undefined);
+    const renamedOther = await scenario.tool('agentAddressEnsureIdentity', {
+      agentDisplayName: '小晴',
+    }, 'oauth-b');
+    assert.equal(renamedOther.result.isError, undefined);
+    assert.deepEqual(scenario.displayNameUpdates.at(-1), {
+      agentID: 'agent-b', name: '小晴', principal: 'b',
+    });
+    assert.equal(scenario.displayNameUpdates[0].agentID, 'agent-a');
+
+    const sent = await scenario.tool('sendToAgent', {
+      to: '大熊', message: 'Normal call should not rename any Agent.',
+    });
+    assert.equal(sent.result.isError, undefined);
+    assert.equal(scenario.displayNameUpdates.length, 2);
   } finally {
     scenario.restore();
   }
@@ -353,6 +429,33 @@ test('directory discovery works without ever claiming a Runtime', async () => {
   }
 });
 
+test('one MCP send call passes the familiar Bot name unchanged to Relay for routing', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const sent = await scenario.tool('sendToAgent', {
+      to: '大熊',
+      message: '你好，大熊！密語是星河。',
+    });
+
+    assert.equal(sent.result.isError, undefined);
+    assert.equal(scenario.calls.length, 1,
+      'Sending by name must not require an additional model-facing MCP tool.');
+    assert.equal(scenario.calls[0].url.pathname, '/v2/messages');
+    assert.deepEqual(scenario.calls[0].body, {
+      to: '大熊',
+      body: '你好，大熊！密語是星河。',
+    });
+
+    const schemas = JSON.stringify(await scenario.toolSchemas());
+    assert.doesNotMatch(schemas, /agentAddressFindByName/);
+    assert.match(schemas, /Relay resolves names in/);
+  } finally {
+    scenario.restore();
+  }
+});
+
 test('bound Session retains message context and replies within one Relay Thread', async () => {
   const scenario = new RemoteMCPScenario();
   scenario.install();
@@ -437,6 +540,22 @@ test('Gateway can propose a real coworker and that coworker alone approves the o
       firstContactMode: 'manual',
     });
 
+    // One Gateway invitation with a trusted native Bot name; the Relay
+    // resolves the internal address without another model-facing tool.
+    const named = await scenario.tool('relayGatewayInviteTeammate', {
+      recipientName: '大熊',
+      recipientBotID: 'trusted-native-bear-id',
+      threadMode: 'platform',
+    });
+    assert.equal(named.result.isError, undefined);
+    assert.equal(scenario.calls.at(-1)?.url.pathname, '/v2/gateway-teammates');
+    assert.deepEqual(scenario.calls.at(-1)?.body, {
+      recipientName: '大熊',
+      recipientBotID: 'trusted-native-bear-id',
+      threadMode: 'platform',
+      firstContactMode: 'manual',
+    });
+
     const approval = await scenario.tool('relayGatewayApproveInvitation', {}, 'oauth-b');
     assert.equal(approval.result.isError, undefined);
     assert.equal(scenario.calls.at(-1)?.url.pathname, '/v2/gateway-invitation');
@@ -453,6 +572,13 @@ test('Gateway can propose a real coworker and that coworker alone approves the o
     assert.equal(removal.result.isError, undefined);
     assert.equal(scenario.calls.at(-1)?.url.searchParams.get('recipient_address'),
       'nuwa/colleague/main');
+
+    const namedRemoval = await scenario.tool('relayGatewayRemoveTeammate', {
+      recipientName: '大熊',
+    });
+    assert.equal(namedRemoval.result.isError, undefined);
+    assert.equal(scenario.calls.at(-1)?.url.searchParams.get('recipient_name'), '大熊');
+    assert.equal(scenario.calls.at(-1)?.url.searchParams.has('recipient_address'), false);
   } finally {
     scenario.restore();
   }

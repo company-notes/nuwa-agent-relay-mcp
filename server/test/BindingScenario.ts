@@ -124,8 +124,10 @@ export class RemoteMCPScenario {
   organizationExists = true;
   resumeCount = 0;
   claimCount = 0;
+  readonly displayNameUpdates: Array<{ agentID: string; name: string; principal: string }> = [];
   registerOrganizationCount = 0;
   heartbeatCount = 0;
+  grantLookups = 0;
   releaseCount = 0;
 
   constructor() {
@@ -170,6 +172,8 @@ export class RemoteMCPScenario {
         }
 
         if (url.pathname === '/v2/account/grant') {
+          this.grantLookups += 1;
+
           return Response.json({ ok: true, data: { grantFingerprint: principal } });
         }
 
@@ -273,14 +277,42 @@ export class RemoteMCPScenario {
           return Response.json({ ok: true, data: { id: sessionID } });
         }
 
+        const agentNameMatch = url.pathname.match(/^\/v2\/account\/agents\/(agent-[ab])$/);
+
+        if (agentNameMatch && init?.method === 'PATCH') {
+          const ownAgentID = 'agent-' + principal[0];
+
+          if (agentNameMatch[1] !== ownAgentID) {
+            return Response.json({ ok: false, error: { code: 'forbidden' } }, {
+              status: 403,
+            });
+          }
+
+          assert.equal(typeof body?.agentDisplayName, 'string');
+          const name = String(body?.agentDisplayName);
+          this.displayNameUpdates.push({
+            agentID: ownAgentID, name, principal: principal[0],
+          });
+
+          return Response.json({ ok: true, data: {
+            id: ownAgentID, displayName: name,
+          } });
+        }
+
         if (url.pathname === '/v2/account/agents') {
           return Response.json({ ok: true, data: [{ id: 'agent-a', handle: 'reviewer' }] });
         }
 
-        if (url.pathname === '/v2/account/sessions/' + SESSION_A) {
+        if (url.pathname === '/v2/account/sessions/' + SESSION_A ||
+            url.pathname === '/v2/account/sessions/' + SESSION_B) {
+          const other = url.pathname.endsWith(SESSION_B);
           return Response.json({
             ok: true,
-            data: { id: SESSION_A, agentId: 'agent-a', canonical: 'nuwa/reviewer-a/main' },
+            data: {
+              id: other ? SESSION_B : SESSION_A,
+              agentId: other ? 'agent-b' : 'agent-a',
+              canonical: other ? 'nuwa/reviewer-b/main' : 'nuwa/reviewer-a/main',
+            },
           });
         }
 

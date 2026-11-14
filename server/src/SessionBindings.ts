@@ -187,9 +187,32 @@ export class SessionBindings {
       : { bound: false };
   }
 
-  async ensure(
+  private async updateOwnDisplayName(
+    client: AddressAPIClient, row: BindingRow, displayName: string,
+  ): Promise<void> {
+    const own = await client.getSession(row.sessionID) as {
+      id?: string; agentId?: string; canonical?: string;
+    };
+
+    if (!own || own.id !== row.sessionID ||
+        own.canonical !== row.canonicalAddress || !own.agentId) {
+      throw new APIError(409, 'binding_identity_mismatch',
+        'The authorized Agent/Session no longer matches this private binding.');
+    }
+
+    const updated = await client.setAgentDisplayName(own.agentId, displayName) as {
+      id?: string; displayName?: string;
+    };
+
+    if (!updated || updated.id !== own.agentId || updated.displayName !== displayName) {
+      throw new APIError(502, 'agent_display_name_update_invalid',
+        'Agent Address did not confirm the requested display name.');
+    }
+  }
+
+  private async ensureBound(
     authorization: string, agentDisplayName?: string,
-  ): Promise<Record<string, unknown>> {
+  ): Promise<{ key: string; row: BindingRow; created: boolean }> {
     const client = this.address(authorization);
     const key = await this.principal(client);
     await this.tokenCipher.requireKey();
@@ -204,9 +227,15 @@ export class SessionBindings {
           'The bound Session Organization is no longer authorized.');
       }
 
-      return SessionBindings.publicResult(
-        await this.renew(client, key, existing, status.organization.slug), false,
-      );
+      const renewed = await this.renew(client, key, existing, status.organization.slug);
+
+      if (agentDisplayName) {
+        // This is the current OAuth grant's own Session, never a Gateway
+        // acting on a different colleague's identity.
+        await this.updateOwnDisplayName(client, renewed, agentDisplayName);
+      }
+
+      return { key, row: renewed, created: false };
     }
 
     if (!status.organization) {
@@ -263,8 +292,16 @@ export class SessionBindings {
       }
 
       return {
-        bound: true, created: true, sessionID: created.session.id,
-        canonical: created.session.canonical, expiresAt: created.leaseExpiresAt,
+        key,
+        row: {
+          sessionID: created.session.id,
+          organizationID: status.organization.id,
+          canonicalAddress: created.session.canonical,
+          encryptedRuntimeToken: encryptedRuntime,
+          encryptedResumeToken: encryptedResume,
+          expiresAt: created.leaseExpiresAt,
+        },
+        created: true,
       };
     } catch (error) {
       if (created.runtimeToken && created.session?.id) {
@@ -277,6 +314,14 @@ export class SessionBindings {
 
       throw error;
     }
+  }
+
+  async ensure(
+    authorization: string, agentDisplayName?: string,
+  ): Promise<Record<string, unknown>> {
+    const bound = await this.ensureBound(authorization, agentDisplayName);
+
+    return SessionBindings.publicResult(bound.row, bound.created);
   }
 
   async resume(
@@ -357,12 +402,11 @@ export class SessionBindings {
   }
 
   async authorize(authorization: string): Promise<BoundSession> {
-    await this.ensure(authorization);
-    const client = this.address(authorization);
-    const key = await this.principal(client);
-    const row = await this.row(key);
+    // Reuse the verified grant and renewed binding from the same operation.
+    // Reading the grant and binding a second time adds latency but no authority.
+    const { key, row } = await this.ensureBound(authorization);
 
-    if (!row || row.expiresAt <= new Date().toISOString()) {
+    if (row.expiresAt <= new Date().toISOString()) {
       throw new APIError(403, 'session_binding_required',
         'This OAuth grant has no authorized Session Runtime.');
     }

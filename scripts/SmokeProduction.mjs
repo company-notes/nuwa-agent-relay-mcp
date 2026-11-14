@@ -27,6 +27,9 @@ const landingPage = await landing.text();
 assert.match(landingPage, /GrokBot/);
 assert.match(landingPage, /OpenMausBot/);
 assert.ok(landingPage.includes('src="/start.js"'), 'Onboarding script must be referenced.');
+assert.match(landingPage, /助理 A 的名稱/);
+assert.match(landingPage, /助理 B 的名稱/);
+assert.doesNotMatch(landingPage, /助理 A 的 Nuwa 地址|助理 B 的 Nuwa 地址/);
 assert.match(landing.headers.get('content-security-policy') || '', /script-src 'self'/);
 
 const guide = await request('/start');
@@ -40,6 +43,9 @@ assert.match(promptText, /function verifyPrompt/);
 assert.match(promptText, /預設希望目前所有符合資格的同事都能接線/);
 assert.match(promptText, /密語是星河/);
 assert.match(promptText, /密語是月光/);
+assert.match(promptText, /colleagueA/);
+assert.match(promptText, /colleagueB/);
+assert.doesNotMatch(promptText, /addressA|addressB|先填入這位助理真正的 Nuwa 地址/);
 assert.doesNotMatch(promptText, /relayReplyThread|relayProvisionAgentMailbox/,
   'Public user prompts should not expose internal tool implementation details.');
 
@@ -50,6 +56,10 @@ const skill = await request('/skills/nuwa-agent-relay/SKILL.md');
 assert.equal(skill.status, 200, 'Skill installation entrypoint must remain reachable.');
 const skillText = await skill.text();
 assert.match(skillText, /agentAddressEnsureIdentity/);
+assert.match(skillText, /sendToAgent/);
+assert.match(skillText, /no Gateway name lookup/);
+assert.doesNotMatch(skillText, /agentAddressFindByName/,
+  'Name resolution must not add a second MCP tool call.');
 assert.doesNotMatch(skillText, /human provides the Session ID|access token and loses the binding/i);
 
 const metadata = await request('/.well-known/oauth-protected-resource/mcp');

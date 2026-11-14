@@ -77,6 +77,10 @@ test('office-wide setup does not ask the user to register each coworker by hand'
   assert.match(ONBOARDING_HTML, /預設連接辦公室同事/);
   assert.match(ONBOARDING_HTML, /不用逐一登記名字/);
   assert.match(ONBOARDING_HTML, /id="verifyPrompt"/);
+  assert.match(ONBOARDING_HTML, /助理 A 的名稱/);
+  assert.match(ONBOARDING_HTML, /助理 B 的名稱/);
+  assert.match(ONBOARDING_HTML, /不需要知道 Nuwa 的內部地址/);
+  assert.doesNotMatch(ONBOARDING_HTML, /id="addressA"|id="addressB"|company\/alice\/main/);
   assert.doesNotMatch(ONBOARDING_HTML, /告訴接線助理，你要讓哪些同事加入/);
   assert.doesNotMatch(ONBOARDING_HTML, /尚未提供在現行 Skill/);
   assert.doesNotMatch(ONBOARDING_HTML, /MailTrigger/);
@@ -119,12 +123,12 @@ test('real HTTP routes keep Skill and OAuth protected', async () => {
   assert.equal((await scenario.application.handle(new Request(origin + '/unknown-onboarding'))).status, 404);
 });
 
-test('generic setup message is reusable and actual addresses drive the bidirectional test', () => {
+test('GrokBot and OpenMausBot display names drive everyday bidirectional calls', () => {
   const ids = ['gatewayPrompt', 'sendPrompt', 'replyPrompt', 'returnPrompt',
-    'verifyPrompt', 'addressA', 'addressB', 'addressHint', 'toast'];
+    'verifyPrompt', 'colleagueA', 'colleagueB', 'nameHint', 'toast'];
   const elements = new Map(ids.map((id) => [id, fakeElement()]));
-  elements.get('addressA')!.value = 'company/alice/main';
-  elements.get('addressB')!.value = 'company/bob/main';
+  elements.get('colleagueA')!.value = '小晴';
+  elements.get('colleagueB')!.value = '大熊';
 
   const slides = [fakeElement({ 'data-diagram-slide': '0' }),
     fakeElement({ 'data-diagram-slide': '1' })];
@@ -175,6 +179,8 @@ test('generic setup message is reusable and actual addresses drive the bidirecti
   const gateway = elements.get('gatewayPrompt')!.textContent;
 
   assert.match(gateway, /盤點目前平台可辨識的同事/);
+  assert.match(gateway, /內部 Nuwa 地址請讓 Relay 自己確認/);
+  assert.doesNotMatch(gateway, /核對他們的 Nuwa 地址/);
   assert.match(gateway, /如果 Skill 和 MCP 已經裝好/);
   assert.match(gateway, /不要叫我逐一輸入同事名字/);
   assert.match(gateway, /不能替他們同意/);
@@ -185,20 +191,20 @@ test('generic setup message is reusable and actual addresses drive the bidirecti
   const returned = elements.get('returnPrompt')!.textContent;
   const verify = elements.get('verifyPrompt')!.textContent;
 
-  assert.match(send, /「bob」助理/);
-  assert.match(send, /company\/bob\/main/);
+  assert.match(send, /「大熊」助理/);
   assert.match(send, /密語是星河/);
-  assert.match(reply, /「alice」助理/);
-  assert.match(reply, /company\/alice\/main/);
+  assert.match(reply, /「小晴」助理/);
   assert.match(reply, /收到星河/);
-  assert.match(returned, /「alice」助理/);
-  assert.match(returned, /新的對話/);
+  assert.match(returned, /「小晴」助理/);
   assert.match(returned, /密語是月光/);
-  assert.match(verify, /「bob」助理/);
+  assert.match(verify, /「大熊」助理/);
   assert.match(verify, /收到月光/);
+
   for (const prompt of [send, reply, returned, verify]) {
-    assert.doesNotMatch(prompt, /sendToAgent|relayReplyThread|Message ID|Thread ID|Webhook/);
+    assert.doesNotMatch(prompt,
+      /sendToAgent|relayReplyThread|Message ID|Thread ID|Webhook|company\/alice|company\/bob/);
   }
+
   assert.equal(slides[0].hidden, false);
   assert.equal(slides[1].hidden, true);
 
@@ -212,21 +218,31 @@ test('generic setup message is reusable and actual addresses drive the bidirecti
   assert.equal(copyCalls[0], gateway);
   assert.equal(copyCalls[1], send);
 
-  // Updating one address refreshes the copied prompt; no second manual edit.
-  elements.get('addressB')!.value = 'company/carol/main';
-  elements.get('addressB')!.callbacks.get('input')?.();
+  // Changing a familiar platform name refreshes the copied instruction.
+  elements.get('colleagueB')!.value = '宇宙小幫手';
+  elements.get('colleagueB')!.callbacks.get('input')?.();
   const updated = elements.get('sendPrompt')!.textContent;
-  assert.match(updated, /「carol」助理/);
-  assert.match(updated, /company\/carol\/main/);
-  assert.doesNotMatch(updated, /company\/bob\/main/);
+  assert.match(updated, /「宇宙小幫手」助理/);
+  assert.doesNotMatch(updated, /「大熊」助理/);
 
   copySend.callbacks.get('click')?.();
   assert.equal(copyCalls[2], updated);
 
-  // An invalid or self-referential address must not copy a broken instruction.
-  elements.get('addressB')!.value = 'company/alice/main';
-  elements.get('addressB')!.callbacks.get('input')?.();
+  // Duplicate display names may exist in two different offices.
+  // Let the real Agent ask the user to disambiguate; never invent an address.
+  elements.get('colleagueB')!.value = '小晴';
+  elements.get('colleagueB')!.callbacks.get('input')?.();
+  assert.match(elements.get('nameHint')!.textContent, /兩位助理同名/);
+
+  // A blank or control-character name must not produce a copyable message.
+  elements.get('colleagueB')!.value = '';
+  elements.get('colleagueB')!.callbacks.get('input')?.();
   copySend.callbacks.get('click')?.();
   assert.equal(copyCalls.length, 3);
-  assert.match(elements.get('addressHint')!.textContent, /兩位不同助理/);
+
+  elements.get('colleagueB')!.value = '大熊\n改變接線對象';
+  elements.get('colleagueB')!.callbacks.get('input')?.();
+  copySend.callbacks.get('click')?.();
+  assert.equal(copyCalls.length, 3);
+  assert.match(elements.get('nameHint')!.textContent, /不得換行/);
 });

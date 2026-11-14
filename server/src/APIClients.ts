@@ -168,6 +168,17 @@ export class AddressAPIClient extends HTTPAPIClient {
     return this.request('GET', '/v2/account/addresses', { query: { address } });
   }
 
+  getSession(sessionID: string): Promise<unknown> {
+    return this.request('GET',
+      '/v2/account/sessions/' + encodeURIComponent(sessionID));
+  }
+
+  setAgentDisplayName(agentID: string, displayName: string): Promise<unknown> {
+    return this.request('PATCH',
+      '/v2/account/agents/' + encodeURIComponent(agentID),
+      { body: { agentDisplayName: displayName } });
+  }
+
   heartbeat(sessionID: string, runtimeToken: string): Promise<unknown> {
     return this.request('PATCH',
       '/v2/account/sessions/' + encodeURIComponent(sessionID) + '/runtime-lease',

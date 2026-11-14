@@ -19,30 +19,52 @@ export class GatewayTools extends MCPToolSet {
       () => this.client.call('GET', '/v2/gateway-teammates'));
 
     this.register('relayGatewayInviteTeammate',
-      'On user-authorized office-wide setup, propose each real, verified local coworker without ' +
-      'asking the user to type a manual roster; this tool invites ONE coworker per call. ' +
-      'Match the recipient canonical address to an authoritative platform-native Bot ID. ' +
-      'A verified Gateway Wake is required. The invitation remains pending until the coworker ' +
-      'approves from its OWN Session. Never assume directory membership grants consent, invent IDs, ' +
-      'or claim automatic delivery before the actual recipient Bot runs.',
+      'On user-authorized office-wide setup, propose ONE real platform coworker per call. ' +
+      'Prefer recipientName (the local native Bot display name) plus verified recipientBotID. ' +
+      'Relay resolves that name to a registered Agent/Session; never call an extra MCP directory ' +
+      'tool or ask Gateway to invent a canonical address. Alternatively provide recipientAddress. ' +
+      'Supply exactly ONE of recipientName or recipientAddress. Approval is pending until the ' +
+      'recipient authorizes with its OWN Session; do not assume name discovery grants consent.',
       {
-        recipientAddress: z.string().min(3).max(255),
+        recipientName: z.string().trim().min(1).max(120).optional(),
+        recipientAddress: z.string().trim().min(3).max(255).optional(),
         recipientBotID: z.string().regex(/^[A-Za-z0-9._:-]{1,192}$/),
         threadMode: z.enum(['platform', 'explicit']),
         firstContactMode: z.enum(['manual', 'automatic']).optional(),
       },
-      ({ recipientAddress, recipientBotID, threadMode, firstContactMode }) =>
+      ({ recipientName, recipientAddress, recipientBotID, threadMode, firstContactMode }) =>
         this.client.call('POST', '/v2/gateway-teammates', {
-          recipientAddress, recipientBotID, threadMode,
+          ...(recipientName ? { recipientName } : {}),
+          ...(recipientAddress ? { recipientAddress } : {}),
+          recipientBotID, threadMode,
           firstContactMode: firstContactMode ?? 'manual',
         }));
 
     this.register('relayGatewayRemoveTeammate',
-      'On explicit user request, revoke an approved or pending office Gateway coworker by ' +
-      'their real public canonical address. This cancels pending notifications and native Thread bindings.',
-      { recipientAddress: z.string().min(3).max(255) },
-      ({ recipientAddress }) => this.client.call('DELETE', '/v2/gateway-teammates',
-        undefined, { recipient_address: recipientAddress as string }));
+      'On explicit user request, remove ONE approved or pending coworker by recipientName, ' +
+      'the real platform Bot display name. Relay resolves that name freshly and requires ' +
+      'a unique authorized identity; do not look it up with another MCP tool. ' +
+      'Alternatively use a verified recipientAddress. Provide exactly one of the two. ' +
+      'This cancels pending notifications and native Thread bindings.',
+      {
+        recipientName: z.string().trim().min(1).max(120).optional(),
+        recipientAddress: z.string().trim().min(3).max(255).optional(),
+      },
+      ({ recipientName, recipientAddress }) => {
+        // MCPToolSet exposes validated arguments as unknown; narrow them
+        // before constructing the HTTP client's string-only query values.
+        const query: Record<string, string> = {};
+
+        if (typeof recipientName === 'string') {
+          query.recipient_name = recipientName;
+        }
+
+        if (typeof recipientAddress === 'string') {
+          query.recipient_address = recipientAddress;
+        }
+
+        return this.client.call('DELETE', '/v2/gateway-teammates', undefined, query);
+      });
 
     this.register('relayGatewayInvitation',
       'Check whether this coworker Session has a pending or active office Gateway invitation. ' +

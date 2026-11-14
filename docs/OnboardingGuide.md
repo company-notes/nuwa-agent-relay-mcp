@@ -13,7 +13,7 @@
 
    > 請幫我把這個 AI 平台接上 Nuwa，讓辦公室目前的 AI 同事都能互相聯絡，也能接到其他平台的來電。請先閱讀官方 Nuwa 助理指南：https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md 。若已連接 Nuwa，就直接沿用。請盤點目前平台可辨識的同事，協助設定共用的接線入口；需要同事本人授權時，請引導有權的人核准，不能代替其他助理同意。最後清楚告訴我哪些同事已接通、哪些還缺設定。
 
-3. **找兩位真正的同事試通話。** 在[公開導覽](https://mcp.agent-relay.company-notes.com/start)填入兩位同事的 Nuwa 地址，網頁會直接產生四段可複製的自然語言指令。由 A 找 B、B 在原對話回覆、B 再主動找 A、A 回覆第二通。
+3. **找兩位真正的同事試通話。** 在[公開導覽](https://mcp.agent-relay.company-notes.com/start)填入兩位同事在 GrokBot、OpenMausBot 等平台顯示的**助理名稱**，網頁會產生四段可複製的自然語言指令。一般使用者不需要知道 Nuwa 地址。由 A 找 B、B 在原對話回覆、B 再主動找 A、A 回覆第二通。
 
 這是**預期的使用者體驗**。目前技術上已支援共用一個 Gateway Wake 入口與多位收件 Session，但還不能在任意平台完整做到「一次授權，自動開通所有現有同事」。不要把前端操作流程當成已完成實機驗收。
 
@@ -21,9 +21,9 @@
 
 **已實作：**
 
-- 身分與地址：`agentAddressEnsureIdentity`、`agentAddressListAgents`、`agentAddressListSessions`、`agentAddressResolve`。
+- **一次呼叫即可通話**：`agentAddressEnsureIdentity` 在安裝時建立助理身分。正常發話時，助理只呼叫一次 `sendToAgent`，把使用者說的「大熊」當作收件對象；Relay 在同一個伺服器請求內查授權的 Agent Address 名冊並確定真正 Session，**不需要 Gateway 或 MCP 第二次查找**。同名、未註冊或沒有 Default Session 就拒絕，不猜地址。
 - 真正的助理傳訊：`sendToAgent` 開一段新 Relay 通話，`relayReplyThread` 在原通話回答。
-- 共用接收：Gateway 經驗證設定一次 Wake；`relayGatewayInviteTeammate` 替有地址和可信 Bot ID 的同事建立待批准邀請；同事用自己的 Session 透過 `relayGatewayApproveInvitation` 核准。多位經核准的同事共用這個 Wake，各自有獨立的 Bot ID 和對話關係。
+- 共用接收：Gateway 經驗證設定一次 Wake，只提供各位本平台同事的真實顯示名稱與可信 Bot ID；`relayGatewayInviteTeammate` 在 Relay 內部解析名稱並建立待批准邀請，**不需要 Gateway 另外查地址**。同事再用自己的 Session 透過 `relayGatewayApproveInvitation` 核准。多位經核准的同事共用這個 Wake，各自保有獨立 Bot ID 和對話關係。
 - 收件名單狀態：`relayGatewayTeammates` 顯示待批准／已啟用，並支援撤銷。邀請不等於啟用；送出不等於接聽。
 
 **距離「預設全部加入」還差：**
@@ -45,6 +45,6 @@
 | 兩個人找同一位助理 | 不同寄件者的原生協作對話分開，不互相洩露內容 |
 | 同事取消授權 | 只停止這位同事的接線，不影響其他人 |
 
-網站表單只在瀏覽器內替換已填好的公開地址，不會向 Nuwa 上傳地址，也不會替你操作任何授權。想查送達問題應先檢查 `relayReceipt`、Wake 和原生 Bot 執行紀錄，送達不明時不要盲目重寄。
+網站表單只在瀏覽器內替換已填好的助理名稱，不會向 Nuwa 上傳表單內容，也不會替你操作任何授權。助理收到指令後，只需呼叫一次 `sendToAgent` 並傳入顯示名稱；Relay 在同一個請求內完成授權範圍中的名稱解析。沒有唯一匹配時會拒絕發送並要求確認，不額外呼叫 MCP 名冊工具。想查送達問題應先檢查 `relayReceipt`、Wake 和原生 Bot 執行紀錄，送達不明時不要盲目重寄。
 
 更詳細的電話架構與系統邊界見 [Architecture](Architecture.md)，真實跨平台驗收見 [ProductionWebhookAcceptance](ProductionWebhookAcceptance.md)。

@@ -483,6 +483,68 @@ test('bound Session retains message context and replies within one Relay Thread'
   }
 });
 
+test('receive-only webhook challenge can be verified by the owning OAuth Session', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const schemas = await scenario.toolSchemas();
+    assert.match(JSON.stringify(schemas), /relayVerifyWake/);
+    assert.doesNotMatch(JSON.stringify(schemas), /bearerToken|signingSecret|runtimeToken|resumeToken/);
+
+    const verificationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const challenge = 'a'.repeat(64);
+
+    const result = await scenario.tool('relayVerifyWake', {
+      verificationId, challenge,
+    });
+
+    assert.equal(result.result.isError, undefined);
+    assert.equal(scenario.calls.length, 1);
+    assert.equal(scenario.calls[0].url.pathname, '/v2/wake-subscription/verification');
+    assert.equal(scenario.calls[0].url.searchParams.get('session_id'), SESSION_A);
+    assert.equal(scenario.calls[0].url.searchParams.has('challenge'), false);
+    assert.deepEqual(scenario.calls[0].body, { verificationId, challenge });
+    assert.equal(scenario.calls[0].headers.get('authorization'), 'Bearer oauth-a');
+    assert.equal(scenario.calls[0].headers.get('x-nuwa-runtime-token'), RUNTIME_SECRET);
+
+    const second = await scenario.tool('relayVerifyWake', {
+      verificationId, challenge,
+    }, 'oauth-b');
+    assert.equal(second.result.isError, undefined);
+    assert.equal(scenario.calls.at(-1)?.url.searchParams.get('session_id'), SESSION_B);
+    assert.equal(scenario.calls.at(-1)?.headers.get('authorization'), 'Bearer oauth-b');
+    assert.notEqual(
+      scenario.calls.at(-1)?.headers.get('x-nuwa-runtime-token'),
+      scenario.calls[0].headers.get('x-nuwa-runtime-token'),
+    );
+  } finally {
+    scenario.restore();
+  }
+});
+
+test('Wake verification refuses invalid challenges before any relay request', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const verificationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const malformed = await scenario.tool('relayVerifyWake', {
+      verificationId, challenge: 'not-a-valid-proof',
+    });
+    assert.equal(malformed.result.isError, true);
+    assert.equal(scenario.calls.length, 0);
+
+    const malformedID = await scenario.tool('relayVerifyWake', {
+      verificationId: 'wrong', challenge: 'a'.repeat(64),
+    });
+    assert.equal(malformedID.result.isError, true);
+    assert.equal(scenario.calls.length, 0);
+  } finally {
+    scenario.restore();
+  }
+});
+
 test('model-facing Wake pairing forwards no credential values', async () => {
   const scenario = new RemoteMCPScenario();
   scenario.install();

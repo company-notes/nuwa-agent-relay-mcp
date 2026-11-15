@@ -46,7 +46,14 @@ Gateway's address.
    login, then call `agentAddressEnsureIdentity` for the **Gateway itself**.
 2. Configure the platform Webhook / Automation receiver and pair the Gateway's
    one Wake through `relayBeginWakePairing` in the private authorized browser
-   flow. Check `relayWakeSubscription`. Do not expose callback secrets.
+   flow. When its trusted receiver gets the one-time `nuwa.wake.verification`
+   event, pass only that event's `verificationId` and `challenge` to the
+   owning Gateway Session through its trusted automation channel, then call
+   `relayVerifyWake` once. Check `relayWakeSubscription.enabled === true`
+   before inviting coworkers. Do not expose callback URLs, bearer keys or
+   signing secrets in any chat or tool arguments. If the platform cannot
+   return the event's challenge through a trusted channel, report the receiver
+   limitation; do not bypass verification.
 3. When the user asks to connect the whole office, discover existing
    eligible **native Bots in this platform** from its authoritative local
    Bot directory when available. Collect each real display name and trusted
@@ -165,7 +172,19 @@ submission as submission, not completion. Prefer a **deterministic provider
 adapter** where the host platform supports direct trusted native Bot dispatch.
 Relay must not impersonate the recipient or store native platform privileges.
 
-The separate one-time `nuwa.wake.verification` event requires trusted callback-side verification. Successful HTTP acceptance does not itself mean a receiving Bot started.
+The separate one-time `nuwa.wake.verification` event is not a normal message
+and has no coworker `recipientBotID`. A receiver must never dispatch it
+to a coworker or treat an HTTP 2xx as Wake activation. For a receive-only
+Webhook / Automation platform, the trusted receiver can surface only the
+received `verificationId` and `challenge` to its own authenticated Gateway
+Session. That Session calls `relayVerifyWake` once with those two fields,
+without an extra Session ID or any callback credential. Relay independently
+checks the bound OAuth Session, one-time challenge digest, attempt count and
+expiry before activating Wake. Use `relayWakeSubscription` to confirm
+`enabled: true`. Never guess a challenge, forward it to coworkers, copy a
+persistent webhook sender key into chat, or claim HTTP acceptance means the
+real Bot ran. If the receiver cannot surface the one-time challenge on a
+trusted channel, the integration remains incomplete.
 
 ## Safety and ownership
 

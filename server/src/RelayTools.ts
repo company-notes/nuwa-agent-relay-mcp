@@ -137,6 +137,21 @@ export class RelayTools extends MCPToolSet {
       {},
       () => this.client.call('POST', '/v2/wake-pairings'));
 
+    this.register('relayVerifyWake',
+      'Confirm ONE unexpired Wake challenge delivered to this Session\'s own trusted ' +
+      'Webhook. Use only the verificationId and challenge from the genuine ' +
+      'nuwa.wake.verification event, never the Webhook URL or sender key. ' +
+      'A received HTTP 2xx does not activate Wake without this confirmation. ' +
+      'Do not call on behalf of another Agent or attempt to guess a proof.',
+      {
+        verificationId: z.string().uuid(),
+        challenge: z.string().regex(/^[a-f0-9]{64}$/),
+      },
+      ({ verificationId, challenge }) =>
+        this.client.call('POST', '/v2/wake-subscription/verification', {
+          verificationId, challenge,
+        }));
+
     this.register('relayWakeSubscription',
       'Inspect the bound Session Wake without disclosing secrets.',
       {},

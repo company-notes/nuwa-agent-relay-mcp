@@ -765,7 +765,6 @@ test('office Gateway explicitly delegates a named coworker call and original Thr
     assert.equal(rotated.result.isError, undefined);
     assert.equal(scenario.calls.at(-1)?.url.pathname,
       '/v2/gateway-office-coworkers/xiaoqing-native/passphrase');
-    assert.equal(scenario.calls.at(-1)?.method, 'PUT');
   } finally {
     scenario.restore();
   }

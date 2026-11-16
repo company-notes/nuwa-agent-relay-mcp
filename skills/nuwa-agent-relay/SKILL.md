@@ -72,12 +72,21 @@ The coworkers speak and work as themselves; the Gateway never answers for them.
   `organization/agent/session` address or verified Email alias using
   `sendToAgent`. Relay resolves the target inside the send request. There
   is no separate lookup turn through a Gateway.
-- Relay selects the recipient Session and its office Gateway. It wakes
-  **the Gateway only**, attaching the verified `recipientBotID` and
-  `relayThreadID`; the Gateway forwards once to that specific platform Bot.
+- Relay selects the recipient Session and its office Gateway. Its signed
+  Wake includes the trusted `senderDisplayName`, `senderCanonicalAddress`,
+  actual message content in `body`, `recipientBotID`, `messageID` and
+  `relayThreadID`. Gateway forwards the sender name and message content
+  directly to that real platform Bot, keeping the IDs in trusted context
+  for deduplication and immediate reply. A trusted `senderAuthMode` field
+  distinguishes normal Session speaking from `office-trust` or `passphrase`
+  Gateway delegation; the latter two are **not** native Bot attestation.
 - The real Bot replies with `relayReplyThread` in the original Relay Thread,
-  with its own authenticated Session. A new outbound call uses `sendToAgent`
+  either with its own authenticated Session or through an explicitly opted-in,
+  auditable office Gateway selecting `from`. A new outbound call uses `sendToAgent`
   and creates a new Relay Thread, waking the other office's Gateway.
+  `relayMessage` is available for recovery or additional history;
+  `relayAcknowledgeRead` is an optional read receipt, not a prerequisite
+  for understanding or answering a freshly forwarded message.
 - Verified messages and Gateway delivery receipts are different from model
   execution. A Wake HTTP 2xx proves only that the callback was accepted.
 
@@ -89,13 +98,55 @@ separate native conversations by verified sender/recipient pair; never
 fabricate native Thread IDs.
 
 **Authority boundaries:** An office enrollment creates a real Agent Address
-record, not a reusable Runtime capability for the model. The platform-side
-Bot identity bridge must authenticate the **actual sending Bot** before it
-acquires its own Runtime or publishes a reply. OAuth, Resume, Runtime and
-Webhook secrets stay in protected server-side storage. A Gateway's permission
-to enroll coworkers and receive Wake never authorizes it to pretend to be a
-coworker, read that coworker's private inbox or accept an Handoff for them.
+record, not a reusable Runtime capability for the model. A platform-side Bot identity bridge is still needed to authenticate the
+**actual native sending Bot**. The optional office trust/passphrase modes
+instead record an explicitly declared coworker and the authorized Gateway actor;
+they do not claim native attestation. OAuth, Resume, Runtime and
+Webhook secrets stay in protected server-side storage. A Gateway's permission to enroll coworkers and receive Wake alone never
+confers speaking power. Only explicit office-delegation opt-in allows it to
+submit a message or Thread reply with a declared coworker source, separately
+audited as Gateway-delegated. This still never grants private inbox access,
+Handoff acceptance or access to a coworker's Runtime.
 Invalid, ambiguous or conflicting identities fail closed.
+
+
+## Optional office-speaking delegation (shared GrokBot OAuth)
+
+By default an enrolled office Gateway only receives and forwards; a Gateway
+`sendToAgent` or `relayReplyThread` without `from` remains forbidden. An office
+administrator may explicitly call `relayGatewayOfficeDelegation(enabled: true)`
+after verified shared Wake and coworker enrollment. To inspect the choice, use
+`relayGatewayOfficeDelegationStatus`. Disabling immediately stops delegated
+speaking without removing the existing 12 coworker routes or their Wake.
+
+In an opted-in office, `sendToAgent({ from: "小晴", to: "大熊", message: "..." })`
+starts a new Thread, while
+`relayReplyThread({ from: "大熊", threadID: "...", body: "..." })`
+continues the original Thread. `from` accepts a unique registered display name,
+the coworker's canonical Agent/Session address, or a verified Email alias. Relay
+checks that the asserted Session belongs to an **active coworker of this exact
+Gateway**. It records the coworker Session as the sender and the actual Gateway
+Session as the separate invoking actor. This is **office-delegated**, not a
+platform-authenticated proof of which native Bot really invoked the tool.
+An outside Agent, another Gateway's roster, an unregistered name, or a
+different Thread participant must be rejected before any send.
+
+Each coworker can optionally set a 16–128 character passphrase during
+`relayGatewayEnrollOfficeCoworkers` or rotate it with
+`relayGatewayCoworkerPassphrase(recipientBotID, passphrase)`. Remove it explicitly
+with `relayGatewayRemoveCoworkerPassphrase`. Once a passphrase is set, every
+delegated send and reply on behalf of that coworker **must** include the correct
+`passphrase`; omission cannot downgrade to trust mode. The Relay stores a salted
+PBKDF2 verifier, never the plaintext, and never includes it in its responses.
+
+**Important limitation:** GrokBot's MCP tools and some conversation/tool traces
+are shared. Any passphrase supplied in a model-facing tool argument may be seen
+by the model or in a shared trace. Do not promise that only one native Bot can
+know it or that it cryptographically attests the original caller. Never expose
+an OAuth bearer, Runtime/Resume capability, Wake secret, or a private callback
+credential through a tool. Prefer a random high-entropy passphrase and do not
+repeat it in ordinary chat. The real native Bot-to-Nuwa Session attestation
+remains a separate later improvement (Issue #39).
 
 ## Communicate by the coworker's everyday name
 
@@ -145,8 +196,11 @@ For a **dedicated shared office Gateway**, a signed callback's `recipientSession
 is the *coworker's* authorized Session, not the Gateway's. On **every incoming
 message** the Gateway should perform **zero MCP directory or routing calls**:
 validate the signed event, take the Relay-selected `recipientBotID` and
-`recipientPlatformThreadID` (when provided), and forward the event exactly
-once to that native Bot/conversation. Relay has already resolved names,
+`recipientPlatformThreadID` (when provided), and forward the actual message
+content (`body`) with the verified sender name (`senderDisplayName`) exactly
+once to that native Bot/conversation. Keep the `relayThreadID` available in
+the trusted reply context so the Bot can call `relayReplyThread` directly.
+Relay has already resolved names,
 permissions, sender identity and conversation mappings. Never call
 `agentAddressListAgents`, `agentAddressResolve` or `relayMessage` to
 figure out the intended recipient; never use the message body to select or
@@ -174,7 +228,7 @@ trusted channel, the integration remains incomplete.
 
 ## Safety and ownership
 
-- The authenticated client owns its own Session and exclusive Runtime Lease. Sharing a human account or knowing a canonical address does not allow impersonation.
+- The authenticated client owns its own Session and exclusive Runtime Lease. The opt-in office-delegation exception permits audited declared coworker speaking without pretending to possess a coworker's Runtime; it never establishes platform-native attestation.
 - Runtime, Resume and OAuth tokens never belong in model-facing MCP fields; only the private server can recover them.
 - `relayRemoveWake` removes the selected Session callback only when deliberately requested.
 - A successful send means submission, not confirmed mailbox arrival, read acknowledgement or task completion.

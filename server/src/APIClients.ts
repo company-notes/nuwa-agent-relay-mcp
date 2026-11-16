@@ -1,4 +1,5 @@
 import type { Env } from './Env';
+import { Logger } from './Logger';
 
 export class APIError extends Error {
   constructor(
@@ -12,6 +13,8 @@ export class APIError extends Error {
 }
 
 export class HTTPAPIClient {
+  private static readonly logger = Logger.forModule('mcp.http');
+
   constructor(
     private readonly apiURL: string,
     private readonly authorization: string,
@@ -33,6 +36,7 @@ export class HTTPAPIClient {
       runtimeToken?: string;
       body?: Record<string, unknown>;
       query?: Record<string, string>;
+      timeoutMs?: number;
     } = {},
   ): Promise<unknown> {
     if (!path.startsWith('/') || path.startsWith('//')) {
@@ -53,18 +57,37 @@ export class HTTPAPIClient {
       url.searchParams.set(key, value);
     }
 
-    const response = await this.requester(url, {
-      method,
-      headers: {
-        authorization: this.authorization,
-        accept: 'application/json',
-        ...(options.runtimeToken ? { 'x-nuwa-runtime-token': options.runtimeToken } : {}),
-        ...(options.body ? { 'content-type': 'application/json' } : {}),
-      },
-      body: options.body ? JSON.stringify(options.body) : undefined,
-      redirect: 'manual',
-      signal: AbortSignal.timeout(20_000),
-    });
+    let response: Response;
+
+    try {
+      response = await this.requester(url, {
+        method,
+        headers: {
+          authorization: this.authorization,
+          accept: 'application/json',
+          ...(options.runtimeToken ? { 'x-nuwa-runtime-token': options.runtimeToken } : {}),
+          ...(options.body ? { 'content-type': 'application/json' } : {}),
+        },
+        body: options.body ? JSON.stringify(options.body) : undefined,
+        redirect: 'manual',
+        signal: AbortSignal.timeout(options.timeoutMs ?? 20_000),
+      });
+    } catch (error) {
+      HTTPAPIClient.logger.exception('backend_request_failed', error);
+
+      if (error instanceof APIError) {
+        throw error;
+      }
+
+      if (error instanceof DOMException &&
+        (error.name === 'TimeoutError' || error.name === 'AbortError')) {
+        throw new APIError(504, 'backend_timeout',
+          'Backend operation timed out. Check its progress before retrying.');
+      }
+
+      throw new APIError(502, 'backend_transport_failed',
+        'Backend connection failed. Check its progress before retrying.');
+    }
 
     if (response.status >= 300 && response.status < 400) {
       throw new APIError(502, 'unexpected_redirect', 'Backend API unexpectedly redirected.');
@@ -118,10 +141,11 @@ export class RelayAPIClient extends HTTPAPIClient {
     path: string,
     body?: Record<string, unknown>,
     query?: Record<string, string>,
+    timeoutMs?: number,
   ): Promise<unknown> {
     const { sessionID, runtimeToken } = await this.boundSession();
 
-    return this.request(method, path, { sessionID, runtimeToken, body, query });
+    return this.request(method, path, { sessionID, runtimeToken, body, query, timeoutMs });
   }
 }
 

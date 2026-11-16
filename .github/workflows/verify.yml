@@ -74,7 +74,7 @@ jobs:
 
   deploy:
     name: Deploy remote MCP to Cloudflare
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     needs: [server, studio, studio-windows]
     runs-on: ubuntu-latest
     environment: production
@@ -134,7 +134,7 @@ jobs:
 
   smoke:
     name: Verify live official MCP Skill and OAuth protection
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     needs: deploy
     runs-on: ubuntu-latest
     timeout-minutes: 5

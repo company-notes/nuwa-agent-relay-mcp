@@ -11,28 +11,30 @@
 1. **建立接線助理。** 在每個要使用的平台建立一位專用的 Nuwa 接線助理。已有 Nuwa 連線與 Skill 的平台直接沿用。
 2. **請它協助設定整間辦公室。** 把下面這段指令貼入接線助理：
 
-   > 請幫我把這個 AI 平台接上 Nuwa，讓辦公室目前的 AI 同事都能互相聯絡，也能接到其他平台的來電。請先閱讀官方 Nuwa 助理指南：https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md 。若已連接 Nuwa，就直接沿用。請盤點目前平台可辨識的同事，協助設定共用的接線入口；需要同事本人授權時，請引導有權的人核准，不能代替其他助理同意。最後清楚告訴我哪些同事已接通、哪些還缺設定。
+   > 請幫我把這個 AI 平台接上 Nuwa，讓辦公室目前的 AI 同事都能互相聯絡，也能接到其他平台的來電。請先閱讀官方 Nuwa 助理指南：https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md 。若已連接 Nuwa，就直接沿用。請盤點目前平台可辨識的同事，協助設定共用的接線入口；請使用辦公室管理授權建立或沿用每位同事的 Agent Address 和 Default Session，配置各自傳輸信箱與 Gateway 接線路由。每個辦公室共用一個 Wake；最後核對實際收件與雙向回覆。
 
 3. **找兩位真正的同事試通話。** 在[公開導覽](https://mcp.agent-relay.company-notes.com/start)填入兩位同事在 GrokBot、OpenMausBot 等平台顯示的**助理名稱**，網頁會產生四段可複製的自然語言指令。一般使用者不需要知道 Nuwa 地址。由 A 找 B、B 在原對話回覆、B 再主動找 A、A 回覆第二通。
 
 這是**預期的使用者體驗**。目前技術上已支援共用一個 Gateway Wake 入口與多位收件 Session，但還不能在任意平台完整做到「一次授權，自動開通所有現有同事」。不要把前端操作流程當成已完成實機驗收。
 
-## 技術接線現在實際能做到什麼？
+## 正常接線的技術契約
 
-**已實作：**
+1. Gateway 在一個已授權 Organization 下擁有自己的 Agent Address，
+   並透過一次配對建立本辦公室唯一的 Wake。
+2. Gateway 從平台可信 Bot 名單取得每位同事的顯示名稱和原生 Bot ID，
+   使用 `relayGatewayEnrollOfficeCoworkers` 一次登記整個辦公室。
+   Relay 建立或重用真實 Agent／Default Session、MailTrigger 信箱與接線路由。
+3. 其他辦公室的同事使用 `sendToAgent`，直接填入姓名、真實
+   Agent Address 或已驗證 Email 別名。Relay 在同一個請求中解析地址。
+4. 郵件確認收件後，Relay 只 Wake 收件辦公室的 Gateway。
+   Gateway 依 Relay 指定的 Bot ID 轉接一次，真正的收件 Bot 執行工作。
+5. 真正的收件同事使用自己的已驗證 Session 在原
+   `relayThreadID` 回覆；要主動新通話則直接再次使用 `sendToAgent`。
+   同一架構適用於任意兩個辦公室的雙向通話。
 
-- **一次呼叫即可通話**：`agentAddressEnsureIdentity` 在安裝時建立助理身分。正常發話時，助理只呼叫一次 `sendToAgent`，把使用者說的「大熊」當作收件對象；Relay 在同一個伺服器請求內查授權的 Agent Address 名冊並確定真正 Session，**不需要 Gateway 或 MCP 第二次查找**。同名、未註冊或沒有 Default Session 就拒絕，不猜地址。
-- 真正的助理傳訊：`sendToAgent` 開一段新 Relay 通話，`relayReplyThread` 在原通話回答。
-- 共用接收：Gateway 經驗證設定一次 Wake，只提供各位本平台同事的真實顯示名稱與可信 Bot ID；`relayGatewayInviteTeammate` 在 Relay 內部解析名稱並建立待批准邀請，**不需要 Gateway 另外查地址**。同事再用自己的 Session 透過 `relayGatewayApproveInvitation` 核准。多位經核准的同事共用這個 Wake，各自保有獨立 Bot ID 和對話關係。
-- 收件名單狀態：`relayGatewayTeammates` 顯示待批准／已啟用，並支援撤銷。邀請不等於啟用；送出不等於接聽。
-
-**距離「預設全部加入」還差：**
-
-1. **可靠的辦公室名單。** Agent Address 列的是整個 Organization 的 Nuwa Agent，尚無通用能力將它對應到某個平台上所有現有的原生 Bot ID。不能把其他辦公室的同事誤登記到這間辦公室。
-2. **全辦公室的一次性授權政策。** 現有權限設計仍要求每位真正收件者的 Session 獨立批准，Gateway 不能單方面替全部同事同意；要省略這一步，需要新增由真正有權的組織／平台管理者核准的批次委派與撤銷機制，而不是移除身分檢查。
-3. **真正的接收端驗收。** Webhook 回應成功不代表平台 Bot 已開始執行。OpenMausBot 第一次建立原生協作對話後的可信 Thread ID 回填仍需實機整合。
-
-這些缺口記錄在 [Gateway 整合邊界](GatewayOnboardingGap.md)，不應塞入第一次進站的使用者畫面。
+Agent Address 身分註冊與同事的 Runtime 發話權是兩個不同責任。
+平台端的可信 Bot 身分橋接負責驗證實際發話者，不能把 Gateway
+的 OAuth 或 Runtime 當成每個同事的授權。
 
 ## 測試時如何判斷成功？
 

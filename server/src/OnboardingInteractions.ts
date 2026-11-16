@@ -29,22 +29,32 @@ export const ONBOARDING_SCRIPT = `
 
   function gatewaySetup() {
     return [
-      '請幫我把這個 AI 平台接上 Nuwa，讓辦公室目前的 AI 同事都能互相聯絡，',
-      '也能接到其他平台的來電。你是接線助理，負責設定與轉接，不代替同事回答。',
+      '請為目前這個 AI 平台設定 Nuwa 辦公室總機，讓同一 Organization 的各辦公室',
+      '可以互相傳訊、委派工作及接續對話。',
       '',
-      '請先閱讀官方 Nuwa 助理指南：' + skillURL,
-      '檢查這個平台是否已連上 Nuwa：' + mcpURL,
-      '如果 Skill 和 MCP 已經裝好，直接沿用，不要重複安裝。',
+      '先閱讀官方 Nuwa Skill：' + skillURL,
+      'Nuwa MCP 入口：' + mcpURL,
       '',
-      '請盤點目前平台可辨識的同事，確認各自的平台顯示名稱與可信 Bot ID。',
-      '內部 Nuwa 地址請讓 Relay 自己確認，你不需要逐位呼叫工具查地址。',
-      '預設希望目前所有符合資格的同事都能接線，不要叫我逐一輸入同事名字。',
-      '請依照指南設定一次共用的收件入口，並處理能合法設定的接線對應。',
-      '若需要同事本人的授權，請逐一交由有權的助理批准，不能替他們同意。',
-      '如果平台無法自動查到同事或還沒有完成授權，請清楚列出缺口，',
-      '不要把「已找到同事」當成「已接通」。',
+      '你是本辦公室的 Gateway，負責一次完成接線設定與維護分機名錄。',
+      'Relay 通知你有來電時，使用平台原有的 Bot 傳訊能力，將訊息',
+      '轉交給 Relay 已指定的 Bot ID。由真正的同事閱讀、工作與回覆。',
       '',
-      '請每次只引導我完成下一個必要的設定，不要要求我貼密碼或私密憑證。'
+      '請依以下標準流程接入整間辦公室：',
+      '1. 使用本辦公室既有的 Nuwa Skill、MCP 和受權 Gateway 身分。',
+      '2. 由 Gateway 建立並驗證一個共用 Wake 接收入口。',
+      '3. 從平台可信 Bot 名錄盤點所有現有同事的顯示名稱與 Bot ID。',
+      '4. 以 Organization 的管理授權，為同事建立或沿用真正的 Agent Address、',
+      '   Default Session 與所需的 MailTrigger 傳輸信箱，登記 Bot ID 與收件路由。',
+      '5. 將各同事的來電統一交由本辦公室 Gateway 接收 Wake；由 Gateway',
+      '   精確轉交給被指定的同事，並保留每位同事各自的發話身分。',
+      '6. 核對名錄、地址、接線路由、真實 Bot 收件與原通話回覆，再回報接通名單。',
+      '',
+      '日常通訊時，同事可直接以姓名、Agent Address 或已驗證 Email 別名',
+      '呼叫 sendToAgent；Relay 在同一次請求內解析唯一收件者。',
+      '回覆已有通話時接續原 Relay Thread；發新通話時建立新的 Relay Thread。',
+      '',
+      '請從確認本辦公室 Gateway 接入狀態開始，每次只引導我完成下一項操作。',
+      '所有憑證使用平台的受保護授權流程，不在聊天中要求我輸入任何金鑰。'
     ].join('\\n');
   }
 
@@ -53,16 +63,16 @@ export const ONBOARDING_SCRIPT = `
       '請透過 Nuwa 找另一間辦公室的「' + colleagueName('colleagueB') +
         '」助理聊一下。',
       '告訴他：「你好，我們來測試通話，密語是星河。收到後請回覆密語。」',
-      '若有同名的助理或找不到人，先問我，不要猜測。'
+      '請由 Relay 解析同事的唯一地址，並將這則新通話送到正確的收件人。'
     ].join('\\n');
   }
 
   function replyPrompt() {
     return [
-      '如果你收到剛才「' + colleagueName('colleagueA') +
+      '請查收剛才「' + colleagueName('colleagueA') +
         '」助理傳來的測試訊息，',
-      '請直接在原本的對話回覆：「收到星河！」',
-      '如果還沒收到，就告訴我。'
+      '請用 Nuwa 接續原本的 Relay Thread 回覆：「收到星河！」',
+      '並確認寄件方在原本的通話收到這則回覆。'
     ].join('\\n');
   }
 
@@ -77,10 +87,10 @@ export const ONBOARDING_SCRIPT = `
 
   function verifyPrompt() {
     return [
-      '如果你收到「' + colleagueName('colleagueB') +
+      '請查收「' + colleagueName('colleagueB') +
         '」助理剛才主動打來的電話，',
-      '請在那段對話回覆：「收到月光！」',
-      '如果還沒收到，就告訴我。'
+      '請用 Nuwa 在那通 Relay Thread 回覆：「收到月光！」',
+      '並確認寄件方收到原通話的回覆。'
     ].join('\\n');
   }
 

@@ -4,13 +4,42 @@ import * as z from 'zod/v4';
 import { RelayAPIClient } from './APIClients';
 import { MCPToolSet } from './ToolSet';
 
-/** Gateways may invite; only the recipient's separate Runtime may approve. */
+/** The organization-owned office Gateway manages its own native Bot directory. */
 export class GatewayTools extends MCPToolSet {
   constructor(server: McpServer, private readonly client: RelayAPIClient) {
     super(server);
   }
 
   install(): void {
+    this.register('relayGatewayEnrollOfficeCoworkers',
+      'Register this office\'s native Bots in ONE user-authorized operation. ' +
+      'Use real platform display names and verified native Bot IDs from the platform directory. ' +
+      'The Relay creates or restores each real Organization Agent/Default Session, provisions ' +
+      'its transport mailbox, and attaches its incoming route to this Gateway\'s ONE verified Wake. ' +
+      'The returned addresses and routes are public metadata, never Runtime or Resume credentials.',
+      {
+        coworkers: z.array(z.object({
+          displayName: z.string().trim().min(1).max(120),
+          recipientBotID: z.string().regex(/^[A-Za-z0-9._:-]{1,192}$/),
+          threadMode: z.enum(['platform', 'explicit']),
+          firstContactMode: z.enum(['manual', 'automatic']).optional(),
+        })).min(1).max(25),
+      },
+      ({ coworkers }) => this.client.call('POST', '/v2/gateway-office-coworkers', {
+        coworkers: (coworkers as Array<{
+          displayName: string; recipientBotID: string; threadMode: string;
+          firstContactMode?: string;
+        }>).map((coworker) => ({
+          ...coworker, firstContactMode: coworker.firstContactMode ?? 'manual',
+        })),
+      }));
+
+    this.register('relayGatewayOfficeCoworkers',
+      'Read the real display names, trusted native Bot IDs, Agent Addresses ' +
+      'and receiving-route state for this Gateway\'s own Organization office.',
+      {},
+      () => this.client.call('GET', '/v2/gateway-office-coworkers'));
+
     this.register('relayGatewayTeammates',
       'List this Gateway Session\'s proposed and approved coworkers, including pending approvals. ' +
       'Use after office-wide discovery to report who is actually active; do not equate discovery ' +

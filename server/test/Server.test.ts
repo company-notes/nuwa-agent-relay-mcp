@@ -23,8 +23,9 @@ test('publishes the V2 Skill without exposing internal transport infrastructure'
   assert.match(expected, /^---\nname: nuwa-agent-relay\n/);
   assert.match(expected, /sendToAgent/);
   assert.match(expected, /relayVerifyWake/);
+  assert.match(expected, /relayGatewayEnrollOfficeCoworkers/);
   assert.match(expected, /nuwa\.wake\.verification/);
-  assert.doesNotMatch(expected, /MailTrigger|github\.com|\bHost\b|\bWork\b|work_address_id/);
+  assert.doesNotMatch(expected, /github\.com|\bHost\b|\bWork\b|work_address_id/);
 });
 
 test('OAuth discovery and missing token remain protected without a Session binding', async () => {
@@ -577,6 +578,51 @@ test('HTTP transport rejects redirects and escaped cross-origin paths', async ()
   assert.equal(requests.length, 1);
   await assert.rejects(client.request('GET', '//attacker.invalid/private'), /relative/);
   await assert.rejects(client.request('GET', '/\\attacker.invalid/private'), /escaped/);
+});
+
+test('Gateway enrolls the entire native Bot roster in one authorized MCP operation', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const schemas = JSON.stringify(await scenario.toolSchemas());
+    assert.match(schemas, /relayGatewayEnrollOfficeCoworkers/);
+    assert.match(schemas, /relayGatewayOfficeCoworkers/);
+    assert.doesNotMatch(schemas, /runtimeToken|resumeToken|signingSecret|bearerToken/);
+
+    const coworkers = [
+      { displayName: '雲朵', recipientBotID: 'native-cloud-001', threadMode: 'platform' },
+      { displayName: '小河', recipientBotID: 'native-river-002', threadMode: 'platform' },
+    ];
+    const enrolled = await scenario.tool('relayGatewayEnrollOfficeCoworkers', { coworkers });
+
+    assert.equal(enrolled.result.isError, undefined);
+    assert.equal(scenario.calls.length, 1);
+    assert.equal(scenario.calls[0].url.pathname, '/v2/gateway-office-coworkers');
+    assert.equal(scenario.calls[0].url.searchParams.get('session_id'), SESSION_A);
+    assert.equal(scenario.calls[0].headers.get('authorization'), 'Bearer oauth-a');
+    assert.equal(scenario.calls[0].headers.get('x-nuwa-runtime-token'), RUNTIME_SECRET);
+    assert.deepEqual(scenario.calls[0].body, {
+      coworkers: coworkers.map((bot) => ({ ...bot, firstContactMode: 'manual' })),
+    });
+
+    const listed = await scenario.tool('relayGatewayOfficeCoworkers', {});
+
+    assert.equal(listed.result.isError, undefined);
+    assert.equal(scenario.calls.at(-1)?.url.pathname, '/v2/gateway-office-coworkers');
+    assert.equal(scenario.calls.at(-1)?.url.searchParams.get('session_id'), SESSION_A);
+
+    const invalid = await scenario.tool('relayGatewayEnrollOfficeCoworkers', {
+      coworkers: [{ displayName: 'invalid', recipientBotID: 'bad bot id',
+        threadMode: 'platform' }],
+    });
+
+    assert.equal(invalid.result.isError, true);
+    assert.equal(scenario.calls.length, 2,
+      'Invalid native IDs must be rejected before contacting Relay.');
+  } finally {
+    scenario.restore();
+  }
 });
 
 test('Gateway can propose a real coworker and that coworker alone approves the office route', async () => {

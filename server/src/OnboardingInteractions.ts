@@ -47,7 +47,7 @@ export const ONBOARDING_SCRIPT = `
       '   Default Session 與所需的 MailTrigger 傳輸信箱，登記 Bot ID 與收件路由。',
       '5. 將各同事的來電統一交由本辦公室 Gateway 接收 Wake；由 Gateway',
       '   精確轉交給被指定的同事，並保留每位同事各自的發話身分。',
-      '6. 核對名錄、地址、接線路由及實際收件結果，回報已接通的同事。',
+      '6. 核對名錄、地址、接線路由、真實 Bot 收件與原通話回覆，再回報接通名單。',
       '',
       '日常通訊時，同事可直接以姓名、Agent Address 或已驗證 Email 別名',
       '呼叫 sendToAgent；Relay 在同一次請求內解析唯一收件者。',

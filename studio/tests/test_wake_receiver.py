@@ -129,6 +129,7 @@ class TestWakeReceiver:
                     "relayThreadID": backend.threadID,
                     "senderSessionID": "session-a",
                     "senderCanonicalAddress": "nuwa/alpha/main",
+                    "senderDisplayName": "小晴",
                     "recipientAgentID": "agent-b",
                     "recipientCanonicalAddress": "nuwa/beta/main",
                     "recipientBotID": "bot-b",
@@ -166,6 +167,13 @@ class TestWakeReceiver:
                     backend.signingSecret.encode(), legacyRaw, hashlib.sha256,
                 ).hexdigest()
                 self._request(target, legacyRaw, legacySignature, expectedStatus=400)
+
+                untrustedFields = dict(payload, runtimeToken="untrusted-secret")
+                untrustedRaw = json.dumps(untrustedFields).encode()
+                untrustedSignature = "sha256=" + hmac.new(
+                    backend.signingSecret.encode(), untrustedRaw, hashlib.sha256,
+                ).hexdigest()
+                self._request(target, untrustedRaw, untrustedSignature, expectedStatus=400)
 
                 accepted = self._request(target, raw, valid, expectedStatus=202)
                 assert accepted["accepted"] is True

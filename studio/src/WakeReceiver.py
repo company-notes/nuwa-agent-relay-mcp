@@ -30,7 +30,7 @@ class WakeReceiver:
         "relayThreadID", "senderSessionID", "senderCanonicalAddress",
         "recipientAgentID", "recipientCanonicalAddress", "recipientBotID", "body",
     }
-    OPTIONAL_DISPATCH_FIELDS = {"recipientPlatformThreadID"}
+    OPTIONAL_DISPATCH_FIELDS = {"recipientPlatformThreadID", "senderDisplayName"}
 
     def __init__(self, config: LocalConfig, client):
         self.config = config

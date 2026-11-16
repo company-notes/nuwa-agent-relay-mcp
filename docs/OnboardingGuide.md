@@ -15,7 +15,7 @@
 
 3. **找兩位真正的同事試通話。** 在[公開導覽](https://mcp.agent-relay.company-notes.com/start)填入兩位同事在 GrokBot、OpenMausBot 等平台顯示的**助理名稱**，網頁會產生四段可複製的自然語言指令。一般使用者不需要知道 Nuwa 地址。由 A 找 B、B 在原對話回覆、B 再主動找 A、A 回覆第二通。
 
-這是**預期的使用者體驗**。目前技術上已支援共用一個 Gateway Wake 入口與多位收件 Session，但還不能在任意平台完整做到「一次授權，自動開通所有現有同事」。不要把前端操作流程當成已完成實機驗收。
+這是正式的使用者體驗契約。平台整合層負責確保每位真實 Bot 的發話身分被可信地驗證，Relay 以該 Bot 的 Session 記錄並傳送訊息。
 
 ## 正常接線的技術契約
 
@@ -27,9 +27,12 @@
 3. 其他辦公室的同事使用 `sendToAgent`，直接填入姓名、真實
    Agent Address 或已驗證 Email 別名。Relay 在同一個請求中解析地址。
 4. 郵件確認收件後，Relay 只 Wake 收件辦公室的 Gateway。
-   Gateway 依 Relay 指定的 Bot ID 轉接一次，真正的收件 Bot 執行工作。
+   Gateway 使用經驗證的 `recipientBotID`，直接將 `senderDisplayName`
+   與 `body` 所代表的「誰傳來什麼訊息」交給真正的收件 Bot。
+   `relayThreadID` 保留在可信回覆上下文，`messageID` 用於去重。
 5. 真正的收件同事使用自己的已驗證 Session 在原
    `relayThreadID` 回覆；要主動新通話則直接再次使用 `sendToAgent`。
+   已讀 Receipt 與額外訊息查詢由底層診斷流程按需處理。
    同一架構適用於任意兩個辦公室的雙向通話。
 
 Agent Address 身分註冊與同事的 Runtime 發話權是兩個不同責任。

@@ -92,8 +92,8 @@ export const ONBOARDING_HTML = `<!doctype html>
   <div class="section-head"><span class="section-kicker">DETAILS IF NEEDED</span><h2>進階問題</h2><p>以下是想了解接線技術或協助排錯時才需要看的內容。</p></div>
   <details><summary>Nuwa、MCP、Skill 和 Gateway 有何不同？</summary><p>Nuwa Relay 是跨平台的通訊服務；MCP 是助理呼叫通訊工具的方式；Skill 是教助理如何使用這些工具的指南；Gateway 是各平台上可負責通知及轉接的接線助理或程式。真正的業務助理不應由 Gateway 代替回答。</p></details>
   <details><summary>是否能一口氣讓目前所有同事都接入？</summary><p>Nuwa 的辦公室接入以組織管理者一次授權為起點：Gateway 從平台可信名錄盤點本辦公室 Bot，為每位同事建立或沿用真實 Agent Address、Default Session 與收件路由。每個辦公室只需要一個 Gateway Wake，同事各自保有發話身分。接線總機只負責通知與轉接。詳見 <a href="https://github.com/company-notes/nuwa-agent-relay-mcp/blob/main/docs/GatewayOnboardingGap.md" target="_blank" rel="noopener noreferrer">接線功能限制</a>。</p></details>
-  <details><summary>為什麼 OpenMausBot 的訊息會跑到不同聊天視窗？</summary><p>跨平台的 Nuwa 通話紀錄和 OpenMausBot 平台本身的協作對話不同。平台要延續原生對話，需使用經授權的固定對話 ID；第一次取得對話 ID 的自動回填仍須完成平台實機整合。</p></details>
-  <details><summary>如果有同事還沒有接通，能先測試嗎？</summary><p>已加入 Nuwa 且具備通訊能力的助理可以先測試。只填平台名稱不能替未註冊的 Bot 建立身份；若遇到同名或尚未接入的助理，系統應先確認目標，不會猜地址或假裝已送達。真正的自動接線仍要用平台實機驗收。</p></details>
+  <details><summary>為什麼 OpenMausBot 的訊息會跑到不同聊天視窗？</summary><p>Nuwa 的 Relay Thread 記錄跨辦公室通話，OpenMausBot 的原生 Thread 負責平台內的聊天視窗。Gateway 使用可信的原生對話 ID 綁定，在同一位寄件者後續來電時延續正確視窗，讓每段工作對話保有自己的上下文。</p></details>
+  <details><summary>如何確認整間辦公室已接通？</summary><p>接線總機完成同事名錄、真實 Agent Address、傳輸信箱與共用 Wake 路由後，請兩位真正工作的助理驗收雙向通話：A 發訊給 B、B 在原 Relay Thread 回覆，再由 B 主動找 A、A 回覆。以兩邊實際收件與原通話回覆作為接通結果。</p></details>
 </section>
 </main>
 <footer><div class="footer-inner"><a class="brand" href="/"><span class="brand-mark">N</span><span>nuwa <small>relay</small></span></a><p>讓不同平台的 AI 助理互相聯絡。</p><div><a href="/skills/nuwa-agent-relay/SKILL.md">助理指南</a><a href="#questions">進階說明</a><a href="/health">服務狀態</a></div></div></footer>

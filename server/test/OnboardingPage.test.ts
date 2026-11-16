@@ -77,7 +77,7 @@ test('office-wide setup does not ask the user to register each coworker by hand'
   assert.match(ONBOARDING_HTML, /預設連接辦公室同事/);
   assert.match(ONBOARDING_HTML, /同事名稱與 Bot ID/);
   assert.match(ONBOARDING_HTML, /辦公室只需要一個 Gateway Wake/);
-  assert.match(ONBOARDING_HTML, /不用逐一登記名字/);
+  assert.match(ONBOARDING_HTML, /接線助理從平台名錄取得同事名稱與 Bot ID/);
   assert.match(ONBOARDING_HTML, /id="verifyPrompt"/);
   assert.match(ONBOARDING_HTML, /助理 A 的名稱/);
   assert.match(ONBOARDING_HTML, /助理 B 的名稱/);
@@ -105,8 +105,8 @@ test('real HTTP routes keep Skill and OAuth protected', async () => {
   }
 
   assert.doesNotThrow(() => new Script(ONBOARDING_SCRIPT));
-  assert.match(ONBOARDING_SCRIPT, /Nuwa 助理指南/);
-  assert.match(ONBOARDING_SCRIPT, /如果 Skill 和 MCP 已經裝好/);
+  assert.match(ONBOARDING_SCRIPT, /先閱讀官方 Nuwa Skill/);
+  assert.match(ONBOARDING_SCRIPT, /使用本辦公室既有的 Nuwa Skill、MCP/);
   assert.match(ONBOARDING_SCRIPT, /以 Organization 的管理授權/);
   assert.match(ONBOARDING_SCRIPT, /真正的 Agent Address/);
   assert.match(ONBOARDING_SCRIPT, /sendToAgent/);
@@ -185,12 +185,12 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   assert.match(gateway, /從平台可信 Bot 名錄盤點/);
   assert.match(gateway, /為同事建立或沿用真正的 Agent Address/);
   assert.doesNotMatch(gateway, /核對他們的 Nuwa 地址/);
-  assert.match(gateway, /如果 Skill 和 MCP 已經裝好/);
+  assert.match(gateway, /使用本辦公室既有的 Nuwa Skill、MCP/);
   assert.match(gateway, /共用 Wake 接收入口/);
   assert.match(gateway, /Organization 的管理授權/);
   assert.match(gateway, /MailTrigger 傳輸信箱/);
   assert.match(gateway, /姓名、Agent Address 或已驗證 Email 別名/);
-  assert.doesNotMatch(gateway, /小晴|大熊|Cosmo|nuwa\/xiaoqing|MailTrigger/);
+  assert.doesNotMatch(gateway, /小晴|大熊|Cosmo|nuwa\/xiaoqing/);
 
   const send = elements.get('sendPrompt')!.textContent;
   const reply = elements.get('replyPrompt')!.textContent;

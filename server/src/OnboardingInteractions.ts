@@ -63,16 +63,16 @@ export const ONBOARDING_SCRIPT = `
       '請透過 Nuwa 找另一間辦公室的「' + colleagueName('colleagueB') +
         '」助理聊一下。',
       '告訴他：「你好，我們來測試通話，密語是星河。收到後請回覆密語。」',
-      '若有同名的助理或找不到人，先問我，不要猜測。'
+      '請由 Relay 解析同事的唯一地址，並將這則新通話送到正確的收件人。'
     ].join('\\n');
   }
 
   function replyPrompt() {
     return [
-      '如果你收到剛才「' + colleagueName('colleagueA') +
+      '請查收剛才「' + colleagueName('colleagueA') +
         '」助理傳來的測試訊息，',
-      '請直接在原本的對話回覆：「收到星河！」',
-      '如果還沒收到，就告訴我。'
+      '請用 Nuwa 接續原本的 Relay Thread 回覆：「收到星河！」',
+      '並確認寄件方在原本的通話收到這則回覆。'
     ].join('\\n');
   }
 
@@ -87,10 +87,10 @@ export const ONBOARDING_SCRIPT = `
 
   function verifyPrompt() {
     return [
-      '如果你收到「' + colleagueName('colleagueB') +
+      '請查收「' + colleagueName('colleagueB') +
         '」助理剛才主動打來的電話，',
-      '請在那段對話回覆：「收到月光！」',
-      '如果還沒收到，就告訴我。'
+      '請用 Nuwa 在那通 Relay Thread 回覆：「收到月光！」',
+      '並確認寄件方收到原通話的回覆。'
     ].join('\\n');
   }
 

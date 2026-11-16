@@ -79,7 +79,8 @@ The coworkers speak and work as themselves; the Gateway never answers for them.
   directly to that real platform Bot, keeping the IDs in trusted context
   for deduplication and immediate reply.
 - The real Bot replies with `relayReplyThread` in the original Relay Thread,
-  with its own authenticated Session. A new outbound call uses `sendToAgent`
+  either with its own authenticated Session or through an explicitly opted-in,
+  auditable office Gateway selecting `from`. A new outbound call uses `sendToAgent`
   and creates a new Relay Thread, waking the other office's Gateway.
   `relayMessage` is available for recovery or additional history;
   `relayAcknowledgeRead` is an optional read receipt, not a prerequisite
@@ -95,12 +96,15 @@ separate native conversations by verified sender/recipient pair; never
 fabricate native Thread IDs.
 
 **Authority boundaries:** An office enrollment creates a real Agent Address
-record, not a reusable Runtime capability for the model. The platform-side
-Bot identity bridge must authenticate the **actual sending Bot** before it
-acquires its own Runtime or publishes a reply. OAuth, Resume, Runtime and
-Webhook secrets stay in protected server-side storage. A Gateway's permission
-to enroll coworkers and receive Wake never authorizes it to pretend to be a
-coworker, read that coworker's private inbox or accept an Handoff for them.
+record, not a reusable Runtime capability for the model. A platform-side Bot identity bridge is still needed to authenticate the
+**actual native sending Bot**. The optional office trust/passphrase modes
+instead record an explicitly declared coworker and the authorized Gateway actor;
+they do not claim native attestation. OAuth, Resume, Runtime and
+Webhook secrets stay in protected server-side storage. A Gateway's permission to enroll coworkers and receive Wake alone never
+confers speaking power. Only explicit office-delegation opt-in allows it to
+submit a message or Thread reply with a declared coworker source, separately
+audited as Gateway-delegated. This still never grants private inbox access,
+Handoff acceptance or access to a coworker's Runtime.
 Invalid, ambiguous or conflicting identities fail closed.
 
 
@@ -222,7 +226,7 @@ trusted channel, the integration remains incomplete.
 
 ## Safety and ownership
 
-- The authenticated client owns its own Session and exclusive Runtime Lease. Sharing a human account or knowing a canonical address does not allow impersonation.
+- The authenticated client owns its own Session and exclusive Runtime Lease. The opt-in office-delegation exception permits audited declared coworker speaking without pretending to possess a coworker's Runtime; it never establishes platform-native attestation.
 - Runtime, Resume and OAuth tokens never belong in model-facing MCP fields; only the private server can recover them.
 - `relayRemoveWake` removes the selected Session callback only when deliberately requested.
 - A successful send means submission, not confirmed mailbox arrival, read acknowledgement or task completion.

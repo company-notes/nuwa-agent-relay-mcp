@@ -10,6 +10,8 @@ export class RelayTools extends MCPToolSet {
     threadID: z.string().uuid(),
     body: z.string().min(1).max(100_000),
     to: z.string().min(1).max(255),
+    from: z.string().trim().min(1).max(255).optional(),
+    passphrase: z.string().min(16).max(128).optional(),
     subject: z.string().min(1).max(255),
     artifactLinks: z.array(z.url()).max(20).optional(),
   };
@@ -64,31 +66,41 @@ export class RelayTools extends MCPToolSet {
   }
 
   private registerMessageTools(): void {
-    const { to, body, subject, artifactLinks, threadID } = this.schemas;
+    const { to, from, passphrase, body, subject, artifactLinks, threadID } = this.schemas;
 
     this.register('sendToAgent',
       'Send to a canonical Agent/Session address OR the familiar display name of a ' +
       'registered coworker, creating a new Relay Thread. Relay resolves names in ' +
       'this SAME request; never call another MCP tool or ask Gateway to look up ' +
       'the destination. Ambiguous or unknown names are rejected before delivery. ' +
-      'Use relayReplyThread to continue an existing Thread; submission is not delivery.',
-      { to, message: body, subject: subject.optional(), artifactLinks },
-      ({ to, message, subject, artifactLinks }) =>
+      'Use relayReplyThread to continue an existing Thread; submission is not delivery. ' +
+      'When the owning office Gateway explicitly enabled delegation, optional from selects an ' +
+      'active coworker by name, verified Email or canonical address. The sender is auditable as ' +
+      'Gateway-delegated, not platform-attested. A configured coworker passphrase is mandatory; ' +
+      'do not claim model-visible passphrases prove native platform identity.',
+      { to, from, passphrase, message: body, subject: subject.optional(), artifactLinks },
+      ({ to, from, passphrase, message, subject, artifactLinks }) =>
         this.client.call('POST', '/v2/messages', {
           to, body: message,
+          ...(from ? { from } : {}),
+          ...(passphrase ? { passphrase } : {}),
           ...(subject ? { subject } : {}),
           ...(artifactLinks ? { artifactLinks } : {}),
         }));
 
     this.register('relayReplyThread',
       'Reply in the original Relay Thread as this actual Bot\'s authenticated Session. ' +
-      'Use the trusted relayThreadID forwarded by the office Gateway. A shared ' +
-      'Gateway OAuth binding never grants another Bot\'s speaking authority.',
-      { threadID, body, artifactLinks },
-      ({ threadID, body: text, artifactLinks }) =>
+      'Use the trusted relayThreadID forwarded by the office Gateway. ' +
+      'An explicitly enabled Gateway may select its active coworker through from, ' +
+      'with that coworker\'s optional configured passphrase. ' +
+      'The server records the Gateway actor separately and never asserts platform attestation.',
+      { threadID, from, passphrase, body, artifactLinks },
+      ({ threadID, from, passphrase, body: text, artifactLinks }) =>
         this.client.call('POST',
           '/v2/threads/' + encodeURIComponent(threadID as string) + '/messages',
-          { body: text, ...(artifactLinks ? { artifactLinks } : {}) }));
+          { body: text, ...(from ? { from } : {}),
+            ...(passphrase ? { passphrase } : {}),
+            ...(artifactLinks ? { artifactLinks } : {}) }));
   }
 
   private registerHandoffTools(): void {

@@ -130,6 +130,7 @@ class TestWakeReceiver:
                     "senderSessionID": "session-a",
                     "senderCanonicalAddress": "nuwa/alpha/main",
                     "senderDisplayName": "小晴",
+                    "senderAuthMode": "office-trust",
                     "recipientAgentID": "agent-b",
                     "recipientCanonicalAddress": "nuwa/beta/main",
                     "recipientBotID": "bot-b",

@@ -36,8 +36,14 @@
    同一架構適用於任意兩個辦公室的雙向通話。
 
 Agent Address 身分註冊與同事的 Runtime 發話權是兩個不同責任。
-平台端的可信 Bot 身分橋接負責驗證實際發話者，不能把 Gateway
-的 OAuth 或 Runtime 當成每個同事的授權。
+預設情況下，Gateway 不能代替同事發訊。辦公室管理者可選擇開啟
+`relayGatewayOfficeDelegation(enabled: true)`，允許用 `sendToAgent(from, to, message)`
+及 `relayReplyThread(from, threadID, body)` 指定已登記的同事。
+Relay 會保存實際執行的 Gateway Session 與宣告的同事 Session，並清楚記錄
+`office-trust` 或 `passphrase` 的認證級別，而非聲稱平台已驗證 Bot。
+同事可選設定暗語；一旦設定，每次發訊或回覆都必須驗證，省略不可繞過。
+GrokBot 共用 MCP 工具的模型可接觸暗語參數，因此暗語不是強平台身分保證。
+真正的原生 Bot 身分證明仍屬 Issue #39。
 
 ## 測試時如何判斷成功？
 

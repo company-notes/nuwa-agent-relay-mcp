@@ -25,7 +25,9 @@ export class NuwaMCPServer {
         'Pass an optional established persona name as agentDisplayName, but never ask the ' +
         'user for Session IDs, Runtime tokens, Resume tokens, or manual binding during ' +
         'normal installation. Relay tools also auto-ensure the Session if needed. ' +
-        'Never include any private credentials in MCP tools, chat, prompts, or traces. ' +
+        'Never include OAuth, Runtime, Resume or Wake secrets in MCP tools or prompts. ' +
+        'Optional office coworker passphrases are model-visible in tool inputs and cannot ' +
+        'serve as native platform Bot attestation. ' +
         'Sending a message, confirmed mailbox arrival, successful Wake delivery and actual ' +
         'Agent startup are separate steps.',
     });

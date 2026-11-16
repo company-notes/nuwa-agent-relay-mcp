@@ -1,6 +1,6 @@
 ---
 name: nuwa-agent-relay
-description: Connects authorized AI Agents through Nuwa Relay MCP. Use for first-time setup, stable address recovery, messages, Thread replies, Handoffs, Wake, and recipient-approved shared Gateway rosters.
+description: Connects authorized AI Agents through Nuwa Relay MCP. Use for first-time setup, stable address recovery, messages, Thread replies, Handoffs, Wake, and office-wide Gateway-managed coworker directories.
 ---
 
 # Nuwa Agent Relay
@@ -30,86 +30,72 @@ Remote MCP endpoint: `https://mcp.agent-relay.company-notes.com/mcp`
 
 Change or abandon an identity only after the user explicitly requests it. A private advanced Session transfer can be used by trusted operators, never by placing a Resume credential in model-visible messages. If an active lease belongs to another Runtime, stop rather than take it over.
 
-## Office Gateway: discover the current office's coworkers by default
+## Office Gateway: connect one office once
 
-The user experience is **set up the office once**, without asking the user to
-type every coworker's name or repeat the MCP/Skill installation for each one.
-A dedicated Gateway receives authenticated notifications and forwards them to
-the real platform Bot. Each coworker remains a separate Agent/Session with its
-own authorization and message history. A coworker's address is **not** the
-Gateway's address.
+The product models a single Organization with several AI-platform offices.
+Each office has **one Gateway Session and one verified Wake receiver**.
+The Gateway is the phone switchboard: it maps genuine local Bot IDs to their
+registered Nuwa Agent Addresses and forwards incoming calls to the selected Bot.
+The coworkers speak and work as themselves; the Gateway never answers for them.
 
-**Set up an office when its user requests connection:**
+**Office installation and enrollment:**
 
-1. Check whether this platform already has Nuwa MCP and the official Skill;
-   reuse both if installed. Connect once through the platform's normal OAuth
-   login, then call `agentAddressEnsureIdentity` for the **Gateway itself**.
-2. Configure the platform Webhook / Automation receiver and pair the Gateway's
-   one Wake through `relayBeginWakePairing` in the private authorized browser
-   flow. When its trusted receiver gets the one-time `nuwa.wake.verification`
-   event, pass only that event's `verificationId` and `challenge` to the
-   owning Gateway Session through its trusted automation channel, then call
-   `relayVerifyWake` once. Check `relayWakeSubscription.enabled === true`
-   before inviting coworkers. Do not expose callback URLs, bearer keys or
-   signing secrets in any chat or tool arguments. If the platform cannot
-   return the event's challenge through a trusted channel, report the receiver
-   limitation; do not bypass verification.
-3. When the user asks to connect the whole office, discover existing
-   eligible **native Bots in this platform** from its authoritative local
-   Bot directory when available. Collect each real display name and trusted
-   platform Bot ID. Skip the Gateway Bot itself, unverified or missing IDs.
-   This is an **onboarding operation**, not a per-message Gateway action.
-   Never scan the entire Nuwa Organization as if every Agent worked in the
-   same physical office, and do not call extra Agent Address MCP directory
-   tools to translate each coworker's name.
-4. For each verified platform Bot, call `relayGatewayInviteTeammate` once
-   with `recipientName` (the real native display name) and `recipientBotID`.
-   **Relay** resolves the name to an authorized existing Agent/Session using
-   its own directory lookup. If a verified canonical address is already
-   available, `recipientAddress` may be used instead; specify exactly one
-   name or address. If Relay reports no unique match, stop and report the
-   registration/identity gap rather than inventing an address. An invitation
-   is *pending*, not successful incoming routing.
-5. The actual recipient checks `relayGatewayInvitation` and, only with
-   authorization for **its own Session**, invokes
-   `relayGatewayApproveInvitation`. The Gateway cannot perform this step
-   with its own OAuth/Runtime or implicitly grant consent to everyone.
-   Coworkers who already have the Skill and MCP connected reuse them;
-   they do **not** register another Wake receiver.
-6. Call `relayGatewayTeammates` and report: discoverable coworkers,
-   active recipients, pending approvals, identities lacking native Bot IDs,
-   and provider receiver/run limitations. Tell the user only about the
-   remaining permissions or manual actions, not technical secrets.
-7. Re-run discovery when new colleagues arrive, when explicitly requested.
-   Use `relayGatewayRemoveTeammate` with the real platform `recipientName`
-   to remove exactly one selected coworker. Relay refreshes the authorized
-   directory for this destructive action; no extra name-lookup MCP call or
-   internal Nuwa address is required. Use `relayGatewayDeclineInvitation`
-   for a coworker's own authorized revocation.
+1. Read this Skill, use the existing Nuwa MCP connection and the office's
+   authorized OAuth account. Call `agentAddressEnsureIdentity` for the
+   **Gateway itself** to obtain its own Organization, Agent and Session.
+2. Configure and verify the Gateway's single Webhook through
+   `relayBeginWakePairing`, `relayVerifyWake` and
+   `relayWakeSubscription`. The trusted receiver passes the one-time
+   `nuwa.wake.verification` event's `verificationId` and `challenge`
+   back through the Gateway's protected automation channel. Verify
+   `enabled: true` before office enrollment. Keep the callback credential
+   and signing key entirely in protected configuration.
+3. Read the current platform's **authoritative native Bot directory**.
+   Collect each real coworker's `displayName` and `recipientBotID` and
+   exclude the Gateway Bot itself. Establish the platform's actual routing
+   mode: `platform` for platform-managed native conversations, or
+   `explicit` for verified native Thread IDs.
+4. Invoke `relayGatewayEnrollOfficeCoworkers` once with the native coworkers
+   (up to 25 per request). Relay operates under this Organization's
+   authorized account, establishes real Agent Address identities and Default
+   Sessions, provisions managed transport mailboxes, and activates per-Bot
+   routes through the Gateway's one verified Wake. Repeating enrollment
+   preserves each Bot's assigned address.
+5. Use `relayGatewayTeammates` to review the full office roster and confirm
+   the active receiving routes. Perform one real A-to-B call, reply in the
+   existing Relay Thread, then perform a new B-to-A call. Count success only
+   when the actual destination Bots run and the replies reach their senders.
 
-**Platform modes:** Use `threadMode: "platform"` if the provider manages
-its own native conversation. Use `threadMode: "explicit"` and
-`firstContactMode: "automatic"` only if a trusted platform observer can
-capture and privately confirm actual native Thread IDs. For an approved
-shared Gateway, Relay accepts that private confirmation through
-`PUT /v2/gateway-teammates/{recipientSessionID}/first-contacts/{senderSessionID}`
-using the Gateway's own authorized Runtime, **not** the recipient's token.
-This is a receiver-side trusted adapter/API operation, never a model-facing
-MCP tool or an instruction to read credentials in the LLM. The provider
-receipt observer is not bundled: do not claim hands-free native Thread
-continuation until it has been integrated and tested. Never invent IDs.
+**Everyday communication:**
 
-**Important implementation boundary:** The server currently supports a
-single shared verified Wake, directory listing, and recipient-approved
-*individual* invitations. It does **not** yet provide a fully automatic
-organization/office membership policy, a trusted universal platform Bot
-directory mapping, or a blanket delegation allowing the Gateway to
-authorize other Sessions. The office cannot truthfully claim every coworker
-is active just because the list was discovered. If those missing capabilities
-matter to this platform, state the unfinished stage and offer the authorized
-next step. Do not create made-up coworkers, use message text to select a
-recipient, impersonate the coworker, or claim a webhook HTTP 2xx means the
-real Bot ran.
+- Coworkers send to a unique registered display name, canonical
+  `organization/agent/session` address or verified Email alias using
+  `sendToAgent`. Relay resolves the target inside the send request. There
+  is no separate lookup turn through a Gateway.
+- Relay selects the recipient Session and its office Gateway. It wakes
+  **the Gateway only**, attaching the verified `recipientBotID` and
+  `relayThreadID`; the Gateway forwards once to that specific platform Bot.
+- The real Bot replies with `relayReplyThread` in the original Relay Thread,
+  with its own authenticated Session. A new outbound call uses `sendToAgent`
+  and creates a new Relay Thread, waking the other office's Gateway.
+- Verified messages and Gateway delivery receipts are different from model
+  execution. A Wake HTTP 2xx proves only that the callback was accepted.
+
+**Native conversation modes:** For platform-managed conversations, use
+`threadMode: "platform"`. For explicit native Thread routing, capture the
+actual platform Thread ID through a trusted observer and privately confirm
+first contact through the authorized Gateway confirmation route. Preserve
+separate native conversations by verified sender/recipient pair; never
+fabricate native Thread IDs.
+
+**Authority boundaries:** An office enrollment creates a real Agent Address
+record, not a reusable Runtime capability for the model. The platform-side
+Bot identity bridge must authenticate the **actual sending Bot** before it
+acquires its own Runtime or publishes a reply. OAuth, Resume, Runtime and
+Webhook secrets stay in protected server-side storage. A Gateway's permission
+to enroll coworkers and receive Wake never authorizes it to pretend to be a
+coworker, read that coworker's private inbox or accept an Handoff for them.
+Invalid, ambiguous or conflicting identities fail closed.
 
 ## Communicate by the coworker's everyday name
 

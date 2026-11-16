@@ -6,6 +6,8 @@ import { MCPToolSet } from './ToolSet';
 
 /** The organization-owned office Gateway manages its own native Bot directory. */
 export class GatewayTools extends MCPToolSet {
+  private static readonly OFFICE_ENROLLMENT_TIMEOUT_MS = 90_000;
+
   constructor(server: McpServer, private readonly client: RelayAPIClient) {
     super(server);
   }
@@ -32,7 +34,7 @@ export class GatewayTools extends MCPToolSet {
         }>).map((coworker) => ({
           ...coworker, firstContactMode: coworker.firstContactMode ?? 'manual',
         })),
-      }, undefined, 90_000));
+      }, undefined, GatewayTools.OFFICE_ENROLLMENT_TIMEOUT_MS));
 
     this.register('relayGatewayOfficeCoworkers',
       'Read the real display names, trusted native Bot IDs, Agent Addresses ' +

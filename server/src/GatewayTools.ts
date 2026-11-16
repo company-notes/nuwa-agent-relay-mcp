@@ -32,7 +32,7 @@ export class GatewayTools extends MCPToolSet {
         }>).map((coworker) => ({
           ...coworker, firstContactMode: coworker.firstContactMode ?? 'manual',
         })),
-      }));
+      }, undefined, 90_000));
 
     this.register('relayGatewayOfficeCoworkers',
       'Read the real display names, trusted native Bot IDs, Agent Addresses ' +

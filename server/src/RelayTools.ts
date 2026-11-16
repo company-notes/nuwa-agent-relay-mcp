@@ -81,7 +81,9 @@ export class RelayTools extends MCPToolSet {
         }));
 
     this.register('relayReplyThread',
-      'Reply inside an existing Relay Thread as the authorized bound Session.',
+      'Reply in the original Relay Thread as this actual Bot\'s authenticated Session. ' +
+      'Use the trusted relayThreadID forwarded by the office Gateway. A shared ' +
+      'Gateway OAuth binding never grants another Bot\'s speaking authority.',
       { threadID, body, artifactLinks },
       ({ threadID, body: text, artifactLinks }) =>
         this.client.call('POST',
@@ -125,7 +127,8 @@ export class RelayTools extends MCPToolSet {
         undefined, refreshArchive ? { refresh: 'archive' } : undefined));
 
     this.register('relayAcknowledgeRead',
-      'Explicitly acknowledge a received message as the bound Session.',
+      'Optional read receipt for this authenticated receiving Session. ' +
+      'Direct Wake delivery and replying to the original Thread do not require a read receipt.',
       { messageID },
       ({ messageID }) => this.client.call('PUT',
         '/v2/messages/' + encodeURIComponent(messageID as string) + '/read-receipt'));

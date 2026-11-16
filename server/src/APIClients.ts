@@ -1,4 +1,5 @@
 import type { Env } from './Env';
+import { Logger } from './Logger';
 
 export class APIError extends Error {
   constructor(
@@ -12,6 +13,8 @@ export class APIError extends Error {
 }
 
 export class HTTPAPIClient {
+  private static readonly logger = Logger.forModule('mcp.http');
+
   constructor(
     private readonly apiURL: string,
     private readonly authorization: string,
@@ -70,6 +73,12 @@ export class HTTPAPIClient {
         signal: AbortSignal.timeout(options.timeoutMs ?? 20_000),
       });
     } catch (error) {
+      HTTPAPIClient.logger.exception('backend_request_failed', error);
+
+      if (error instanceof APIError) {
+        throw error;
+      }
+
       if (error instanceof DOMException &&
         (error.name === 'TimeoutError' || error.name === 'AbortError')) {
         throw new APIError(504, 'backend_timeout',

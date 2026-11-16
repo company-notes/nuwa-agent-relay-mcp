@@ -77,7 +77,9 @@ The coworkers speak and work as themselves; the Gateway never answers for them.
   actual message content in `body`, `recipientBotID`, `messageID` and
   `relayThreadID`. Gateway forwards the sender name and message content
   directly to that real platform Bot, keeping the IDs in trusted context
-  for deduplication and immediate reply.
+  for deduplication and immediate reply. A trusted `senderAuthMode` field
+  distinguishes normal Session speaking from `office-trust` or `passphrase`
+  Gateway delegation; the latter two are **not** native Bot attestation.
 - The real Bot replies with `relayReplyThread` in the original Relay Thread,
   either with its own authenticated Session or through an explicitly opted-in,
   auditable office Gateway selecting `from`. A new outbound call uses `sendToAgent`

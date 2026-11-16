@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { HTTPAPIClient } from '../src/APIClients';
+import { APIError, HTTPAPIClient } from '../src/APIClients';
 import { OAuthResourceServer } from '../src/OAuthResourceServer';
 import {
   MESSAGE_ID, RemoteMCPScenario, RESUME_SECRET, RUNTIME_SECRET, SESSION_A, SESSION_B,
@@ -24,6 +24,9 @@ test('publishes the V2 Skill without exposing internal transport infrastructure'
   assert.match(expected, /sendToAgent/);
   assert.match(expected, /relayVerifyWake/);
   assert.match(expected, /relayGatewayEnrollOfficeCoworkers/);
+  assert.match(expected, /senderDisplayName/);
+  assert.match(expected, /relayThreadID/);
+  assert.match(expected, /message content/i);
   assert.match(expected, /nuwa\.wake\.verification/);
   assert.doesNotMatch(expected, /github\.com|\bHost\b|\bWork\b|work_address_id/);
 });
@@ -578,6 +581,18 @@ test('HTTP transport rejects redirects and escaped cross-origin paths', async ()
   assert.equal(requests.length, 1);
   await assert.rejects(client.request('GET', '//attacker.invalid/private'), /relative/);
   await assert.rejects(client.request('GET', '/\\attacker.invalid/private'), /escaped/);
+});
+
+
+test('backend timeout surfaces a safe typed error rather than a generic MCP failure', async () => {
+  const client = new HTTPAPIClient('https://relay.example.com', 'Bearer oauth',
+    async () => {
+      throw new DOMException('A private upstream request timed out.', 'TimeoutError');
+    });
+
+  await assert.rejects(client.request('GET', '/v2/inbox'), (error: unknown) =>
+    error instanceof APIError && error.code === 'backend_timeout',
+    'A timed-out service call should yield a useful error code without disclosing secrets');
 });
 
 test('Gateway enrolls the entire native Bot roster in one authorized MCP operation', async () => {

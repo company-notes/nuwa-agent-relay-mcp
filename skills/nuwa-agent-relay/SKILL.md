@@ -61,7 +61,7 @@ The coworkers speak and work as themselves; the Gateway never answers for them.
    Sessions, provisions managed transport mailboxes, and activates per-Bot
    routes through the Gateway's one verified Wake. Repeating enrollment
    preserves each Bot's assigned address.
-5. Use `relayGatewayTeammates` to review the full office roster and confirm
+5. Use `relayGatewayOfficeCoworkers` and `relayGatewayTeammates` to review the full office roster and confirm
    the active receiving routes. Perform one real A-to-B call, reply in the
    existing Relay Thread, then perform a new B-to-A call. Count success only
    when the actual destination Bots run and the replies reach their senders.

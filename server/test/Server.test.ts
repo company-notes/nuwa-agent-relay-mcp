@@ -708,3 +708,65 @@ test('Gateway can propose a real coworker and that coworker alone approves the o
     scenario.restore();
   }
 });
+
+
+test('office Gateway explicitly delegates a named coworker call and original Thread reply', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const schemas = JSON.stringify(await scenario.toolSchemas());
+    assert.match(schemas, /relayGatewayOfficeDelegation/);
+    assert.match(schemas, /relayGatewayCoworkerPassphrase/);
+
+    const activated = await scenario.tool('relayGatewayOfficeDelegation', { enabled: true });
+    assert.equal(activated.result.isError, undefined);
+    assert.equal(scenario.calls.at(-1)?.url.pathname, '/v2/gateway-office-delegation');
+
+    const enrolled = await scenario.tool('relayGatewayEnrollOfficeCoworkers', {
+      coworkers: [
+        { displayName: '小晴', recipientBotID: 'xiaoqing-native', threadMode: 'platform',
+          passphrase: 'xiaoqing-private-phrase-2026' },
+      ],
+    });
+    assert.equal(enrolled.result.isError, undefined);
+    assert.deepEqual(scenario.calls.at(-1)?.body, {
+      coworkers: [
+        { displayName: '小晴', recipientBotID: 'xiaoqing-native', threadMode: 'platform',
+          firstContactMode: 'manual', passphrase: 'xiaoqing-private-phrase-2026' },
+      ],
+    });
+
+    const called = await scenario.tool('sendToAgent', {
+      from: '小晴', passphrase: 'xiaoqing-private-phrase-2026',
+      to: '大熊', message: '請幫我確認 NUWA-GROK-01。',
+    });
+    assert.equal(called.result.isError, undefined);
+    assert.equal(scenario.calls.at(-1)?.url.pathname, '/v2/messages');
+    assert.deepEqual(scenario.calls.at(-1)?.body, {
+      from: '小晴', passphrase: 'xiaoqing-private-phrase-2026',
+      to: '大熊', body: '請幫我確認 NUWA-GROK-01。',
+    });
+
+    const replied = await scenario.tool('relayReplyThread', {
+      from: '小晴', passphrase: 'xiaoqing-private-phrase-2026',
+      threadID: THREAD_ID, body: '原 Thread 回覆。',
+    });
+    assert.equal(replied.result.isError, undefined);
+    assert.equal(scenario.calls.at(-1)?.url.pathname,
+      '/v2/threads/' + THREAD_ID + '/messages');
+    assert.deepEqual(scenario.calls.at(-1)?.body, {
+      from: '小晴', passphrase: 'xiaoqing-private-phrase-2026', body: '原 Thread 回覆。',
+    });
+
+    const rotated = await scenario.tool('relayGatewayCoworkerPassphrase', {
+      recipientBotID: 'xiaoqing-native', passphrase: 'xiaoqing-new-private-phrase-2026',
+    });
+    assert.equal(rotated.result.isError, undefined);
+    assert.equal(scenario.calls.at(-1)?.url.pathname,
+      '/v2/gateway-office-coworkers/xiaoqing-native/passphrase');
+    assert.equal(scenario.calls.at(-1)?.method, 'PUT');
+  } finally {
+    scenario.restore();
+  }
+});

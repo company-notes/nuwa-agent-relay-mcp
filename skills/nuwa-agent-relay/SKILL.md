@@ -72,12 +72,18 @@ The coworkers speak and work as themselves; the Gateway never answers for them.
   `organization/agent/session` address or verified Email alias using
   `sendToAgent`. Relay resolves the target inside the send request. There
   is no separate lookup turn through a Gateway.
-- Relay selects the recipient Session and its office Gateway. It wakes
-  **the Gateway only**, attaching the verified `recipientBotID` and
-  `relayThreadID`; the Gateway forwards once to that specific platform Bot.
+- Relay selects the recipient Session and its office Gateway. Its signed
+  Wake includes the trusted `senderDisplayName`, `senderCanonicalAddress`,
+  actual message content in `body`, `recipientBotID`, `messageID` and
+  `relayThreadID`. Gateway forwards the sender name and message content
+  directly to that real platform Bot, keeping the IDs in trusted context
+  for deduplication and immediate reply.
 - The real Bot replies with `relayReplyThread` in the original Relay Thread,
   with its own authenticated Session. A new outbound call uses `sendToAgent`
   and creates a new Relay Thread, waking the other office's Gateway.
+  `relayMessage` is available for recovery or additional history;
+  `relayAcknowledgeRead` is an optional read receipt, not a prerequisite
+  for understanding or answering a freshly forwarded message.
 - Verified messages and Gateway delivery receipts are different from model
   execution. A Wake HTTP 2xx proves only that the callback was accepted.
 
@@ -145,8 +151,11 @@ For a **dedicated shared office Gateway**, a signed callback's `recipientSession
 is the *coworker's* authorized Session, not the Gateway's. On **every incoming
 message** the Gateway should perform **zero MCP directory or routing calls**:
 validate the signed event, take the Relay-selected `recipientBotID` and
-`recipientPlatformThreadID` (when provided), and forward the event exactly
-once to that native Bot/conversation. Relay has already resolved names,
+`recipientPlatformThreadID` (when provided), and forward the actual message
+content (`body`) with the verified sender name (`senderDisplayName`) exactly
+once to that native Bot/conversation. Keep the `relayThreadID` available in
+the trusted reply context so the Bot can call `relayReplyThread` directly.
+Relay has already resolved names,
 permissions, sender identity and conversation mappings. Never call
 `agentAddressListAgents`, `agentAddressResolve` or `relayMessage` to
 figure out the intended recipient; never use the message body to select or

@@ -34,6 +34,12 @@ export class GatewayTools extends MCPToolSet {
         })),
       }));
 
+    this.register('relayGatewayOfficeCoworkers',
+      'Read the real display names, trusted native Bot IDs, Agent Addresses ' +
+      'and receiving-route state for this Gateway\'s own Organization office.',
+      {},
+      () => this.client.call('GET', '/v2/gateway-office-coworkers'));
+
     this.register('relayGatewayTeammates',
       'List this Gateway Session\'s proposed and approved coworkers, including pending approvals. ' +
       'Use after office-wide discovery to report who is actually active; do not equate discovery ' +

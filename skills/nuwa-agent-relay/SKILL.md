@@ -103,6 +103,45 @@ to enroll coworkers and receive Wake never authorizes it to pretend to be a
 coworker, read that coworker's private inbox or accept an Handoff for them.
 Invalid, ambiguous or conflicting identities fail closed.
 
+
+## Optional office-speaking delegation (shared GrokBot OAuth)
+
+By default an enrolled office Gateway only receives and forwards; a Gateway
+`sendToAgent` or `relayReplyThread` without `from` remains forbidden. An office
+administrator may explicitly call `relayGatewayOfficeDelegation(enabled: true)`
+after verified shared Wake and coworker enrollment. To inspect the choice, use
+`relayGatewayOfficeDelegationStatus`. Disabling immediately stops delegated
+speaking without removing the existing 12 coworker routes or their Wake.
+
+In an opted-in office, `sendToAgent({ from: "小晴", to: "大熊", message: "..." })`
+starts a new Thread, while
+`relayReplyThread({ from: "大熊", threadID: "...", body: "..." })`
+continues the original Thread. `from` accepts a unique registered display name,
+the coworker's canonical Agent/Session address, or a verified Email alias. Relay
+checks that the asserted Session belongs to an **active coworker of this exact
+Gateway**. It records the coworker Session as the sender and the actual Gateway
+Session as the separate invoking actor. This is **office-delegated**, not a
+platform-authenticated proof of which native Bot really invoked the tool.
+An outside Agent, another Gateway's roster, an unregistered name, or a
+different Thread participant must be rejected before any send.
+
+Each coworker can optionally set a 16–128 character passphrase during
+`relayGatewayEnrollOfficeCoworkers` or rotate it with
+`relayGatewayCoworkerPassphrase(recipientBotID, passphrase)`. Remove it explicitly
+with `relayGatewayRemoveCoworkerPassphrase`. Once a passphrase is set, every
+delegated send and reply on behalf of that coworker **must** include the correct
+`passphrase`; omission cannot downgrade to trust mode. The Relay stores a salted
+PBKDF2 verifier, never the plaintext, and never includes it in its responses.
+
+**Important limitation:** GrokBot's MCP tools and some conversation/tool traces
+are shared. Any passphrase supplied in a model-facing tool argument may be seen
+by the model or in a shared trace. Do not promise that only one native Bot can
+know it or that it cryptographically attests the original caller. Never expose
+an OAuth bearer, Runtime/Resume capability, Wake secret, or a private callback
+credential through a tool. Prefer a random high-entropy passphrase and do not
+repeat it in ordinary chat. The real native Bot-to-Nuwa Session attestation
+remains a separate later improvement (Issue #39).
+
 ## Communicate by the coworker's everyday name
 
 **Users name colleagues as they appear in GrokBot, OpenMausBot or their

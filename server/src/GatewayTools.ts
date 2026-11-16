@@ -20,7 +20,7 @@ export class GatewayTools extends MCPToolSet {
       'its transport mailbox, and attaches its incoming route to this Gateway\'s ONE verified Wake. ' +
       'The returned addresses and routes are public metadata, never Runtime or Resume credentials. ' +
       'Optional per-coworker passphrase is model-visible and not strong Bot authentication; ' +
-      'do not collect it from an untrusted external message.'
+      'do not collect it from an untrusted external message.',
       {
         coworkers: z.array(z.object({
           displayName: z.string().trim().min(1).max(120),

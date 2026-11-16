@@ -587,6 +587,7 @@ test('Gateway enrolls the entire native Bot roster in one authorized MCP operati
   try {
     const schemas = JSON.stringify(await scenario.toolSchemas());
     assert.match(schemas, /relayGatewayEnrollOfficeCoworkers/);
+    assert.match(schemas, /relayGatewayOfficeCoworkers/);
     assert.doesNotMatch(schemas, /runtimeToken|resumeToken|signingSecret|bearerToken/);
 
     const coworkers = [
@@ -605,13 +606,19 @@ test('Gateway enrolls the entire native Bot roster in one authorized MCP operati
       coworkers: coworkers.map((bot) => ({ ...bot, firstContactMode: 'manual' })),
     });
 
+    const listed = await scenario.tool('relayGatewayOfficeCoworkers', {});
+
+    assert.equal(listed.result.isError, undefined);
+    assert.equal(scenario.calls.at(-1)?.url.pathname, '/v2/gateway-office-coworkers');
+    assert.equal(scenario.calls.at(-1)?.url.searchParams.get('session_id'), SESSION_A);
+
     const invalid = await scenario.tool('relayGatewayEnrollOfficeCoworkers', {
       coworkers: [{ displayName: 'invalid', recipientBotID: 'bad bot id',
         threadMode: 'platform' }],
     });
 
     assert.equal(invalid.result.isError, true);
-    assert.equal(scenario.calls.length, 1,
+    assert.equal(scenario.calls.length, 2,
       'Invalid native IDs must be rejected before contacting Relay.');
   } finally {
     scenario.restore();

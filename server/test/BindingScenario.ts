@@ -68,7 +68,7 @@ class MemoryStatement implements BindingStatement {
         return { meta: { changes: 0 } };
       }
 
-      current.expiresAt = expiresAt;
+      current.expiresAt = current.expiresAt > expiresAt ? current.expiresAt : expiresAt;
 
       return { meta: { changes: 1 } };
     }
@@ -127,6 +127,7 @@ export class RemoteMCPScenario {
   readonly displayNameUpdates: Array<{ agentID: string; name: string; principal: string }> = [];
   registerOrganizationCount = 0;
   heartbeatCount = 0;
+  relayLeaseChecks = 0;
   grantLookups = 0;
   statusLookups = 0;
   statusDelayMS = 0;
@@ -192,6 +193,8 @@ export class RemoteMCPScenario {
               account: { email: 'user@example.com' },
               organization: this.organizationExists
                 ? { id: this.organizationID, slug: 'nuwa' } : null,
+              ...(url.searchParams.get('include_grant') === '1'
+                ? { grantFingerprint: principal } : {}),
             },
           });
         }
@@ -365,12 +368,25 @@ export class RemoteMCPScenario {
       }
 
       assert.equal(url.origin, this.env.RELAY_API_URL);
+      this.relayLeaseChecks += 1;
+      const sessionID = url.searchParams.get('session_id') ?? '';
+      const runtime = this.activeLeases.get(sessionID);
+
+      if (!runtime || headers.get('x-nuwa-runtime-token') !== runtime) {
+        return Response.json({ ok: false, error: { code: 'runtime_not_owner' } }, {
+          status: 409,
+        });
+      }
+
       this.calls.push({ url, headers, body });
 
       return Response.json({ ok: true, data: {
         id: MESSAGE_ID, threadId: THREAD_ID,
         recentThreadMessages: [{ body: 'Previous context' }],
-      } }, { status: init?.method === 'POST' ? 201 : 200 });
+      } }, {
+        status: init?.method === 'POST' ? 201 : 200,
+        headers: { 'x-nuwa-lease-expires-at': new Date(Date.now() + 15 * 60_000).toISOString() },
+      });
     };
   }
 

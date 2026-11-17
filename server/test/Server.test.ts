@@ -108,11 +108,13 @@ test('user binds a Session privately; Remote MCP sends with encrypted Runtime le
   }
 });
 
-test('a normal MCP send renews its Runtime with one grant lookup, not a second lookup', async () => {
+test('successive messages reuse the request account status without skipping Runtime verification', async (context) => {
   const scenario = new RemoteMCPScenario();
   scenario.install();
 
   try {
+    scenario.statusDelayMS = 50;
+    const started = performance.now();
     const first = await scenario.tool('sendToAgent', {
       to: '大熊', message: 'The first message should not repeat grant verification.',
     });
@@ -120,6 +122,7 @@ test('a normal MCP send renews its Runtime with one grant lookup, not a second l
     assert.equal(first.result.isError, undefined);
     assert.equal(scenario.grantLookups, 1);
     assert.equal(scenario.claimCount, 1);
+    assert.equal(scenario.statusLookups, 1, 'The first request must reuse its verified account status.');
 
     const second = await scenario.tool('sendToAgent', {
       to: '大熊', message: 'The next request must still authenticate separately.',
@@ -131,6 +134,15 @@ test('a normal MCP send renews its Runtime with one grant lookup, not a second l
     assert.equal(scenario.heartbeatCount, 1,
       'The existing Runtime lease must still be verified.');
     assert.equal(scenario.calls.length, 2);
+    context.diagnostic('Two sends with simulated 50 ms status latency: ' +
+      (performance.now() - started).toFixed(1) + ' ms; status calls: ' + scenario.statusLookups);
+    assert.equal(scenario.statusLookups, 2,
+      'One Account Status per HTTP request; never reuse it across requests.');
+
+    for (const call of scenario.calls) {
+      assert.equal(call.url.searchParams.get('session_id'), SESSION_A);
+      assert.equal(call.headers.get('x-nuwa-runtime-token'), RUNTIME_SECRET);
+    }
   } finally {
     scenario.restore();
   }

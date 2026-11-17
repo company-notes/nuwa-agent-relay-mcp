@@ -31,6 +31,8 @@ export class NuwaMCPServer {
         'without re-enrolling. Never create a replacement office identity to fix a failure. ' +
         'Use one sendToAgent or relayReplyThread call with your own enrolled from on a shared ' +
         'office connection. Use forwarded message content directly; only fetch history if needed. ' +
+        'Call directly when the schema is available, following required platform tool discovery. ' +
+        'Forward the original Thread ID in a ready-to-use relayReplyThread call format. ' +
         'For ordinary office Wake, dispatch once to recipientBotID using the native tool, ' +
         'with zero MCP lookups or extra routing decisions, then stop. ' +
         'Sending a message, confirmed mailbox arrival, successful Wake delivery and actual ' +

@@ -32,6 +32,11 @@ test('publishes the V2 Skill without exposing internal transport infrastructure'
   assert.match(expected, /agentAddressSelectSession/);
   assert.match(expected, /relayReplyThread\(\{from:/);
   assert.match(expected, /Do not fetch it again/);
+  assert.match(expected, /Call the tool directly when its schema is available/);
+  assert.match(expected, /Forward a ready-to-use reply call/);
+  assert.match(expected, /relayReplyThread\(\{from: "<recipient's full registered name>", threadID: "<actual relayThreadID>", body: "<reply>"\}\)/);
+  assert.match(expected, /platform-required\s+tool discovery/);
+  assert.match(expected, /Omit `from` on an independent connection/);
   assert.doesNotMatch(expected, /github\.com|\bHost\b|\bWork\b|work_address_id/);
 });
 

@@ -42,7 +42,9 @@ export const ONBOARDING_SCRIPT = `
       '   批次完成全部同事的接入，沿用既有地址與名錄。',
       '4. 收到正常 Wake 時，依 recipientBotID 使用平台原生工具轉交一次，',
       '   完整轉交正文、寄件者及原 Relay Thread 回覆上下文，讓本人依 Skill 回覆。',
-      '   零 MCP 查詢，提交後結束。',
+      '   附上 relayReplyThread({from, threadID, body}) 的呼叫格式，',
+      '   帶入實際 Thread ID 與收件者自己的完整登記名稱（已知時），由同事填回覆正文。',
+      '   獨立連線省略 from；平台允許時直接呼叫。Gateway 零 MCP 查詢，提交後結束。',
       '5. 回報 Gateway 地址、Wake 狀態及已接入同事名單。'
     ].join('\\n');
   }

@@ -49,11 +49,13 @@ assert.match(promptText, /唯一的 Wake 接收例行任務並完成驗證/);
 assert.match(promptText, /接收入口或金鑰變更時，以同一 Gateway 身分重新配對/);
 assert.match(promptText, /recipientBotID 使用平台原生工具轉交一次/);
 assert.match(promptText, /零 MCP 查詢，提交後結束/);
+assert.match(promptText, /relayReplyThread\(\{from, threadID, body\}\)/);
+assert.match(promptText, /平台允許時直接呼叫/);
 assert.doesNotMatch(promptText, /MailTrigger|Default Session|agentAddressSelectSession/);
 assert.match(promptText, /colleagueA/);
 assert.match(promptText, /colleagueB/);
 assert.doesNotMatch(promptText, /addressA|addressB|先填入這位助理真正的 Nuwa 地址/);
-assert.doesNotMatch(promptText, /relayReplyThread|relayProvisionAgentMailbox/,
+assert.doesNotMatch(promptText, /relayProvisionAgentMailbox/,
   'Public user prompts should not expose internal tool implementation details.');
 
 const styles = await request('/start.css');
@@ -68,6 +70,8 @@ assert.match(skillText, /No preliminary directory lookup/);
 assert.match(skillText, /Zero MCP calls for ordinary office Wake dispatch/);
 assert.match(skillText, /agentAddressSelectSession/);
 assert.match(skillText, /relayReplyThread/);
+assert.match(skillText, /Forward a ready-to-use reply call/);
+assert.match(skillText, /Call the tool directly when its schema is available/);
 assert.doesNotMatch(skillText, /agentAddressFindByName/,
   'Name resolution must not add a second MCP tool call.');
 assert.doesNotMatch(skillText, /human provides the Session ID|access token and loses the binding/i);

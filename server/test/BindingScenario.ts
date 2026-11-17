@@ -197,6 +197,43 @@ export class RemoteMCPScenario {
           }, { status: 201 });
         }
 
+        if (url.pathname === '/v2/account/addresses' && init?.method === 'GET') {
+          const address = url.searchParams.get('address');
+
+          if (address !== 'nuwa/reviewer-a/main') {
+            return Response.json({ ok: false, error: { code: 'session_not_found' } }, {
+              status: 404,
+            });
+          }
+
+          return Response.json({ ok: true, data: {
+            id: SESSION_A,
+            canonical: address,
+            runtime: this.activeLeases.has(SESSION_A)
+              ? { expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() }
+              : null,
+          } });
+        }
+
+        if (url.pathname === '/v2/account/sessions/' + SESSION_A + '/owner-runtime-lease' &&
+            init?.method === 'PUT') {
+          if (this.activeLeases.has(SESSION_A)) {
+            return Response.json({ ok: false, error: { code: 'session_in_use' } }, {
+              status: 409,
+            });
+          }
+
+          const runtime = RUNTIME_SECRET + '_recovered';
+          this.activeLeases.set(SESSION_A, runtime);
+
+          return Response.json({ ok: true, data: {
+            session: { id: SESSION_A, canonical: 'nuwa/reviewer-a/main' },
+            runtimeToken: runtime,
+            resumeToken: RESUME_SECRET + '_owner',
+            leaseExpiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+          } });
+        }
+
         if (url.pathname === '/v2/account/agent-runtime-leases' && init?.method === 'POST') {
           if (!this.organizationExists) {
             return Response.json({ ok: false, error: { code: 'organization_required' } }, {

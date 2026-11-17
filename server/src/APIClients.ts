@@ -90,11 +90,13 @@ export class HTTPAPIClient {
         'Backend connection failed. Check its progress before retrying.');
     }
 
-    if (response.ok && options.onResponse) {
+    const result = await this.readResponse(response);
+
+    if (options.onResponse) {
       await options.onResponse(response);
     }
 
-    return this.readResponse(response);
+    return result;
   }
 
   protected async readResponse(response: Response): Promise<unknown> {
@@ -184,8 +186,8 @@ export class AddressAPIClient extends HTTPAPIClient {
     super(env.ADDRESS_API_URL, authorization, requester);
   }
 
-  private accountSnapshot(): Promise<Record<string, unknown>> {
-    this.verifiedAccount ??= this.readResponse(this.verifiedStatus!) as
+  private accountSnapshot(response: Response): Promise<Record<string, unknown>> {
+    this.verifiedAccount ??= this.readResponse(response) as
       Promise<Record<string, unknown>>;
 
     return this.verifiedAccount;
@@ -197,7 +199,7 @@ export class AddressAPIClient extends HTTPAPIClient {
     }
 
     this.statusConsumed = true;
-    const { grantFingerprint, ...status } = await this.accountSnapshot();
+    const { grantFingerprint, ...status } = await this.accountSnapshot(this.verifiedStatus);
 
     return status;
   }
@@ -207,7 +209,7 @@ export class AddressAPIClient extends HTTPAPIClient {
       return this.request('GET', '/v2/account/grant');
     }
 
-    const { grantFingerprint } = await this.accountSnapshot();
+    const { grantFingerprint } = await this.accountSnapshot(this.verifiedStatus);
 
     return { grantFingerprint };
   }

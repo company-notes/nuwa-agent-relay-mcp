@@ -37,7 +37,6 @@ export class GatewayTools extends MCPToolSet {
         })),
       }, undefined, GatewayTools.OFFICE_ENROLLMENT_TIMEOUT_MS));
 
-
     this.register('relayGatewayOfficeCoworkers',
       'Read the real display names, trusted native Bot IDs, Agent Addresses ' +
       'and receiving-route state for this Gateway\'s own Organization office.',

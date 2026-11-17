@@ -368,11 +368,11 @@ export class SessionBindings {
     };
     const existing = await this.row(key);
 
-    if (existing?.sessionID === target.id) {
-      return this.ensure(authorization);
-    }
-
     if (target.runtime && Date.parse(target.runtime.expiresAt) > Date.now()) {
+      if (existing?.sessionID === target.id) {
+        return this.ensure(authorization);
+      }
+
       throw new APIError(409, 'session_in_use',
         'The requested Session is still in use.');
     }

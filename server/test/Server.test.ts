@@ -359,8 +359,16 @@ test('new OAuth grant reselects its idle original Gateway Session without re-enr
     assert.equal(scenario.calls[1].url.pathname, '/v2/threads/' + THREAD_ID + '/messages');
     assert.equal(scenario.calls[1].url.searchParams.get('session_id'), SESSION_A);
     assert.deepEqual(scenario.calls[1].body, { from: '小安', body: '小晴，收到。' });
-    assert.equal(scenario.calls.length, 2,
-      'Address recovery, send and reply must not enroll coworkers or change Wake.');
+    const message = await scenario.tool('relayMessage', {
+      from: '小晴', messageID: MESSAGE_ID, contextLimit: 8,
+    }, 'oauth-b');
+    assert.equal(message.result.isError, undefined);
+    assert.equal(scenario.calls[2].url.pathname, '/v2/messages/' + MESSAGE_ID);
+    assert.equal(scenario.calls[2].url.searchParams.get('session_id'), SESSION_A);
+    assert.equal(scenario.calls[2].url.searchParams.get('from'), '小晴');
+    assert.equal(scenario.calls[2].url.searchParams.get('context_limit'), '8');
+    assert.equal(scenario.calls.length, 3,
+      'Address recovery, send, reply and read need no new office configuration.');
   } finally {
     scenario.restore();
   }

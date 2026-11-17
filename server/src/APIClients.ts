@@ -179,32 +179,35 @@ export class AddressAPIClient extends HTTPAPIClient {
     env: Env,
     authorization: string,
     requester: typeof fetch = (input, init) => env.ADDRESS_WORKER.fetch(input, init),
-    verifiedStatus?: Response,
+    private readonly verifiedStatus?: Response,
   ) {
     super(env.ADDRESS_API_URL, authorization, requester);
+  }
 
-    if (verifiedStatus) {
-      this.verifiedAccount = this.readResponse(verifiedStatus) as Promise<Record<string, unknown>>;
-    }
+  private accountSnapshot(): Promise<Record<string, unknown>> {
+    this.verifiedAccount ??= this.readResponse(this.verifiedStatus!) as
+      Promise<Record<string, unknown>>;
+
+    return this.verifiedAccount;
   }
 
   async status(): Promise<unknown> {
-    if (!this.verifiedAccount || this.statusConsumed) {
+    if (!this.verifiedStatus || this.statusConsumed) {
       return this.request('GET', '/v2/account/status');
     }
 
     this.statusConsumed = true;
-    const { grantFingerprint, ...status } = await this.verifiedAccount;
+    const { grantFingerprint, ...status } = await this.accountSnapshot();
 
     return status;
   }
 
   async grant(): Promise<unknown> {
-    if (!this.verifiedAccount) {
+    if (!this.verifiedStatus) {
       return this.request('GET', '/v2/account/grant');
     }
 
-    const { grantFingerprint } = await this.verifiedAccount;
+    const { grantFingerprint } = await this.accountSnapshot();
 
     return { grantFingerprint };
   }

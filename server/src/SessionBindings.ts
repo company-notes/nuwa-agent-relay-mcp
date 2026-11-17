@@ -101,6 +101,75 @@ export class SessionBindings {
     };
   }
 
+  private async persist(
+    key: string, organization: { id: string; slug: string }, claim: ClaimResponse,
+  ): Promise<BindingRow> {
+    if (!claim.session?.id || !SessionBindings.SESSION_ID.test(claim.session.id) ||
+        !claim.resumeToken?.startsWith('resume_')) {
+      throw new APIError(502, 'invalid_claim_result',
+        'Agent Address returned incomplete private Session credentials.');
+    }
+
+    SessionBindings.checkLease(claim, claim.session.id, organization.slug);
+
+    const encryptedRuntime = await this.tokenCipher.encrypt(
+      claim.runtimeToken, key, claim.session.id,
+    );
+    const encryptedResume = await this.tokenCipher.encrypt(
+      claim.resumeToken, 'resume:' + key, claim.session.id,
+    );
+    const inserted = await this.env.BINDINGS_DB.prepare(
+      `INSERT OR IGNORE INTO remote_session_bindings
+        (grant_fingerprint, organization_id, session_id, canonical_address,
+         encrypted_runtime_token, encrypted_resume_token, expires_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(key, organization.id, claim.session.id,
+      claim.session.canonical, encryptedRuntime, encryptedResume,
+      claim.leaseExpiresAt, new Date().toISOString()).run();
+
+    if (inserted.meta.changes !== 1) {
+      throw new APIError(409, 'session_provisioning_race',
+        'A Session was bound by another request. Retry without changing identity.');
+    }
+
+    return {
+      sessionID: claim.session.id,
+      organizationID: organization.id,
+      canonicalAddress: claim.session.canonical,
+      encryptedRuntimeToken: encryptedRuntime,
+      encryptedResumeToken: encryptedResume,
+      expiresAt: claim.leaseExpiresAt,
+    };
+  }
+
+  private async releaseBinding(
+    client: AddressAPIClient, key: string, row: BindingRow,
+  ): Promise<boolean> {
+    const runtimeToken = await this.tokenCipher.decrypt(
+      row.encryptedRuntimeToken, key, row.sessionID,
+    );
+
+    if (row.expiresAt > new Date().toISOString()) {
+      try {
+        await client.release(row.sessionID, runtimeToken);
+      } catch (error) {
+        if (!(error instanceof APIError) || error.status !== 409 ||
+            error.code !== 'runtime_not_owner') {
+          throw error;
+        }
+
+        SessionBindings.logger.error('stale_lease_binding_revoked', { status: error.status });
+      }
+    }
+
+    const deleted = await this.env.BINDINGS_DB.prepare(
+      `DELETE FROM remote_session_bindings
+        WHERE grant_fingerprint = ? AND encrypted_runtime_token = ?`,
+    ).bind(key, row.encryptedRuntimeToken).run();
+
+    return deleted.meta.changes === 1;
+  }
+
   private async renew(
     client: AddressAPIClient, key: string, row: BindingRow,
     organizationSlug: string,
@@ -258,51 +327,9 @@ export class SessionBindings {
     ) as ClaimResponse;
 
     try {
-      if (!created.session?.id || !SessionBindings.SESSION_ID.test(created.session.id) ||
-          !created.resumeToken?.startsWith('resume_')) {
-        throw new APIError(502, 'invalid_claim_result',
-          'Agent Address returned incomplete private Session credentials.');
-      }
+      const row = await this.persist(key, status.organization, created);
 
-      SessionBindings.checkLease(created, created.session.id, status.organization.slug);
-
-      if (!created.resumeToken) {
-        throw new APIError(502, 'invalid_claim_result',
-          'Agent Address returned incomplete private Session credentials.');
-      }
-
-      const encryptedRuntime = await this.tokenCipher.encrypt(
-        created.runtimeToken, key, created.session.id,
-      );
-      const encryptedResume = await this.tokenCipher.encrypt(
-        created.resumeToken, 'resume:' + key, created.session.id,
-      );
-      const inserted = await this.env.BINDINGS_DB.prepare(
-        `INSERT OR IGNORE INTO remote_session_bindings
-          (grant_fingerprint, organization_id, session_id, canonical_address,
-           encrypted_runtime_token, encrypted_resume_token, expires_at, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).bind(key, status.organization.id, created.session.id,
-        created.session.canonical, encryptedRuntime, encryptedResume,
-        created.leaseExpiresAt, new Date().toISOString()).run();
-
-      if (inserted.meta.changes !== 1) {
-        throw new APIError(409, 'session_provisioning_race',
-          'A Session was created by another request. Retry without changing identity.');
-      }
-
-      return {
-        key,
-        row: {
-          sessionID: created.session.id,
-          organizationID: status.organization.id,
-          canonicalAddress: created.session.canonical,
-          encryptedRuntimeToken: encryptedRuntime,
-          encryptedResumeToken: encryptedResume,
-          expiresAt: created.leaseExpiresAt,
-        },
-        created: true,
-      };
+      return { key, row, created: true };
     } catch (error) {
       if (created.runtimeToken && created.session?.id) {
         try {
@@ -322,6 +349,67 @@ export class SessionBindings {
     const bound = await this.ensureBound(authorization, agentDisplayName);
 
     return SessionBindings.publicResult(bound.row, bound.created);
+  }
+
+  async selectSession(
+    authorization: string, address: string,
+  ): Promise<Record<string, unknown>> {
+    const client = this.address(authorization);
+    const key = await this.principal(client);
+    const status = await client.status() as AccountStatus;
+
+    if (!status.organization) {
+      throw new APIError(403, 'organization_required',
+        'An authorized Organization is required to select a Session.');
+    }
+
+    const target = await client.resolve(address) as Session & {
+      runtime?: { expiresAt: string } | null;
+    };
+    const existing = await this.row(key);
+
+    if (existing?.sessionID === target.id) {
+      return this.ensure(authorization);
+    }
+
+    if (target.runtime && Date.parse(target.runtime.expiresAt) > Date.now()) {
+      throw new APIError(409, 'session_in_use',
+        'The requested Session is still in use.');
+    }
+
+    await this.tokenCipher.requireKey();
+    const recovered = await client.request('PUT',
+      '/v2/account/sessions/' + encodeURIComponent(target.id) + '/owner-runtime-lease',
+      { body: { runtimeLabel: 'nuwa-relay-remote-mcp' } },
+    ) as ClaimResponse;
+
+    try {
+      if (recovered.session?.canonical !== target.canonical) {
+        throw new APIError(502, 'invalid_resume_result',
+          'Agent Address recovered a different Session address.');
+      }
+
+      SessionBindings.checkLease(recovered, target.id, status.organization.slug);
+
+      if (existing && !await this.releaseBinding(client, key, existing)) {
+        throw new APIError(409, 'session_binding_changed',
+          'The current OAuth grant binding changed during selection.');
+      }
+
+      const row = await this.persist(key, status.organization, recovered);
+
+      return SessionBindings.publicResult(row, false);
+    } catch (error) {
+      if (recovered.runtimeToken && recovered.session?.id) {
+        try {
+          await client.release(target.id, recovered.runtimeToken);
+        } catch (releaseError) {
+          SessionBindings.logger.exception('selection_compensation_failed', releaseError);
+        }
+      }
+
+      throw error;
+    }
   }
 
   async resume(
@@ -428,28 +516,6 @@ export class SessionBindings {
       return { revoked: false };
     }
 
-    const runtimeToken = await this.tokenCipher.decrypt(
-      row.encryptedRuntimeToken, key, row.sessionID,
-    );
-
-    if (row.expiresAt > new Date().toISOString()) {
-      try {
-        await client.release(row.sessionID, runtimeToken);
-      } catch (error) {
-        if (!(error instanceof APIError) || error.status !== 409 ||
-            error.code !== 'runtime_not_owner') {
-          throw error;
-        }
-
-        SessionBindings.logger.error('stale_lease_binding_revoked', { status: error.status });
-      }
-    }
-
-    const deleted = await this.env.BINDINGS_DB.prepare(
-      `DELETE FROM remote_session_bindings
-        WHERE grant_fingerprint = ? AND encrypted_runtime_token = ?`,
-    ).bind(key, row.encryptedRuntimeToken).run();
-
-    return { revoked: deleted.meta.changes === 1 };
+    return { revoked: await this.releaseBinding(client, key, row) };
   }
 }

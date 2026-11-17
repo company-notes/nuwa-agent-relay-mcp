@@ -11,7 +11,6 @@ export class RelayTools extends MCPToolSet {
     body: z.string().min(1).max(100_000),
     to: z.string().min(1).max(255),
     from: z.string().trim().min(1).max(255).optional(),
-    passphrase: z.string().min(16).max(128).optional(),
     subject: z.string().min(1).max(255),
     artifactLinks: z.array(z.url()).max(20).optional(),
   };
@@ -66,7 +65,7 @@ export class RelayTools extends MCPToolSet {
   }
 
   private registerMessageTools(): void {
-    const { to, from, passphrase, body, subject, artifactLinks, threadID } = this.schemas;
+    const { to, from, body, subject, artifactLinks, threadID } = this.schemas;
 
     this.register('sendToAgent',
       'Send to a canonical Agent/Session address OR the familiar display name of a ' +
@@ -74,16 +73,13 @@ export class RelayTools extends MCPToolSet {
       'this SAME request; never call another MCP tool or ask Gateway to look up ' +
       'the destination. Ambiguous or unknown names are rejected before delivery. ' +
       'Use relayReplyThread to continue an existing Thread; submission is not delivery. ' +
-      'When the owning office Gateway explicitly enabled delegation, optional from selects an ' +
-      'active coworker by name, verified Email or canonical address. The sender is auditable as ' +
-      'Gateway-delegated, not platform-attested. A configured coworker passphrase is mandatory; ' +
-      'do not claim model-visible passphrases prove native platform identity.',
-      { to, from, passphrase, message: body, subject: subject.optional(), artifactLinks },
-      ({ to, from, passphrase, message, subject, artifactLinks }) =>
+      'On a shared office Gateway connection, pass from as the actual Bot\'s registered name. ' +
+      'Relay maps it to the coworker Session; no extra switch or passphrase is required.',
+      { to, from, message: body, subject: subject.optional(), artifactLinks },
+      ({ to, from, message, subject, artifactLinks }) =>
         this.client.call('POST', '/v2/messages', {
           to, body: message,
           ...(from ? { from } : {}),
-          ...(passphrase ? { passphrase } : {}),
           ...(subject ? { subject } : {}),
           ...(artifactLinks ? { artifactLinks } : {}),
         }));
@@ -91,15 +87,13 @@ export class RelayTools extends MCPToolSet {
     this.register('relayReplyThread',
       'Reply in the original Relay Thread as this actual Bot\'s authenticated Session. ' +
       'Use the trusted relayThreadID forwarded by the office Gateway. ' +
-      'An explicitly enabled Gateway may select its active coworker through from, ' +
-      'with that coworker\'s optional configured passphrase. ' +
-      'The server records the Gateway actor separately and never asserts platform attestation.',
-      { threadID, from, passphrase, body, artifactLinks },
-      ({ threadID, from, passphrase, body: text, artifactLinks }) =>
+      'On a shared office Gateway connection, pass from as the replying Bot\'s registered ' +
+      'name. Relay records its coworker Session and the Gateway audit actor.',
+      { threadID, from, body, artifactLinks },
+      ({ threadID, from, body: text, artifactLinks }) =>
         this.client.call('POST',
           '/v2/threads/' + encodeURIComponent(threadID as string) + '/messages',
           { body: text, ...(from ? { from } : {}),
-            ...(passphrase ? { passphrase } : {}),
             ...(artifactLinks ? { artifactLinks } : {}) }));
   }
 

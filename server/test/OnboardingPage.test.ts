@@ -105,11 +105,9 @@ test('real HTTP routes keep Skill and OAuth protected', async () => {
   }
 
   assert.doesNotThrow(() => new Script(ONBOARDING_SCRIPT));
-  assert.match(ONBOARDING_SCRIPT, /先閱讀最新版官方 Nuwa Skill/);
-  assert.match(ONBOARDING_SCRIPT, /安裝或更新最新版 Nuwa Skill 與 MCP/);
-  assert.match(ONBOARDING_SCRIPT, /以 Organization 的管理授權/);
-  assert.match(ONBOARDING_SCRIPT, /真正的 Agent Address/);
-  assert.match(ONBOARDING_SCRIPT, /sendToAgent/);
+  assert.match(ONBOARDING_SCRIPT, /依最新版 Skill/);
+  assert.match(ONBOARDING_SCRIPT, /安裝或更新 Skill 與 MCP/);
+  assert.match(ONBOARDING_SCRIPT, /完成 Organization 授權/);
   assert.match(ONBOARDING_SCRIPT, /測試字詞是星河/);
   assert.match(ONBOARDING_SCRIPT, /測試字詞是月光/);
   assert.doesNotMatch(ONBOARDING_SCRIPT,
@@ -182,27 +180,21 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
 
   const gateway = elements.get('gatewayPrompt')!.textContent;
 
-  assert.match(gateway, /從平台可信 Bot 名錄盤點/);
-  assert.match(gateway, /建立或沿用真正的 Agent Address/);
-  assert.doesNotMatch(gateway, /核對他們的 Nuwa 地址/);
-  assert.match(gateway, /安裝或更新最新版 Nuwa Skill 與 MCP/);
-  assert.match(gateway, /沿用已啟用的共用 Wake/);
-  assert.match(gateway, /確認它指向現有例行任務/);
-  assert.match(gateway, /接收入口／金鑰已變更時，使用同一 Gateway 身分完成 Wake 配對/);
-  assert.match(gateway, /Organization 的管理授權/);
-  assert.match(gateway, /MailTrigger 傳輸信箱/);
-  assert.match(gateway, /姓名、Agent Address 或已驗證 Email 別名/);
-  assert.match(gateway, /recipientBotID/);
-  assert.match(gateway, /零 MCP 查詢/);
-  assert.match(gateway, /提交後結束/);
-  assert.match(gateway, /完整登記名稱 from/);
-  assert.match(gateway, /原 Gateway 地址並恢復其 Session/);
-  assert.match(gateway, /遇到占用或身分衝突時停止並回報/);
-  assert.match(gateway, /驗證事件由 Gateway 完成配對驗證/);
-  assert.match(gateway, /排除 Gateway 本身/);
-  assert.match(gateway, /GrokBot 使用平台管理的原生對話模式/);
-  assert.match(gateway, /由驗收者在兩位/);
-  assert.doesNotMatch(gateway, /小晴|大熊|Cosmo|nuwa\/xiaoqing/);
+  assert.match(gateway, /官方 Skill：https:\/\/mcp\.agent-relay\.company-notes\.com\/skills\/nuwa-agent-relay\/SKILL\.md/);
+  assert.match(gateway, /Nuwa MCP：https:\/\/mcp\.agent-relay\.company-notes\.com\/mcp/);
+  assert.match(gateway, /安裝或更新 Skill 與 MCP，完成 Organization 授權/);
+  assert.match(gateway, /沿用既有身分/);
+  assert.match(gateway, /唯一的 Wake 接收例行任務並完成驗證/);
+  assert.match(gateway, /沿用有效的接線/);
+  assert.match(gateway, /接收入口或金鑰變更時，以同一 Gateway 身分重新配對/);
+  assert.match(gateway, /從平台可信 Bot 名錄取得真實同事的名稱與 Bot ID（排除自己）/);
+  assert.match(gateway, /批次完成全部同事的接入，沿用既有地址與名錄/);
+  assert.match(gateway, /recipientBotID 使用平台原生工具轉交一次/);
+  assert.match(gateway, /完整轉交正文、寄件者及原 Relay Thread 回覆上下文/);
+  assert.match(gateway, /讓本人依 Skill 回覆/);
+  assert.match(gateway, /零 MCP 查詢，提交後結束/);
+  assert.match(gateway, /回報 Gateway 地址、Wake 狀態及已接入同事名單/);
+  assert.doesNotMatch(gateway, /MailTrigger|Default Session|sendToAgent|agentAddressSelectSession|歷史查詢|小晴|大熊|Cosmo|nuwa\/xiaoqing/);
 
   const send = elements.get('sendPrompt')!.textContent;
   const reply = elements.get('replyPrompt')!.textContent;

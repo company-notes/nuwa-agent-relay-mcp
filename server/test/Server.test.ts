@@ -101,7 +101,8 @@ test('user binds a Session privately; Remote MCP sends with encrypted Runtime le
     assert.deepEqual(scenario.calls[0].body, {
       to: 'nuwa/author/main', body: 'Please review the change.', subject: 'Review request',
     });
-    assert.equal(scenario.heartbeatCount, 1);
+    assert.equal(scenario.heartbeatCount, 0);
+    assert.equal(scenario.relayLeaseChecks, 1);
     assert.doesNotMatch(JSON.stringify(sent), /runtime_private|resume_secret/);
   } finally {
     scenario.restore();
@@ -120,7 +121,7 @@ test('successive messages reuse the request account status without skipping Runt
     });
 
     assert.equal(first.result.isError, undefined);
-    assert.equal(scenario.grantLookups, 1);
+    assert.equal(scenario.grantLookups, 0);
     assert.equal(scenario.claimCount, 1);
     assert.equal(scenario.statusLookups, 1, 'The first request must reuse its verified account status.');
 
@@ -129,10 +130,11 @@ test('successive messages reuse the request account status without skipping Runt
     });
 
     assert.equal(second.result.isError, undefined);
-    assert.equal(scenario.grantLookups, 2,
-      'Each tool call must authenticate its Grant exactly once.');
-    assert.equal(scenario.heartbeatCount, 1,
-      'The existing Runtime lease must still be verified.');
+    assert.equal(scenario.grantLookups, 0,
+      'The verified account response already includes the Grant.');
+    assert.equal(scenario.heartbeatCount, 0,
+      'No duplicate heartbeat before Relay authorization.');
+    assert.equal(scenario.relayLeaseChecks, 2);
     assert.equal(scenario.calls.length, 2);
     context.diagnostic('Two sends with simulated 50 ms status latency: ' +
       (performance.now() - started).toFixed(1) + ' ms; status calls: ' + scenario.statusLookups);
@@ -436,7 +438,7 @@ test('revoking a binding clears stale credentials even after Runtime lease was i
   }
 });
 
-test('expired or replaced Runtime fails closed before touching the Relay service', async () => {
+test('expired or replaced Runtime cannot create a Relay message', async () => {
   const scenario = new RemoteMCPScenario();
   scenario.install();
 
@@ -450,6 +452,31 @@ test('expired or replaced Runtime fails closed before touching the Relay service
 
     assert.equal(rejected.result.isError, true);
     assert.equal(scenario.calls.length, 0);
+    assert.equal(scenario.relayLeaseChecks, 1);
+  } finally {
+    scenario.restore();
+  }
+});
+
+test('an outdated local lease record retains the same active Runtime after Relay renewal', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    assert.equal((await scenario.bind()).status, 201);
+    const row = [...scenario.database.rows.values()][0];
+    row.expiresAt = new Date(Date.now() - 1000).toISOString();
+
+    const sent = await scenario.tool('sendToAgent', {
+      to: '大熊', message: 'Continue using the existing Session.',
+    });
+
+    assert.equal(sent.result.isError, undefined);
+    assert.equal(scenario.resumeCount, 1);
+    assert.equal(scenario.heartbeatCount, 1);
+    assert.equal(scenario.claimCount, 0);
+    assert.equal(scenario.calls[0].url.searchParams.get('session_id'), SESSION_A);
+    assert.ok(Date.parse(row.expiresAt) > Date.now());
   } finally {
     scenario.restore();
   }

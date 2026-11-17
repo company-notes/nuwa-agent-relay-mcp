@@ -74,7 +74,7 @@ export class RelayTools extends MCPToolSet {
       'the destination. Ambiguous or unknown names are rejected before delivery. ' +
       'Use relayReplyThread to continue an existing Thread; submission is not delivery. ' +
       'On a shared office Gateway connection, pass from as the actual Bot\'s registered name. ' +
-      'Relay maps it to the coworker Session; no extra switch or passphrase is required.',
+      'Relay maps it to the coworker Session and records the shared Gateway actor.',
       { to, from, message: body, subject: subject.optional(), artifactLinks },
       ({ to, from, message, subject, artifactLinks }) =>
         this.client.call('POST', '/v2/messages', {
@@ -85,7 +85,7 @@ export class RelayTools extends MCPToolSet {
         }));
 
     this.register('relayReplyThread',
-      'Reply in the original Relay Thread as this actual Bot\'s authenticated Session. ' +
+      'Reply in the original Relay Thread using this Session or an enrolled office coworker. ' +
       'Use the trusted relayThreadID forwarded by the office Gateway. ' +
       'On a shared office Gateway connection, pass from as the replying Bot\'s registered ' +
       'name. Relay records its coworker Session and the Gateway audit actor.',

@@ -32,7 +32,7 @@ export const ONBOARDING_SCRIPT = `
       '請為目前這個 AI 平台設定 Nuwa 辦公室總機，讓同一 Organization 的各辦公室',
       '可以互相傳訊、委派工作及接續對話。',
       '',
-      '先閱讀官方 Nuwa Skill：' + skillURL,
+      '先閱讀最新版官方 Nuwa Skill：' + skillURL,
       'Nuwa MCP 入口：' + mcpURL,
       '',
       '你是本辦公室的 Gateway，負責一次完成接線設定與維護分機名錄。',
@@ -42,20 +42,25 @@ export const ONBOARDING_SCRIPT = `
       '共用 MCP 的同事發訊、回覆及需要讀取歷史時，填自己的完整登記名稱 from。',
       '',
       '請依以下標準流程接入整間辦公室：',
-      '1. 使用本辦公室既有的 Nuwa Skill、MCP 和受權 Gateway 身分。',
-      '2. 由 Gateway 建立並驗證一個共用 Wake 接收入口。',
-      '3. 從平台可信 Bot 名錄盤點所有現有同事的顯示名稱與 Bot ID。',
-      '4. 以 Organization 的管理授權，為同事建立或沿用真正的 Agent Address、',
-      '   Default Session 與所需的 MailTrigger 傳輸信箱，登記 Bot ID 與收件路由。',
-      '5. 將各同事的來電統一交由本辦公室 Gateway 接收 Wake；由 Gateway',
-      '   精確轉交給被指定的同事，並保留每位同事各自的發話身分。',
-      '6. 核對名錄、地址、接線路由、真實 Bot 收件與原通話回覆，再回報接通名單。',
+      '1. 安裝或更新最新版 Nuwa Skill 與 MCP，使用同一 Organization 的授權。',
+      '   重新安裝時沿用原 Gateway 身分；更換授權時，依 Skill 由管理者指定',
+      '   原 Gateway 地址並恢復其 Session。遇到占用或身分衝突時停止並回報。',
+      '2. 設定平台的 Wake 接收例行任務：驗證事件由 Gateway 完成配對驗證，',
+      '   正式訊息事件則直接轉交。沿用已啟用的共用 Wake，首次接入時完成配對。',
+      '3. 從平台可信 Bot 名錄盤點所有現有同事的顯示名稱與 Bot ID，排除 Gateway 本身。',
+      '4. 以 Organization 的管理授權批次登記同事，建立或沿用真正的 Agent Address、',
+      '   Default Session、MailTrigger 傳輸信箱（Nuwa 的底層郵件運輸）及收件路由。',
+      '   GrokBot 使用平台管理的原生對話模式；其他平台依實際原生對話能力登記。',
+      '5. 讓所有同事共用此 Gateway Wake，依事件的 recipientBotID 將完整正文、',
+      '   寄件者名稱與原 Relay Thread 上下文直接交給本人，讓本人處理及回覆。',
+      '6. 核對本辦公室名錄、地址與接線路由，回報已接入名單；由驗收者在兩位',
+      '   真實同事的對話中確認雙向收件、原通話回覆及反向的新通話。',
       '',
       '日常通訊時，同事可直接以姓名、Agent Address 或已驗證 Email 別名',
       '呼叫 sendToAgent；Relay 在同一次請求內解析唯一收件者。',
       '回覆已有通話時接續原 Relay Thread；發新通話時建立新的 Relay Thread。',
       '',
-      '已有接線就沿用，不重做登入、信箱配置、Wake 或名冊；有身分問題先停止並回報。',
+      '日常收發只需一次發訊或回覆呼叫，歷史查詢及收件診斷按需使用。',
       '所有憑證使用平台的受保護授權流程，不在聊天中要求我輸入任何金鑰。'
     ].join('\\n');
   }
@@ -64,7 +69,7 @@ export const ONBOARDING_SCRIPT = `
     return [
       '請透過 Nuwa 找「' + colleagueName('colleagueB') +
         '」助理聊一下。',
-      '告訴他：「你好，我們來測試通話，密語是星河。收到後請回覆密語。」',
+      '告訴他：「你好，我們來測試通話，測試字詞是星河。收到後請回覆這個字詞。」',
       '請直接發送一次，由 Relay 解析收件人；共用連線時填自己的 from。'
     ].join('\\n');
   }
@@ -74,7 +79,7 @@ export const ONBOARDING_SCRIPT = `
       '請查收剛才「' + colleagueName('colleagueA') +
         '」助理傳來的測試訊息，',
       '請用 Nuwa 接續原本的 Relay Thread 回覆：「收到星河！」，共用連線時填自己的 from。',
-      '已有完整訊息就直接回覆一次，不需要額外查詢；由驗收者確認對方收到。'
+      '實際收到完整訊息後直接回覆一次，不需要額外查詢；若已回覆，回報結果即可。'
     ].join('\\n');
   }
 
@@ -82,7 +87,7 @@ export const ONBOARDING_SCRIPT = `
     return [
       '請透過 Nuwa 主動找「' + colleagueName('colleagueA') +
         '」助理聊一下。',
-      '告訴他：「換我打給你了！這次密語是月光，請回覆密語。」',
+      '告訴他：「換我打給你了！這次測試字詞是月光，請回覆這個字詞。」',
       '請直接發送一次；共用連線時填自己的 from。同名或找不到人才問我。'
     ].join('\\n');
   }
@@ -92,7 +97,7 @@ export const ONBOARDING_SCRIPT = `
       '請查收「' + colleagueName('colleagueB') +
         '」助理剛才主動打來的電話，',
       '請用 Nuwa 在那通 Relay Thread 回覆：「收到月光！」，共用連線時填自己的 from。',
-      '已有完整訊息就直接回覆一次，不需要額外查詢；由驗收者確認對方收到。'
+      '實際收到完整訊息後直接回覆一次，不需要額外查詢；若已回覆，回報結果即可。'
     ].join('\\n');
   }
 

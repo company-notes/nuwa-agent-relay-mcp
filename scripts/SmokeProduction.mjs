@@ -42,8 +42,12 @@ assert.match(promptText, /function gatewaySetup/);
 assert.match(promptText, /function verifyPrompt/);
 assert.match(promptText, /請依以下標準流程接入整間辦公室/);
 assert.match(promptText, /從平台可信 Bot 名錄盤點所有現有同事的顯示名稱與 Bot ID/);
-assert.match(promptText, /密語是星河/);
-assert.match(promptText, /密語是月光/);
+assert.match(promptText, /測試字詞是星河/);
+assert.match(promptText, /測試字詞是月光/);
+assert.match(promptText, /安裝或更新最新版 Nuwa Skill 與 MCP/);
+assert.match(promptText, /原 Gateway 地址並恢復其 Session/);
+assert.match(promptText, /沿用已啟用的共用 Wake/);
+assert.match(promptText, /零 MCP 查詢/);
 assert.match(promptText, /colleagueA/);
 assert.match(promptText, /colleagueB/);
 assert.doesNotMatch(promptText, /addressA|addressB|先填入這位助理真正的 Nuwa 地址/);
@@ -58,7 +62,10 @@ assert.equal(skill.status, 200, 'Skill installation entrypoint must remain reach
 const skillText = await skill.text();
 assert.match(skillText, /agentAddressEnsureIdentity/);
 assert.match(skillText, /sendToAgent/);
-assert.match(skillText, /no Gateway name lookup/);
+assert.match(skillText, /No preliminary directory lookup/);
+assert.match(skillText, /Zero MCP calls for ordinary office Wake dispatch/);
+assert.match(skillText, /agentAddressSelectSession/);
+assert.match(skillText, /relayReplyThread/);
 assert.doesNotMatch(skillText, /agentAddressFindByName/,
   'Name resolution must not add a second MCP tool call.');
 assert.doesNotMatch(skillText, /human provides the Session ID|access token and loses the binding/i);

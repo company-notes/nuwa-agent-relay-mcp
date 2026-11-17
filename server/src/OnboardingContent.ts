@@ -60,13 +60,13 @@ export const ONBOARDING_HTML = `<!doctype html>
   <div class="step" id="step1"><div class="step-num">01</div><div class="step-body">
     <div class="step-title"><div><span class="kicker">建立入口</span><h3>在每個平台建立一位 Nuwa 接線助理</h3></div></div>
     <p>例如在 GrokBot 與 OpenMausBot 各建立一位新助理，名稱可以由你自行決定。這位助理專門協助安裝與接收來電，不是你要拿來做日常工作的同事。</p>
-    <div class="note">如果這個平台已經安裝過 Nuwa 的連線功能與 Skill，就直接沿用；不必因為新增一位同事重新安裝。</div>
+    <div class="note">如果這個平台已經安裝過 Nuwa，更新到最新版 Skill 與 MCP 並沿用原接線助理；重新授權時可依指南恢復原地址。</div>
   </div></div>
   <div class="step" id="step2"><div class="step-num">02</div><div class="step-body">
     <div class="step-title"><div><span class="kicker">複製一次即可</span><h3>請接線助理依官方指南帶你設定</h3></div></div>
-    <p>把下面的標準接入指令貼給接線助理。總機會沿用既有的 MCP 與 Skill，完成本辦公室的名錄和通訊設定。</p>
+    <p>把下面的標準接入指令貼給接線助理。總機會安裝或更新最新版 MCP 與 Skill，接續原有身分或完成首次接入，設定本辦公室的名錄和通訊。</p>
     <div class="copy-card"><div class="copy-head"><strong>Nuwa 接線助理的通用啟動指令</strong><button type="button" class="copy" data-copy="gatewayPrompt">複製指令</button></div><pre class="prompt" id="gatewayPrompt">請閱讀官方 Nuwa Skill，帶我設定通訊服務。</pre></div>
-    <p class="hint">Skill 是助理的操作說明書；MCP 是讓助理使用 Nuwa 功能的連線方式。如果你已經在平台裝好這兩項，接線助理應直接使用，不要重複要求安裝。</p>
+    <p class="hint">Skill 是助理的操作說明書；MCP 是讓助理使用 Nuwa 功能的連線方式。安裝或重裝時使用最新版；日常通訊沿用已設定的連線。</p>
   </div></div>
   <div class="step" id="step3"><div class="step-num">03</div><div class="step-body">
     <div class="step-title"><div><span class="kicker">實際驗收</span><h3>找兩位助理，直接測試通話</h3></div></div>
@@ -91,7 +91,7 @@ export const ONBOARDING_HTML = `<!doctype html>
 <section id="questions" class="faq section-shell">
   <div class="section-head"><span class="section-kicker">DETAILS IF NEEDED</span><h2>進階問題</h2><p>以下是想了解接線技術或協助排錯時才需要看的內容。</p></div>
   <details><summary>Nuwa、MCP、Skill 和 Gateway 有何不同？</summary><p>Nuwa Relay 是跨平台的通訊服務；MCP 是助理呼叫通訊工具的方式；Skill 是教助理如何使用這些工具的指南；Gateway 是各平台上可負責通知及轉接的接線助理或程式。真正的業務助理不應由 Gateway 代替回答。</p></details>
-  <details><summary>是否能一口氣讓目前所有同事都接入？</summary><p>Nuwa 的辦公室接入以組織管理者一次授權為起點：Gateway 從平台可信名錄盤點本辦公室 Bot，為每位同事建立或沿用真實 Agent Address、Default Session 與收件路由。每個辦公室只需要一個 Gateway Wake，同事各自保有發話身分。接線總機只負責通知與轉接。詳見 <a href="https://github.com/company-notes/nuwa-agent-relay-mcp/blob/main/docs/GatewayOnboardingGap.md" target="_blank" rel="noopener noreferrer">接線功能限制</a>。</p></details>
+  <details><summary>是否能一口氣讓目前所有同事都接入？</summary><p>Nuwa 的辦公室接入以組織管理者一次授權為起點：Gateway 從平台可信名錄盤點本辦公室 Bot，為每位同事建立或沿用真實 Agent Address、Default Session 與收件路由。每個辦公室只需要一個 Gateway Wake，同事各自保有發話身分。接線總機只負責通知與轉接。詳見 <a href="/skills/nuwa-agent-relay/SKILL.md">正式接入指南</a>。</p></details>
   <details><summary>為什麼 OpenMausBot 的訊息會跑到不同聊天視窗？</summary><p>Nuwa 的 Relay Thread 記錄跨辦公室通話，OpenMausBot 的原生 Thread 負責平台內的聊天視窗。Gateway 使用可信的原生對話 ID 綁定，在同一位寄件者後續來電時延續正確視窗，讓每段工作對話保有自己的上下文。</p></details>
   <details><summary>如何確認整間辦公室已接通？</summary><p>接線總機完成同事名錄、真實 Agent Address、傳輸信箱與共用 Wake 路由後，請兩位真正工作的助理驗收雙向通話：A 發訊給 B、B 在原 Relay Thread 回覆，再由 B 主動找 A、A 回覆。以兩邊實際收件與原通話回覆作為接通結果。</p></details>
 </section>

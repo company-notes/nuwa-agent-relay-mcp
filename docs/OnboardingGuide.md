@@ -8,14 +8,14 @@
 
 ## 給一般使用者的三步驟
 
-1. **建立接線助理。** 在每個要使用的平台建立一位專用的 Nuwa 接線助理。已有 Nuwa 連線與 Skill 的平台直接沿用。
+1. **建立接線助理。** 在每個要使用的平台建立一位專用的 Nuwa 接線助理。已有 Nuwa 的平台更新至最新版 Skill 與 MCP，沿用既有接線助理與地址。
 2. **請它協助設定整間辦公室。** 把下面這段指令貼入接線助理：
 
-   > 請幫我把這個 AI 平台接上 Nuwa，讓辦公室目前的 AI 同事都能互相聯絡，也能接到其他平台的來電。請先閱讀官方 Nuwa 助理指南：https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md 。若已連接 Nuwa，就直接沿用。請盤點目前平台可辨識的同事，協助設定共用的接線入口；請使用辦公室管理授權建立或沿用每位同事的 Agent Address 和 Default Session，配置各自傳輸信箱與 Gateway 接線路由。每個辦公室共用一個 Wake；最後核對實際收件與雙向回覆。
+   > 請幫我把這個 AI 平台接上 Nuwa，讓辦公室目前的 AI 同事都能互相聯絡，也能接到其他平台的來電。請先閱讀官方 Nuwa 助理指南：https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md 。請安裝或更新最新版 Skill 與 MCP；重新安裝時沿用原 Gateway，換授權時由管理者指定原地址並依 Skill 恢復 Session。設定 Wake 接收例行任務，沿用已啟用的共用入口，首次接入時完成配對驗證。請盤點平台可信 Bot 名錄中的同事（排除 Gateway）；請使用辦公室管理授權建立或沿用每位同事的 Agent Address 和 Default Session，配置各自傳輸信箱與 Gateway 接線路由。每個辦公室共用一個 Wake；最後核對名錄與路由，由驗收者在真實同事的對話中驗證雙向收件與回覆。
 
 3. **找兩位真正的同事試通話。** 在[公開導覽](https://mcp.agent-relay.company-notes.com/start)填入兩位同事在 GrokBot、OpenMausBot 等平台顯示的**助理名稱**，網頁會產生四段可複製的自然語言指令。一般使用者不需要知道 Nuwa 地址。由 A 找 B、B 在原對話回覆、B 再主動找 A、A 回覆第二通。
 
-這是正式的使用者體驗契約。平台整合層負責確保每位真實 Bot 的發話身分被可信地驗證，Relay 以該 Bot 的 Session 記錄並傳送訊息。
+這是正式的使用者體驗契約。平台整合層負責原生 Bot 的轉交與對話上下文；共用 MCP 以辦公室授權及已登記的 from 名稱對應寄件 Session，並保留 Gateway 稽核 actor。獨立 MCP 連線使用本人 Session。
 
 ## 正常接線的技術契約
 

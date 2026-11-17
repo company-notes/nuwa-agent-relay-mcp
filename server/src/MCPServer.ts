@@ -26,6 +26,8 @@ export class NuwaMCPServer {
         'user for Session IDs, Runtime tokens, Resume tokens, or manual binding during ' +
         'normal installation. Relay tools also auto-ensure the Session if needed. ' +
         'Never include OAuth, Runtime, Resume or Wake secrets in MCP tools or prompts. ' +
+        'On user request, agentAddressSelectSession can restore an idle existing address ' +
+        'in this Organization without re-enrolling the office. ' +
         'Optional office coworker passphrases are model-visible in tool inputs and cannot ' +
         'serve as native platform Bot attestation. ' +
         'Sending a message, confirmed mailbox arrival, successful Wake delivery and actual ' +
@@ -34,7 +36,8 @@ export class NuwaMCPServer {
 
     const bindings = new SessionBindings(this.env);
     new AddressTools(server, new AddressAPIClient(this.env, this.authorization),
-      (persona) => bindings.ensure(this.authorization, persona)).install();
+      (persona) => bindings.ensure(this.authorization, persona),
+      (address) => bindings.selectSession(this.authorization, address)).install();
     const relay = new RelayAPIClient(this.env, this.authorization,
       () => bindings.authorize(this.authorization));
 

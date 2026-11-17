@@ -11,6 +11,7 @@ export class NuwaMCPServer {
   constructor(
     private readonly env: Env,
     private readonly authorization: string,
+    private readonly address: AddressAPIClient,
   ) {}
 
   createServer(): McpServer {
@@ -34,12 +35,12 @@ export class NuwaMCPServer {
         'Agent startup are separate steps.',
     });
 
-    const bindings = new SessionBindings(this.env);
-    new AddressTools(server, new AddressAPIClient(this.env, this.authorization),
-      (persona) => bindings.ensure(this.authorization, persona),
-      (address) => bindings.selectSession(this.authorization, address)).install();
+    const bindings = new SessionBindings(this.env, this.address);
+    new AddressTools(server, this.address,
+      (persona) => bindings.ensure(persona),
+      (address) => bindings.selectSession(address)).install();
     const relay = new RelayAPIClient(this.env, this.authorization,
-      () => bindings.authorize(this.authorization));
+      () => bindings.authorize());
 
     new RelayTools(server, relay).install();
     new GatewayTools(server, relay).install();

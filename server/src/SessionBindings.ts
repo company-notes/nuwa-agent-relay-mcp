@@ -43,14 +43,9 @@ export class SessionBindings {
 
   constructor(
     private readonly env: Env,
-    private readonly requester: typeof fetch =
-      (input, init) => env.ADDRESS_WORKER.fetch(input, init),
+    private readonly address: AddressAPIClient,
   ) {
     this.tokenCipher = new RuntimeTokenCipher(env.SESSION_BINDING_KEY);
-  }
-
-  private address(authorization: string): AddressAPIClient {
-    return new AddressAPIClient(this.env, authorization, this.requester);
   }
 
   private async principal(client: AddressAPIClient): Promise<string> {
@@ -245,8 +240,8 @@ export class SessionBindings {
     }
   }
 
-  async status(authorization: string): Promise<Record<string, unknown>> {
-    const client = this.address(authorization);
+  async status(): Promise<Record<string, unknown>> {
+    const client = this.address;
     const key = await this.principal(client);
     const row = await this.row(key);
 
@@ -280,9 +275,9 @@ export class SessionBindings {
   }
 
   private async ensureBound(
-    authorization: string, agentDisplayName?: string,
+    agentDisplayName?: string,
   ): Promise<{ key: string; row: BindingRow; created: boolean }> {
-    const client = this.address(authorization);
+    const client = this.address;
     const key = await this.principal(client);
     await this.tokenCipher.requireKey();
 
@@ -344,17 +339,17 @@ export class SessionBindings {
   }
 
   async ensure(
-    authorization: string, agentDisplayName?: string,
+    agentDisplayName?: string,
   ): Promise<Record<string, unknown>> {
-    const bound = await this.ensureBound(authorization, agentDisplayName);
+    const bound = await this.ensureBound(agentDisplayName);
 
     return SessionBindings.publicResult(bound.row, bound.created);
   }
 
   async selectSession(
-    authorization: string, address: string,
+    address: string,
   ): Promise<Record<string, unknown>> {
-    const client = this.address(authorization);
+    const client = this.address;
     const key = await this.principal(client);
     const status = await client.status() as AccountStatus;
 
@@ -375,7 +370,7 @@ export class SessionBindings {
 
     if (target.runtime && Date.parse(target.runtime.expiresAt) > Date.now()) {
       if (existing?.sessionID === target.id) {
-        return this.ensure(authorization);
+        return this.ensure();
       }
 
       throw new APIError(409, 'session_in_use',
@@ -418,7 +413,7 @@ export class SessionBindings {
   }
 
   async resume(
-    authorization: string, sessionID: string, resumeToken: string,
+    sessionID: string, resumeToken: string,
   ): Promise<Record<string, unknown>> {
     // An explicit user-requested identity change uses a trusted private channel.
     // Normal Skill-first onboarding never needs a Session ID or Resume token.
@@ -428,7 +423,7 @@ export class SessionBindings {
         'Session ID and Resume capability are required.');
     }
 
-    const client = this.address(authorization);
+    const client = this.address;
     const key = await this.principal(client);
     const existing = await this.row(key);
 
@@ -494,10 +489,10 @@ export class SessionBindings {
     };
   }
 
-  async authorize(authorization: string): Promise<BoundSession> {
+  async authorize(): Promise<BoundSession> {
     // Reuse the verified grant and renewed binding from the same operation.
     // Reading the grant and binding a second time adds latency but no authority.
-    const { key, row } = await this.ensureBound(authorization);
+    const { key, row } = await this.ensureBound();
 
     if (row.expiresAt <= new Date().toISOString()) {
       throw new APIError(403, 'session_binding_required',
@@ -512,8 +507,8 @@ export class SessionBindings {
     };
   }
 
-  async revoke(authorization: string): Promise<{ revoked: boolean }> {
-    const client = this.address(authorization);
+  async revoke(): Promise<{ revoked: boolean }> {
+    const client = this.address;
     const key = await this.principal(client);
     const row = await this.row(key);
 

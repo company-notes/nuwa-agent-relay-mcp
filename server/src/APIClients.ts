@@ -89,6 +89,10 @@ export class HTTPAPIClient {
         'Backend connection failed. Check its progress before retrying.');
     }
 
+    return this.readResponse(response);
+  }
+
+  protected async readResponse(response: Response): Promise<unknown> {
     if (response.status >= 300 && response.status < 400) {
       throw new APIError(502, 'unexpected_redirect', 'Backend API unexpectedly redirected.');
     }
@@ -154,12 +158,19 @@ export class AddressAPIClient extends HTTPAPIClient {
     env: Env,
     authorization: string,
     requester: typeof fetch = (input, init) => env.ADDRESS_WORKER.fetch(input, init),
+    private verifiedStatus?: Response,
   ) {
     super(env.ADDRESS_API_URL, authorization, requester);
   }
 
   status(): Promise<unknown> {
-    return this.request('GET', '/v2/account/status');
+    // Only the current HTTP request may reuse its authentication response.
+    const verified = this.verifiedStatus;
+    this.verifiedStatus = undefined;
+
+    return verified
+      ? this.readResponse(verified)
+      : this.request('GET', '/v2/account/status');
   }
 
   grant(): Promise<unknown> {

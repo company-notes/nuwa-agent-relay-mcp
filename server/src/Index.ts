@@ -3,7 +3,8 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import type { Env } from './Env';
 import { NuwaMCPServer } from './MCPServer';
 import { AGENT_SKILL_MD } from './SkillDocument';
-import { OAuthResourceServer } from './OAuthResourceServer';
+import { OAuthResourceServer, type AuthenticatedRequest } from './OAuthResourceServer';
+import { AddressAPIClient } from './APIClients';
 import { Logger } from './Logger';
 import { SessionBindings } from './SessionBindings';
 import { SessionBindingController } from './SessionBindingController';
@@ -48,7 +49,7 @@ export class HTTPMCPApplication {
       return new Response('Not found', { status: 404 });
     }
 
-    let result: string | Response;
+    let result: AuthenticatedRequest | Response;
 
     try {
       result = await oauth.authenticate(request);
@@ -62,11 +63,13 @@ export class HTTPMCPApplication {
       return result;
     }
 
+    const address = new AddressAPIClient(this.env, result.authorization, undefined, result.status);
+
     if (url.pathname === '/session-bindings') {
       try {
         return await new SessionBindingController(
-          new SessionBindings(this.env),
-        ).handle(request, result);
+          new SessionBindings(this.env, address),
+        ).handle(request);
       } catch (error) {
         HTTPMCPApplication.logger.exception('session_binding_failed', error);
 
@@ -85,7 +88,7 @@ export class HTTPMCPApplication {
       });
 
       stage = 'register_tools';
-      const server = new NuwaMCPServer(this.env, result).createServer();
+      const server = new NuwaMCPServer(this.env, result.authorization, address).createServer();
 
       stage = 'connect_transport';
       await server.connect(transport);

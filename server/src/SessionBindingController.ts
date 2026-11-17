@@ -28,7 +28,7 @@ export class SessionBindingController {
     });
   }
 
-  async handle(request: Request, authorization: string): Promise<Response> {
+  async handle(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const origin = request.headers.get('origin');
 
@@ -38,11 +38,11 @@ export class SessionBindingController {
     }
 
     if (request.method === 'GET') {
-      return SessionBindingController.response(await this.bindings.status(authorization));
+      return SessionBindingController.response(await this.bindings.status());
     }
 
     if (request.method === 'DELETE') {
-      return SessionBindingController.response(await this.bindings.revoke(authorization));
+      return SessionBindingController.response(await this.bindings.revoke());
     }
 
     if (request.method !== 'POST') {
@@ -83,7 +83,7 @@ export class SessionBindingController {
     }
 
     return SessionBindingController.response(
-      await this.bindings.resume(authorization, body.sessionID, body.resumeToken), 201,
+      await this.bindings.resume(body.sessionID, body.resumeToken), 201,
     );
   }
 }

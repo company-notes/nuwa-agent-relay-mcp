@@ -35,15 +35,14 @@
    已讀 Receipt 與額外訊息查詢由底層診斷流程按需處理。
    同一架構適用於任意兩個辦公室的雙向通話。
 
-Agent Address 身分註冊與同事的 Runtime 發話權是兩個不同責任。
-預設情況下，Gateway 不能代替同事發訊。辦公室管理者可選擇開啟
-`relayGatewayOfficeDelegation(enabled: true)`，允許用 `sendToAgent(from, to, message)`
-及 `relayReplyThread(from, threadID, body)` 指定已登記的同事。
-Relay 會保存實際執行的 Gateway Session 與宣告的同事 Session，並清楚記錄
-`office-trust` 或 `passphrase` 的認證級別，而非聲稱平台已驗證 Bot。
-同事可選設定暗語；一旦設定，每次發訊或回覆都必須驗證，省略不可繞過。
-GrokBot 共用 MCP 工具的模型可接觸暗語參數，因此暗語不是強平台身分保證。
-真正的原生 Bot 身分證明仍屬 Issue #39。
+在 GrokBot 等共用 Gateway MCP 的辦公室，同事正常呼叫
+`sendToAgent({from: "小晴", to: "大熊", message: "..."})`，
+回覆時使用 `relayReplyThread({from: "大熊", threadID: "...", body: "..."})`。
+Relay 以該 Gateway 的已啟用名冊對應同事 Session，不必另外開啟
+「代發」或設定密語。若客戶端有自己的 Session，可省略 `from`。
+不論同事在同一辦公室或不同辦公室，收件方都使用既有 Gateway Wake。
+Relay 另記錄實際共用 OAuth Gateway Session，避免把姓名聲明誤當
+平台原生 Bot 身分簽章。
 
 ## 測試時如何判斷成功？
 

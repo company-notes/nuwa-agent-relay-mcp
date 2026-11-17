@@ -39,11 +39,11 @@ export const ONBOARDING_SCRIPT = `
       '2. 設定本辦公室唯一的 Wake 接收例行任務並完成驗證；沿用有效的接線。',
       '   接收入口或金鑰變更時，以同一 Gateway 身分重新配對。',
       '3. 從平台可信 Bot 名錄取得真實同事的名稱與 Bot ID（排除自己），',
-      '   批次完成全部同事的接入，沿用既有地址與名錄。',
+      '   排除群組／頻道，批次完成全部同事的接入，沿用既有地址與名錄。',
       '4. 收到正常 Wake 時，依 recipientBotID 使用平台原生工具轉交一次，',
       '   完整轉交正文、寄件者及原 Relay Thread 回覆上下文，讓本人依 Skill 回覆。',
       '   附上 relayReplyThread({from, threadID, body}) 的呼叫格式，',
-      '   帶入實際 Thread ID 與收件者自己的完整登記名稱（已知時），由同事填回覆正文。',
+      '   帶入實際 Thread ID，from 直接填 recipientBotID（UUID 或 bot: 前綴的原生 ID），由同事填回覆正文。',
       '   獨立連線省略 from；平台允許時直接呼叫。Gateway 零 MCP 查詢，提交後結束。',
       '5. 回報 Gateway 地址、Wake 狀態及已接入同事名單。'
     ].join('\\n');
@@ -54,7 +54,7 @@ export const ONBOARDING_SCRIPT = `
       '請透過 Nuwa 找「' + colleagueName('colleagueB') +
         '」助理聊一下。',
       '告訴他：「你好，我們來測試通話，測試字詞是星河。收到後請回覆這個字詞。」',
-      '請直接發送一次，由 Relay 解析收件人；共用連線時填自己的 from。'
+      '請直接發送一次，優先使用已知的 Bot ID，否則填完整登記名稱，由 Relay 解析；共用連線時填自己的 from。'
     ].join('\\n');
   }
 
@@ -72,7 +72,7 @@ export const ONBOARDING_SCRIPT = `
       '請透過 Nuwa 主動找「' + colleagueName('colleagueA') +
         '」助理聊一下。',
       '告訴他：「換我打給你了！這次測試字詞是月光，請回覆這個字詞。」',
-      '請直接發送一次；共用連線時填自己的 from。同名或找不到人才問我。'
+      '請直接發送一次，優先使用已知的 Bot ID，否則填完整登記名稱；共用連線時填自己的 from。同名或找不到人才問我。'
     ].join('\\n');
   }
 

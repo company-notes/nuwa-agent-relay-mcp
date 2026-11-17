@@ -5,12 +5,17 @@ import { RelayAPIClient } from './APIClients';
 import { MCPToolSet } from './ToolSet';
 
 export class RelayTools extends MCPToolSet {
+  private static readonly IDENTITY = 'registered native Bot UUID (or bot:<native ID>), ' +
+    'complete registered display name, canonical Nuwa address or verified Email alias';
+  private static readonly FROM = 'On a shared office connection, pass your own ' +
+    RelayTools.IDENTITY + ' as from; prefer the known native Bot ID. Omit from on an independent Session.';
+
   private readonly schemas = {
     messageID: z.string().uuid(),
     threadID: z.string().uuid(),
     body: z.string().min(1).max(100_000),
-    to: z.string().min(1).max(255),
-    from: z.string().trim().min(1).max(255).optional(),
+    to: z.string().min(1).max(255).describe(RelayTools.IDENTITY),
+    from: z.string().trim().min(1).max(255).optional().describe(RelayTools.FROM),
     subject: z.string().min(1).max(255),
     artifactLinks: z.array(z.url()).max(20).optional(),
   };
@@ -57,7 +62,7 @@ export class RelayTools extends MCPToolSet {
     this.register('relayMessage',
       'Read one authorized message, optionally with up to 12 preceding Thread messages. ' +
       'Use only when content or history is missing, not before replying to a complete Wake. ' +
-      'On a shared office connection, pass your own enrolled name as from.',
+      RelayTools.FROM,
       { messageID, from, contextLimit: z.number().int().min(1).max(12).optional() },
       ({ messageID, from, contextLimit }) => this.client.call('GET',
         '/v2/messages/' + encodeURIComponent(messageID as string), undefined, {
@@ -70,12 +75,12 @@ export class RelayTools extends MCPToolSet {
     const { to, from, body, subject, artifactLinks, threadID } = this.schemas;
 
     this.register('sendToAgent',
-      'Send to a canonical Agent/Session address OR the familiar display name of a ' +
-      'registered coworker, creating a new Relay Thread. Relay resolves names in ' +
-      'this SAME request; never call another MCP tool or ask Gateway to look up ' +
-      'the destination. Ambiguous or unknown names are rejected before delivery. ' +
+      'Send to a ' + RelayTools.IDENTITY + ', creating a new Relay Thread. ' +
+      'Prefer a known native Bot ID from the trusted platform directory, not a group/channel ID. ' +
+      'Relay resolves names in this SAME request, as well as native Bot IDs and aliases; ' +
+      'no extra MCP lookup is needed. Ambiguous or unknown targets are rejected before delivery. ' +
       'Use relayReplyThread to continue an existing Thread; submission is not delivery. ' +
-      'On a shared office Gateway connection, pass from as the actual Bot\'s registered name. ' +
+      RelayTools.FROM + ' ' +
       'Relay maps it to the coworker Session and records the shared Gateway actor.',
       { to, from, message: body, subject: subject.optional(), artifactLinks },
       ({ to, from, message, subject, artifactLinks }) =>
@@ -89,8 +94,8 @@ export class RelayTools extends MCPToolSet {
     this.register('relayReplyThread',
       'Reply in the original Relay Thread using this Session or an enrolled office coworker. ' +
       'Use the trusted relayThreadID forwarded by the office Gateway directly; no message lookup required. ' +
-      'On a shared office Gateway connection, pass from as the replying Bot\'s registered ' +
-      'name. Relay records its coworker Session and the Gateway audit actor.',
+      'The Wake recipientBotID is the replying Bot\'s own ID (raw UUID or bot:<native ID>). ' +
+      RelayTools.FROM + ' Relay records its coworker Session and the Gateway audit actor.',
       { threadID, from, body, artifactLinks },
       ({ threadID, from, body: text, artifactLinks }) =>
         this.client.call('POST',

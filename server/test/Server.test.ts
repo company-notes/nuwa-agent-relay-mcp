@@ -34,9 +34,11 @@ test('publishes the V2 Skill without exposing internal transport infrastructure'
   assert.match(expected, /Do not fetch it again/);
   assert.match(expected, /Call the tool directly when its schema is available/);
   assert.match(expected, /Forward a ready-to-use reply call/);
-  assert.match(expected, /relayReplyThread\(\{from: "<recipient's full registered name>", threadID: "<actual relayThreadID>", body: "<reply>"\}\)/);
+  assert.match(expected, /relayReplyThread\(\{from: "<actual recipientBotID>", threadID: "<actual relayThreadID>", body: "<reply>"\}\)/);
+  assert.match(expected, /group\/channel ID is not an individual Bot/);
+  assert.match(expected, /bot:<native ID>/);
   assert.match(expected, /platform-required\s+tool discovery/);
-  assert.match(expected, /Omit `from` on an independent connection/);
+  assert.match(expected, /Omit `from`\s+on an independent connection/);
   assert.doesNotMatch(expected, /github\.com|\bHost\b|\bWork\b|work_address_id/);
 });
 
@@ -867,7 +869,7 @@ test('Gateway can propose a real coworker and that coworker alone approves the o
 });
 
 
-test('enrolled GrokBot coworkers send and reply with no extra office configuration', async () => {
+test('enrolled GrokBot coworkers send and reply by native IDs with no extra office configuration', async () => {
   const scenario = new RemoteMCPScenario();
   scenario.install();
 
@@ -878,29 +880,29 @@ test('enrolled GrokBot coworkers send and reply with no extra office configurati
 
     const enrolled = await scenario.tool('relayGatewayEnrollOfficeCoworkers', {
       coworkers: [
-        { displayName: '小晴', recipientBotID: 'xiaoqing-native', threadMode: 'platform' },
-        { displayName: '小安', recipientBotID: 'annie-native', threadMode: 'platform' },
+        { displayName: '小晴', recipientBotID: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', threadMode: 'platform' },
+        { displayName: '小安', recipientBotID: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', threadMode: 'platform' },
       ],
     });
     assert.equal(enrolled.result.isError, undefined);
 
     const called = await scenario.tool('sendToAgent', {
-      from: '小晴', to: '小安', message: '請幫我確認 NUWA-GROK-01。',
+      from: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', to: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', message: '請幫我確認 NUWA-GROK-01。',
     });
     assert.equal(called.result.isError, undefined);
     assert.equal(scenario.calls.at(-1)?.url.pathname, '/v2/messages');
     assert.deepEqual(scenario.calls.at(-1)?.body, {
-      from: '小晴', to: '小安', body: '請幫我確認 NUWA-GROK-01。',
+      from: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', to: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', body: '請幫我確認 NUWA-GROK-01。',
     });
 
     const replied = await scenario.tool('relayReplyThread', {
-      from: '小安', threadID: THREAD_ID, body: '小晴，已收到。',
+      from: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', threadID: THREAD_ID, body: '小晴，已收到。',
     });
     assert.equal(replied.result.isError, undefined);
     assert.equal(scenario.calls.at(-1)?.url.pathname,
       '/v2/threads/' + THREAD_ID + '/messages');
     assert.deepEqual(scenario.calls.at(-1)?.body, {
-      from: '小安', body: '小晴，已收到。',
+      from: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', body: '小晴，已收到。',
     });
     assert.equal(scenario.calls.length, 3,
       'Enrollment, send and reply need no extra administrative MCP call.');

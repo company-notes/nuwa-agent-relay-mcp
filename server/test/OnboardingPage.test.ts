@@ -193,7 +193,8 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   assert.match(gateway, /完整轉交正文、寄件者及原 Relay Thread 回覆上下文/);
   assert.match(gateway, /讓本人依 Skill 回覆/);
   assert.match(gateway, /relayReplyThread\(\{from, threadID, body\}\)/);
-  assert.match(gateway, /帶入實際 Thread ID 與收件者自己的完整登記名稱/);
+  assert.match(gateway, /帶入實際 Thread ID，from 直接填 recipientBotID/);
+  assert.match(gateway, /排除群組／頻道/);
   assert.match(gateway, /獨立連線省略 from；平台允許時直接呼叫/);
   assert.match(gateway, /零 MCP 查詢，提交後結束/);
   assert.match(gateway, /回報 Gateway 地址、Wake 狀態及已接入同事名單/);

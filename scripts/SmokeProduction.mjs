@@ -50,6 +50,7 @@ assert.match(promptText, /接收入口或金鑰變更時，以同一 Gateway 身
 assert.match(promptText, /recipientBotID 使用平台原生工具轉交一次/);
 assert.match(promptText, /零 MCP 查詢，提交後結束/);
 assert.match(promptText, /relayReplyThread\(\{from, threadID, body\}\)/);
+assert.match(promptText, /from 直接填 recipientBotID/);
 assert.match(promptText, /平台允許時直接呼叫/);
 assert.doesNotMatch(promptText, /MailTrigger|Default Session|agentAddressSelectSession/);
 assert.match(promptText, /colleagueA/);
@@ -71,6 +72,7 @@ assert.match(skillText, /Zero MCP calls for ordinary office Wake dispatch/);
 assert.match(skillText, /agentAddressSelectSession/);
 assert.match(skillText, /relayReplyThread/);
 assert.match(skillText, /Forward a ready-to-use reply call/);
+assert.match(skillText, /<actual recipientBotID>/);
 assert.match(skillText, /Call the tool directly when its schema is available/);
 assert.doesNotMatch(skillText, /agentAddressFindByName/,
   'Name resolution must not add a second MCP tool call.');

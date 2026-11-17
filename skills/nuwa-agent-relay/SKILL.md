@@ -12,14 +12,19 @@ Agent/Session. The Gateway receives and forwards; the coworker reads and replies
 ## Everyday messaging — do the useful action once
 
 Use the existing MCP connection. On a shared office connection, supply your own
-complete registered display name as `from`. With your own authenticated Session,
-omit `from`.
+registered native Bot ID as `from` if known, or your complete registered display
+name. With your own authenticated Session, omit `from`.
 
 - New conversation: `sendToAgent({from: "小晴", to: "大熊", message: "請確認部署"})`.
 - Reply to an incoming message: `relayReplyThread({from: "大熊", threadID: "<relayThreadID>", body: "已確認"})`.
-- `to` accepts the coworker's registered display name, canonical address or verified
-  Email alias. Relay resolves it in the send request. Ask for clarification only
-  if routing fails because the name is unknown, ambiguous or unavailable.
+- Both `from` and `to` accept a registered native Bot ID (a raw UUID, or
+  `bot:<native ID>` for other IDs), complete registered display name, canonical
+  Nuwa address or verified Email alias. Prefer a known ID from the platform's
+  trusted Bot directory; a group/channel ID is not an individual Bot. Use the
+  coworker's name when the ID is not known. Relay resolves it in the send
+  request. Ask only when the target is unknown, ambiguous or unavailable.
+- Native ID sender example: `sendToAgent({from: "<your Bot UUID>", to: "<coworker Bot UUID>", message: "請確認部署"})`.
+  Use your own ID from trusted platform context, not the ID of another coworker.
 - Use the forwarded message content directly. Do not fetch it again merely to
   read or reply. Reply only when appropriate to the message or user's request.
 - Call the tool directly when its schema is available. Perform platform-required
@@ -65,11 +70,13 @@ LLM-operated dispatch tool, perform only the one native dispatch action.
 Forward a ready-to-use reply call with the trusted IDs, separate from the
 original message body:
 
-`relayReplyThread({from: "<recipient's full registered name>", threadID: "<actual relayThreadID>", body: "<reply>"})`
+`relayReplyThread({from: "<actual recipientBotID>", threadID: "<actual relayThreadID>", body: "<reply>"})`
 
-Substitute the event's actual `relayThreadID` and the receiving coworker's full
-registered name from the local enrollment roster if known. Otherwise let the
-coworker fill their own name; never use the sender's name as `from`. Omit `from` on an independent connection.
+Substitute the event's actual `relayThreadID` and `recipientBotID` (use the raw
+UUID, or prefix other native IDs with `bot:`). This is the receiving coworker's
+own ID, available directly in the Wake; no roster lookup is needed. Omit `from`
+on an independent connection. A coworker can also use their complete registered
+name, canonical address or verified Email alias.
 The coworker supplies the actual reply text and calls the tool directly when
 available, following any required host tool discovery. No separate
 `relayMessage` lookup or read receipt is needed for the reply.
@@ -103,7 +110,7 @@ Remote MCP endpoint: `https://mcp.agent-relay.company-notes.com/mcp`.
    `relayBeginWakePairing`, the protected browser callback form and
    `relayVerifyWake`. Confirm `relayWakeSubscription` is enabled.
 4. Read the platform's real Bot directory once during enrollment. Exclude
-   the Gateway itself; provide each coworker's `displayName`, `recipientBotID`
+   the Gateway itself and group/channel entries; provide each coworker's `displayName`, `recipientBotID`
    and actual `threadMode` (`platform` or `explicit`) in
    `relayGatewayEnrollOfficeCoworkers` (up to 25 per call). Relay creates or
    reuses the Agent/Default Session, mailbox and route. Repeated enrollment

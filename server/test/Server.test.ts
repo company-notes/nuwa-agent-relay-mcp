@@ -277,6 +277,7 @@ test('tool schemas expose neither Runtime/Resume capabilities nor caller Session
 
     assert.match(schemas, /sendToAgent/);
     assert.match(schemas, /agentAddressEnsureIdentity/);
+    assert.match(schemas, /agentAddressSelectSession/);
     assert.match(schemas, /relayBeginWakePairing/);
     assert.doesNotMatch(schemas, /runtimeToken|resumeToken|runtime_token|sessionID/);
     assert.doesNotMatch(schemas, /bearerToken|signingSecret/);

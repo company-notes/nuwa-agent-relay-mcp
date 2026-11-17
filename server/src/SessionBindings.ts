@@ -1,4 +1,4 @@
-import { AddressAPIClient, APIError } from './APIClients';
+import { AddressAPIClient, APIError, type BoundSession } from './APIClients';
 import type { Env } from './Env';
 import { Logger } from './Logger';
 import { RuntimeTokenCipher } from './RuntimeTokenCipher';
@@ -31,8 +31,6 @@ type ResumeResponse = {
 
 type ClaimResponse = ResumeResponse & { resumeToken: string };
 type Lease = { expiresAt: string };
-
-export type BoundSession = { sessionID: string; runtimeToken: string };
 
 export class SessionBindings {
   private static readonly logger = Logger.forModule('session.binding');
@@ -144,17 +142,14 @@ export class SessionBindings {
       row.encryptedRuntimeToken, key, row.sessionID,
     );
 
-    if (row.expiresAt > new Date().toISOString()) {
-      try {
-        await client.release(row.sessionID, runtimeToken);
-      } catch (error) {
-        if (!(error instanceof APIError) || error.status !== 409 ||
-            error.code !== 'runtime_not_owner') {
-          throw error;
-        }
-
-        SessionBindings.logger.error('stale_lease_binding_revoked', { status: error.status });
+    try {
+      await client.release(row.sessionID, runtimeToken);
+    } catch (error) {
+      if (!SessionBindings.isLostLease(error)) {
+        throw error;
       }
+
+      SessionBindings.logger.error('stale_lease_binding_revoked', { status: 409 });
     }
 
     const deleted = await this.env.BINDINGS_DB.prepare(
@@ -165,36 +160,73 @@ export class SessionBindings {
     return deleted.meta.changes === 1;
   }
 
-  private async renew(
+  private static isLostLease(error: unknown): boolean {
+    return error instanceof APIError && error.status === 409 &&
+      error.code === 'runtime_not_owner';
+  }
+
+  private async heartbeatIfOwned(
     client: AddressAPIClient, key: string, row: BindingRow,
-    organizationSlug: string,
-  ): Promise<BindingRow> {
+  ): Promise<Lease | null> {
     const token = await this.tokenCipher.decrypt(
       row.encryptedRuntimeToken, key, row.sessionID,
     );
 
-    if (row.expiresAt > new Date().toISOString()) {
-      // A failed heartbeat is not permission to take over another Runtime.
-      const lease = await client.heartbeat(row.sessionID, token) as Lease;
-
-      if (!lease?.expiresAt || !Number.isFinite(Date.parse(lease.expiresAt)) ||
-          Date.parse(lease.expiresAt) <= Date.now()) {
-        throw new APIError(502, 'invalid_lease_renewal',
-          'Agent Address did not renew the Session Runtime lease.');
+    try {
+      return await client.heartbeat(row.sessionID, token) as Lease;
+    } catch (error) {
+      if (!SessionBindings.isLostLease(error)) {
+        throw error;
       }
 
-      const result = await this.env.BINDINGS_DB.prepare(
-        `UPDATE remote_session_bindings SET expires_at = ?
-          WHERE grant_fingerprint = ? AND session_id = ?
-            AND encrypted_runtime_token = ?`,
-      ).bind(lease.expiresAt, key, row.sessionID, row.encryptedRuntimeToken).run();
+      return null;
+    }
+  }
 
-      if (result.meta.changes !== 1) {
-        throw new APIError(409, 'session_binding_revoked',
-          'The Session binding changed during Runtime renewal.');
-      }
+  private async saveExpiry(key: string, row: BindingRow, expiresAt: string): Promise<void> {
+    if (!expiresAt || !Number.isFinite(Date.parse(expiresAt)) ||
+        Date.parse(expiresAt) <= Date.now()) {
+      throw new APIError(502, 'invalid_lease_renewal',
+        'Agent Address did not renew the Session Runtime lease.');
+    }
+
+    const result = await this.env.BINDINGS_DB.prepare(
+      `UPDATE remote_session_bindings SET expires_at = MAX(expires_at, ?)
+        WHERE grant_fingerprint = ? AND session_id = ?
+          AND encrypted_runtime_token = ?`,
+    ).bind(expiresAt, key, row.sessionID, row.encryptedRuntimeToken).run();
+
+    if (result.meta.changes !== 1) {
+      throw new APIError(409, 'session_binding_revoked',
+        'The Session binding changed during Runtime renewal.');
+    }
+  }
+
+  private async recordRelayRenewal(key: string, row: BindingRow, expiresAt: string): Promise<void> {
+    try {
+      await this.saveExpiry(key, row, expiresAt);
+    } catch (error) {
+      // Relay has already completed the operation. Do not turn an accepted
+      // message into a retryable failure merely because expiry bookkeeping failed.
+      SessionBindings.logger.exception('relay_lease_sync_failed', error);
+    }
+  }
+
+  private async renew(
+    client: AddressAPIClient, key: string, row: BindingRow,
+    organizationSlug: string,
+  ): Promise<BindingRow> {
+    const wasActive = Date.parse(row.expiresAt) > Date.now();
+    const lease = await this.heartbeatIfOwned(client, key, row);
+
+    if (lease) {
+      await this.saveExpiry(key, row, lease.expiresAt);
 
       return { ...row, expiresAt: lease.expiresAt };
+    }
+
+    if (wasActive) {
+      throw new APIError(409, 'runtime_not_owner', 'This Runtime no longer owns the Session.');
     }
 
     // An expired lease may be safely resumed only with this grant's
@@ -275,7 +307,7 @@ export class SessionBindings {
   }
 
   private async ensureBound(
-    agentDisplayName?: string,
+    agentDisplayName?: string, renewRuntime = true,
   ): Promise<{ key: string; row: BindingRow; created: boolean }> {
     const client = this.address;
     const key = await this.principal(client);
@@ -291,7 +323,9 @@ export class SessionBindings {
           'The bound Session Organization is no longer authorized.');
       }
 
-      const renewed = await this.renew(client, key, existing, status.organization.slug);
+      const renewed = renewRuntime || Date.parse(existing.expiresAt) <= Date.now()
+        ? await this.renew(client, key, existing, status.organization.slug)
+        : existing;
 
       if (agentDisplayName) {
         // This is the current OAuth grant's own Session, never a Gateway
@@ -427,7 +461,8 @@ export class SessionBindings {
     const key = await this.principal(client);
     const existing = await this.row(key);
 
-    if (existing && existing.expiresAt > new Date().toISOString()) {
+    if (existing && (existing.expiresAt > new Date().toISOString() ||
+        await this.heartbeatIfOwned(client, key, existing))) {
       throw new APIError(409, 'session_already_bound',
         'Release the bound Runtime before selecting another Session.');
     }
@@ -490,9 +525,9 @@ export class SessionBindings {
   }
 
   async authorize(): Promise<BoundSession> {
-    // Reuse the verified grant and renewed binding from the same operation.
-    // Reading the grant and binding a second time adds latency but no authority.
-    const { key, row } = await this.ensureBound();
+    // Relay validates the current Runtime and returns its renewed expiry.
+    // Only an expired local record needs recovery before forwarding the call.
+    const { key, row } = await this.ensureBound(undefined, false);
 
     if (row.expiresAt <= new Date().toISOString()) {
       throw new APIError(403, 'session_binding_required',
@@ -504,6 +539,7 @@ export class SessionBindings {
       runtimeToken: await this.tokenCipher.decrypt(
         row.encryptedRuntimeToken, key, row.sessionID,
       ),
+      onRenewed: (expiresAt) => this.recordRelayRenewal(key, row, expiresAt),
     };
   }
 

@@ -32,6 +32,13 @@ Agent Address and Relay API contracts while refactoring.
 
 ## Verification and rollout
 
+- Keep already released identity recovery and ordinary messaging together. A new
+  deployment must retain `agentAddressSelectSession`, `sendToAgent`, and
+  `relayReplyThread`; verify the recovered Gateway can send and reply using its
+  original address without re-pairing Wake or re-enrolling coworkers. Integrate
+  concurrent fixes before deploying; do not deploy an older sibling branch
+  over a previously released feature.
+
 - Remote MCP: `npm ci && npm run check && npm test && npm run build`.
 - Studio: run the Python tests for the supported Linux and Windows targets
   through CI; keep deployment preview separate from production.

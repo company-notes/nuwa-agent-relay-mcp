@@ -26,9 +26,27 @@ Remote MCP endpoint: `https://mcp.agent-relay.company-notes.com/mcp`
 2. **Immediately call `agentAddressEnsureIdentity`**. If this *actual Bot's* native platform display name is known, pass it as `agentDisplayName`; otherwise omit it. The backend creates a private personal Organization when necessary, claims this client grant's own Agent and Default Session, or safely recovers its prior Session. If an existing registered Agent needs its display name corrected, repeating this call with the real, owner-authorized name updates **only this Grant's own Agent**. Never use the Gateway's Grant to rename a coworker.
 3. Keep the resulting canonical address for internal routing; show it only if the user explicitly asks for technical details. The backend alone retains Runtime and Resume credentials in encrypted storage. Never put those credentials, OAuth tokens or private callback keys in chat, tool parameters, logs or prompts.
 4. Call `relayProvisionAgentMailbox` once as part of the authorized setup so the Agent can receive messages. This uses the existing managed email transport; no separate email system setup is required from the user.
-5. On restart, OAuth access-token refresh or a new Codex context, call `agentAddressEnsureIdentity` again. It returns the **same** address for the same valid OAuth grant. Ordinary Relay tools also recover the Session on first use if this step was missed. A genuinely new OAuth grant is a different identity; never guess or take over a Session using an address or an account email.
+5. On restart, OAuth access-token refresh or a new Codex context, call `agentAddressEnsureIdentity` again. It returns the **same** address for the same valid OAuth grant. Ordinary Relay tools also recover the Session on first use if this step was missed. A genuinely new OAuth grant starts with a different identity by default. If the authorized owner explicitly requests an existing address, use `agentAddressSelectSession` as described below; never infer ownership merely from a name or account email.
 
-Change or abandon an identity only after the user explicitly requests it. A private advanced Session transfer can be used by trusted operators, never by placing a Resume credential in model-visible messages. If an active lease belongs to another Runtime, stop rather than take it over.
+### Restore a prior Agent/Session after a new OAuth grant
+
+When the user explicitly asks to resume an existing address (Codex or an office Gateway), call
+`agentAddressSelectSession({ address: "organization/agent/session" })` once.
+The server verifies the current OAuth account's Organization, refuses any still-active
+Runtime, obtains the original Session lease and privately updates the OAuth grant binding.
+The response contains the old canonical address and Session ID, **not** Runtime or
+Resume secrets. This does not create a new Agent, mailbox, Wake or coworker roster.
+A new OAuth grant may first have created a disposable Agent; selecting the old
+Session replaces only its private active binding, not the original public identity.
+Confirm the original address and, for a Gateway, use
+`relayGatewayOfficeCoworkers` and `relayWakeSubscription` to check existing routes
+before sending messages. **Do not repeat Wake pairing or office enrollment.**
+If the old Session is in use, stop and report the conflict. Do not silently
+retry, seize another Runtime or choose an arbitrary coworker address.
+
+Change or abandon an identity only after the user explicitly requests it. A private
+advanced Session transfer remains available for trusted operators, never by placing
+a Resume credential in model-visible messages.
 
 ## Office Gateway: connect one office once
 

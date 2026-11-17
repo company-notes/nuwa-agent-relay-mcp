@@ -277,6 +277,7 @@ test('tool schemas expose neither Runtime/Resume capabilities nor caller Session
 
     assert.match(schemas, /sendToAgent/);
     assert.match(schemas, /agentAddressEnsureIdentity/);
+    assert.match(schemas, /agentAddressSelectSession/);
     assert.match(schemas, /relayBeginWakePairing/);
     assert.doesNotMatch(schemas, /runtimeToken|resumeToken|runtime_token|sessionID/);
     assert.doesNotMatch(schemas, /bearerToken|signingSecret/);
@@ -310,6 +311,56 @@ test('another OAuth grant receives a separate Agent and never borrows the first 
 
     assert.notEqual((await firstAgent.json() as { data: { sessionID: string } }).data.sessionID,
       (await secondAgent.json() as { data: { sessionID: string } }).data.sessionID);
+  } finally {
+    scenario.restore();
+  }
+});
+
+test('new OAuth grant reselects its idle original Gateway Session without re-enrolling coworkers', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const original = await scenario.tool('agentAddressEnsureIdentity', {});
+    const replacement = await scenario.tool('agentAddressEnsureIdentity', {}, 'oauth-b');
+    assert.equal(original.result.isError, undefined);
+    assert.equal(replacement.result.isError, undefined);
+
+    const address = 'nuwa/reviewer-a/main';
+    const blocked = await scenario.tool('agentAddressSelectSession', { address }, 'oauth-b');
+    assert.equal(blocked.result.isError, true);
+    assert.equal(scenario.database.rows.get('b'.repeat(64))?.sessionID, SESSION_B);
+
+    scenario.activeLeases.delete(SESSION_A);
+
+    const recovered = await scenario.tool('agentAddressSelectSession', { address }, 'oauth-b');
+    assert.equal(recovered.result.isError, undefined);
+    const selected = JSON.parse(recovered.result.content[0].text);
+    assert.equal(selected.sessionID, SESSION_A);
+    assert.equal(selected.canonical, address);
+    assert.equal(scenario.database.rows.get('b'.repeat(64))?.sessionID, SESSION_A);
+    assert.doesNotMatch(JSON.stringify(recovered), /resumeToken|runtimeToken|resume_secret/);
+
+    const sent = await scenario.tool('sendToAgent', {
+      from: '小晴', to: '小安', message: 'Gateway restored original Session.',
+    }, 'oauth-b');
+    assert.equal(sent.result.isError, undefined);
+    assert.equal(scenario.calls[0].url.searchParams.get('session_id'), SESSION_A);
+    assert.equal(scenario.calls[0].headers.get('x-nuwa-runtime-token'),
+      RUNTIME_SECRET + '_recovered');
+    assert.deepEqual(scenario.calls[0].body, {
+      from: '小晴', to: '小安', body: 'Gateway restored original Session.',
+    });
+
+    const replied = await scenario.tool('relayReplyThread', {
+      from: '小安', threadID: THREAD_ID, body: '小晴，收到。',
+    }, 'oauth-b');
+    assert.equal(replied.result.isError, undefined);
+    assert.equal(scenario.calls[1].url.pathname, '/v2/threads/' + THREAD_ID + '/messages');
+    assert.equal(scenario.calls[1].url.searchParams.get('session_id'), SESSION_A);
+    assert.deepEqual(scenario.calls[1].body, { from: '小安', body: '小晴，收到。' });
+    assert.equal(scenario.calls.length, 2,
+      'Address recovery, send and reply must not enroll coworkers or change Wake.');
   } finally {
     scenario.restore();
   }

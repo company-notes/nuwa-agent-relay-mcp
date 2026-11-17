@@ -9,6 +9,7 @@ export class AddressTools extends MCPToolSet {
     server: McpServer,
     private readonly client: AddressAPIClient,
     private readonly ensureIdentity: (persona?: string) => Promise<Record<string, unknown>>,
+    private readonly selectSession: (address: string) => Promise<Record<string, unknown>>,
   ) {
     super(server);
   }
@@ -23,6 +24,14 @@ export class AddressTools extends MCPToolSet {
       'Never pass another coworker\'s name from a Gateway or ask for Runtime/Resume credentials.',
       { agentDisplayName: z.string().trim().min(1).max(120).optional() },
       (value) => this.ensureIdentity(value.agentDisplayName as string | undefined));
+
+    this.register('agentAddressSelectSession',
+      'When the authorized user explicitly asks to restore a known Agent/Session address, ' +
+      'select it in the same Organization if no Runtime currently occupies it. ' +
+      'Preserves the old Agent, Session, mailbox, Gateway roster and Wake. ' +
+      'Never request private Resume or Runtime credentials in chat.',
+      { address: z.string().trim().min(1).max(255) },
+      (value) => this.selectSession(value.address as string));
 
     this.register('agentAddressGetStatus',
       'Read the signed-in Account and Organization. This does not authorize any Session Runtime.',

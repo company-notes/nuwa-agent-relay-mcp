@@ -27,7 +27,7 @@ export class NuwaMCPServer {
         'normal installation. Relay tools also auto-ensure the Session if needed. ' +
         'Never include OAuth, Runtime, Resume or Wake secrets in MCP tools or prompts. ' +
         'On a shared office connection, use the calling Bot\'s enrolled name as from ' +
-        'for normal messages and Thread replies; no delegation switch or passphrase. ' +
+        'for ordinary messages and original Thread replies. ' +
         'Sending a message, confirmed mailbox arrival, successful Wake delivery and actual ' +
         'Agent startup are separate steps.',
     });

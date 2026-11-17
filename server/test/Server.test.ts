@@ -28,6 +28,10 @@ test('publishes the V2 Skill without exposing internal transport infrastructure'
   assert.match(expected, /relayThreadID/);
   assert.match(expected, /message content/i);
   assert.match(expected, /nuwa\.wake\.verification/);
+  assert.match(expected, /Zero MCP calls for ordinary office Wake dispatch/);
+  assert.match(expected, /agentAddressSelectSession/);
+  assert.match(expected, /relayReplyThread\(\{from:/);
+  assert.match(expected, /Do not fetch it again/);
   assert.doesNotMatch(expected, /github\.com|\bHost\b|\bWork\b|work_address_id/);
 });
 

@@ -190,6 +190,10 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   assert.match(gateway, /Organization 的管理授權/);
   assert.match(gateway, /MailTrigger 傳輸信箱/);
   assert.match(gateway, /姓名、Agent Address 或已驗證 Email 別名/);
+  assert.match(gateway, /recipientBotID/);
+  assert.match(gateway, /零 MCP 查詢/);
+  assert.match(gateway, /提交後結束/);
+  assert.match(gateway, /完整登記名稱 from/);
   assert.doesNotMatch(gateway, /小晴|大熊|Cosmo|nuwa\/xiaoqing/);
 
   const send = elements.get('sendPrompt')!.textContent;
@@ -202,6 +206,7 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   assert.match(reply, /「小晴」助理/);
   assert.match(reply, /收到星河/);
   assert.match(reply, /接續原本的 Relay Thread/);
+  assert.match(reply, /自己的 from/);
   assert.match(returned, /「小晴」助理/);
   assert.match(returned, /密語是月光/);
   assert.match(verify, /「大熊」助理/);

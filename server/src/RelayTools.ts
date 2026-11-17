@@ -56,6 +56,7 @@ export class RelayTools extends MCPToolSet {
 
     this.register('relayMessage',
       'Read one authorized message, optionally with up to 12 preceding Thread messages. ' +
+      'Use only when content or history is missing, not before replying to a complete Wake. ' +
       'On a shared office connection, pass your own enrolled name as from.',
       { messageID, from, contextLimit: z.number().int().min(1).max(12).optional() },
       ({ messageID, from, contextLimit }) => this.client.call('GET',
@@ -87,7 +88,7 @@ export class RelayTools extends MCPToolSet {
 
     this.register('relayReplyThread',
       'Reply in the original Relay Thread using this Session or an enrolled office coworker. ' +
-      'Use the trusted relayThreadID forwarded by the office Gateway. ' +
+      'Use the trusted relayThreadID forwarded by the office Gateway directly; no message lookup required. ' +
       'On a shared office Gateway connection, pass from as the replying Bot\'s registered ' +
       'name. Relay records its coworker Session and the Gateway audit actor.',
       { threadID, from, body, artifactLinks },

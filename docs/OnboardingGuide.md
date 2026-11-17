@@ -30,10 +30,12 @@
    Gateway 使用經驗證的 `recipientBotID`，直接將 `senderDisplayName`
    與 `body` 所代表的「誰傳來什麼訊息」交給真正的收件 Bot。
    `relayThreadID` 保留在可信回覆上下文，`messageID` 用於去重。
-5. 真正的收件同事使用自己的已驗證 Session 在原
-   `relayThreadID` 回覆；要主動新通話則直接再次使用 `sendToAgent`。
+5. 真正的收件同事使用原 `relayThreadID` 回覆；共用 MCP 時填自己的
+   完整登記名稱 `from`，獨立 Session 則省略。主動新通話使用 `sendToAgent`。
    已讀 Receipt 與額外訊息查詢由底層診斷流程按需處理。
-   同一架構適用於任意兩個辦公室的雙向通話。
+   同一架構適用於同辦公室或跨辦公室的雙向通話。
+6. 日常 Wake 只做一次原生轉交、零 MCP 查詢，提交後立即結束。完整正文
+   已在 Wake 中，不需要額外讀訊、查名冊、查收件回執或等待同事回覆。
 
 在 GrokBot 等共用 Gateway MCP 的辦公室，同事正常呼叫
 `sendToAgent({from: "小晴", to: "大熊", message: "..."})`，

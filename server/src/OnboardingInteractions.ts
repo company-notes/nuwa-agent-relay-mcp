@@ -37,7 +37,9 @@ export const ONBOARDING_SCRIPT = `
       '',
       '你是本辦公室的 Gateway，負責一次完成接線設定與維護分機名錄。',
       'Relay 通知你有來電時，使用平台原有的 Bot 傳訊能力，將訊息',
-      '轉交給 Relay 已指定的 Bot ID。由真正的同事閱讀、工作與回覆。',
+      '依 recipientBotID 直接轉交完整正文、寄件者及原 Relay Thread，由同事閱讀和回覆。',
+      '每次正常 Wake 只呼叫一次原生轉交工具，零 MCP 查詢；提交後結束，不等待同事回覆。',
+      '共用 MCP 的同事發訊、回覆及需要讀取歷史時，填自己的完整登記名稱 from。',
       '',
       '請依以下標準流程接入整間辦公室：',
       '1. 使用本辦公室既有的 Nuwa Skill、MCP 和受權 Gateway 身分。',
@@ -53,14 +55,14 @@ export const ONBOARDING_SCRIPT = `
       '呼叫 sendToAgent；Relay 在同一次請求內解析唯一收件者。',
       '回覆已有通話時接續原 Relay Thread；發新通話時建立新的 Relay Thread。',
       '',
-      '請從確認本辦公室 Gateway 接入狀態開始，每次只引導我完成下一項操作。',
+      '已有接線就沿用，不重做登入、信箱配置、Wake 或名冊；有身分問題先停止並回報。',
       '所有憑證使用平台的受保護授權流程，不在聊天中要求我輸入任何金鑰。'
     ].join('\\n');
   }
 
   function sendPrompt() {
     return [
-      '請透過 Nuwa 找另一間辦公室的「' + colleagueName('colleagueB') +
+      '請透過 Nuwa 找「' + colleagueName('colleagueB') +
         '」助理聊一下。',
       '告訴他：「你好，我們來測試通話，密語是星河。收到後請回覆密語。」',
       '請由 Relay 解析同事的唯一地址，並將這則新通話送到正確的收件人。'
@@ -71,14 +73,14 @@ export const ONBOARDING_SCRIPT = `
     return [
       '請查收剛才「' + colleagueName('colleagueA') +
         '」助理傳來的測試訊息，',
-      '請用 Nuwa 接續原本的 Relay Thread 回覆：「收到星河！」',
+      '請用 Nuwa 接續原本的 Relay Thread 回覆：「收到星河！」，共用連線時填自己的 from。',
       '並確認寄件方在原本的通話收到這則回覆。'
     ].join('\\n');
   }
 
   function returnPrompt() {
     return [
-      '請透過 Nuwa 主動找另一間辦公室的「' + colleagueName('colleagueA') +
+      '請透過 Nuwa 主動找「' + colleagueName('colleagueA') +
         '」助理聊一下。',
       '告訴他：「換我打給你了！這次密語是月光，請回覆密語。」',
       '若有同名的助理或找不到人，先問我，不要猜測。'
@@ -89,7 +91,7 @@ export const ONBOARDING_SCRIPT = `
     return [
       '請查收「' + colleagueName('colleagueB') +
         '」助理剛才主動打來的電話，',
-      '請用 Nuwa 在那通 Relay Thread 回覆：「收到月光！」',
+      '請用 Nuwa 在那通 Relay Thread 回覆：「收到月光！」，共用連線時填自己的 from。',
       '並確認寄件方收到原通話的回覆。'
     ].join('\\n');
   }

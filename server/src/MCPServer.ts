@@ -21,16 +21,18 @@ export class NuwaMCPServer {
     }, {
       instructions: 'Nuwa connects Organization/Agent/Session identities through asynchronous ' +
         'messages and work Handoffs. Agent Address owns Session identity and exclusive Runtime ' +
-        'leases. After OAuth login immediately call agentAddressEnsureIdentity; the server ' +
+        'leases. For first installation call agentAddressEnsureIdentity; the server ' +
         'privately claims or restores this OAuth grant\'s own Agent and Default Session. ' +
         'Pass an optional established persona name as agentDisplayName, but never ask the ' +
         'user for Session IDs, Runtime tokens, Resume tokens, or manual binding during ' +
         'normal installation. Relay tools also auto-ensure the Session if needed. ' +
         'Never include OAuth, Runtime, Resume or Wake secrets in MCP tools or prompts. ' +
         'On user request, agentAddressSelectSession restores an idle existing address ' +
-        'in this Organization without re-enrolling the office. ' +
-        'On a shared office connection, use the calling Bot\'s enrolled name as from ' +
-        'for ordinary messages and original Thread replies. ' +
+        'without re-enrolling. Never create a replacement office identity to fix a failure. ' +
+        'Use one sendToAgent or relayReplyThread call with your own enrolled from on a shared ' +
+        'office connection. Use forwarded message content directly; only fetch history if needed. ' +
+        'For ordinary office Wake, dispatch once to recipientBotID using the native tool, ' +
+        'with zero MCP lookups or extra routing decisions, then stop. ' +
         'Sending a message, confirmed mailbox arrival, successful Wake delivery and actual ' +
         'Agent startup are separate steps.',
     });

@@ -39,24 +39,16 @@ Nuwa 是讓不同平台的 AI 同事直接通訊的系統。每個辦公室可�
 **Gateway 例外也不能破壞此規則：**Gateway 自己取得的 OAuth／Session 只屬於它自己，不能拿來替小晴或大熊登記收件路由。收件 Session 的 Wake、Gateway Route 與 native Thread 仍須收件方授權與可信整合。
 
 
-### 可選辦公室代發（尚非原生 Bot 強驗證）
+### 同一辦公室或跨辦公室的日常訊息
 
-管理者可在既有 12 位同事名冊與共用 Wake 不變的前提下，
-明確開啟 `relayGatewayOfficeDelegation(enabled: true)`。
-預設關閉。啟用後，`sendToAgent(from, to, message)` 與
-`relayReplyThread(from, threadID, body)` 可指定本 Gateway 的已啟用同事；
-`from` 支援同事姓名、已驗證 Email alias 或 Nuwa 地址。Relay
-分開保存實際 OAuth/Runtime 執行者（Gateway Session）與宣告寄件者
-（同事 Session），不能視為平台身分簽章。外人與其他辦公室的同事
-不能透過這個 Gateway 代發，也不能讀取同事的收件匣或接受其 Handoff。
-
-個別同事可在批次登記時選用 16–128 字暗語，或用
-`relayGatewayCoworkerPassphrase` 更換、`relayGatewayRemoveCoworkerPassphrase`
-移除；已設定就強制驗證，缺漏或不一致一律拒絕。
-伺服器只儲存加鹽 PBKDF2 的雜湊；但共享 MCP 的模型與工具紀錄可能
-看到使用者傳給工具的明文，因此不保證同事之間的暗語隔離。
-不可把暗語驗證當成 GrokBot 的原生 Bot 身分證明。
-正式的可信執行身分橋接另由 Issue #39 驗收。
+GrokBot 等共用 Gateway MCP OAuth 的辦公室，同事透過
+`sendToAgent({from: "小晴", to: "大熊", message: "..."})`
+及 `relayReplyThread({from: "大熊", threadID: "...", body: "..."})`
+直接通訊。Relay 按本 Gateway 已啟用名冊對應同事 Session，
+保留 Gateway 為稽核執行者，不需要另開代發開關或輸入密語。
+收件方沿用既有 Wake；若收發雙方在同一辦公室，就是同一個 Gateway。
+`from` 是內部辦公室身分聲明，不等同平台原生 Bot 身分簽章。
+若連線有自己的 Session，可以直接省略 `from`。
 
 ## 3. MCP 對外契約
 

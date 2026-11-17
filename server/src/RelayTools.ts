@@ -36,7 +36,7 @@ export class RelayTools extends MCPToolSet {
   }
 
   private registerInboxTools(): void {
-    const { threadID, messageID } = this.schemas;
+    const { threadID, messageID, from } = this.schemas;
 
     this.register('relayInbox',
       'List messages addressed to the bound Session without marking them read.',
@@ -55,13 +55,14 @@ export class RelayTools extends MCPToolSet {
         '/v2/threads/' + encodeURIComponent(threadID as string)));
 
     this.register('relayMessage',
-      'Read one authorized message, optionally with up to 12 preceding Thread messages.',
-      { messageID, contextLimit: z.number().int().min(1).max(12).optional() },
-      ({ messageID, contextLimit }) => this.client.call('GET',
-        '/v2/messages/' + encodeURIComponent(messageID as string),
-        undefined,
-        contextLimit === undefined
-          ? undefined : { context_limit: String(contextLimit) }));
+      'Read one authorized message, optionally with up to 12 preceding Thread messages. ' +
+      'On a shared office connection, pass your own enrolled name as from.',
+      { messageID, from, contextLimit: z.number().int().min(1).max(12).optional() },
+      ({ messageID, from, contextLimit }) => this.client.call('GET',
+        '/v2/messages/' + encodeURIComponent(messageID as string), undefined, {
+          ...(from ? { from: String(from) } : {}),
+          ...(contextLimit === undefined ? {} : { context_limit: String(contextLimit) }),
+        }));
   }
 
   private registerMessageTools(): void {

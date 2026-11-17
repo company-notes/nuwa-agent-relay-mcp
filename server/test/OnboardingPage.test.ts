@@ -187,6 +187,8 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   assert.doesNotMatch(gateway, /核對他們的 Nuwa 地址/);
   assert.match(gateway, /安裝或更新最新版 Nuwa Skill 與 MCP/);
   assert.match(gateway, /沿用已啟用的共用 Wake/);
+  assert.match(gateway, /確認它指向現有例行任務/);
+  assert.match(gateway, /接收入口／金鑰已變更時，使用同一 Gateway 身分完成 Wake 配對/);
   assert.match(gateway, /Organization 的管理授權/);
   assert.match(gateway, /MailTrigger 傳輸信箱/);
   assert.match(gateway, /姓名、Agent Address 或已驗證 Email 別名/);

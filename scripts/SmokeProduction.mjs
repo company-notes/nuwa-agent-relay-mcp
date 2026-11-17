@@ -47,6 +47,7 @@ assert.match(promptText, /測試字詞是月光/);
 assert.match(promptText, /安裝或更新最新版 Nuwa Skill 與 MCP/);
 assert.match(promptText, /原 Gateway 地址並恢復其 Session/);
 assert.match(promptText, /沿用已啟用的共用 Wake/);
+assert.match(promptText, /接收入口／金鑰已變更時，使用同一 Gateway 身分完成 Wake 配對/);
 assert.match(promptText, /零 MCP 查詢/);
 assert.match(promptText, /colleagueA/);
 assert.match(promptText, /colleagueB/);

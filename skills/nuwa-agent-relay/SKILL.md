@@ -87,7 +87,10 @@ Remote MCP endpoint: `https://mcp.agent-relay.company-notes.com/mcp`.
    current grant's own Agent and Default Session. It can update that Agent's
    display name on explicit, owner-authorized request, not a coworker's name.
    Call `relayProvisionAgentMailbox` once during setup of an independent Agent.
-3. For an office, use the Gateway's own identity. Pair its one Wake through
+3. For an office, use the Gateway's own identity and configure the receiving
+   routine. Reuse the one verified Wake while its endpoint and credentials
+   match the receiving routine. For initial setup or an explicitly changed
+   endpoint or key, pair that same Gateway Session through
    `relayBeginWakePairing`, the protected browser callback form and
    `relayVerifyWake`. Confirm `relayWakeSubscription` is enabled.
 4. Read the platform's real Bot directory once during enrollment. Exclude
@@ -127,7 +130,8 @@ Thread is separate from the platform's native conversation.
 - If the original address is unavailable or occupied, stop and report the
   conflict. Do not silently change identity, retry or create another Gateway.
   After restoration confirm the original address/Session, existing Wake and
-  roster once; do not repeat pairing, mail setup or enrollment.
+  roster once. Reuse the mailbox and enrollment; follow the setup pairing
+  flow only when the receiving endpoint or key has explicitly changed.
 - A shared office coworker uses its own registered `from` on the shared
   connection, not an independent identity setup. The declared coworker is the
   message sender and Gateway is retained as audit actor; this is not

@@ -128,6 +128,8 @@ export class RemoteMCPScenario {
   registerOrganizationCount = 0;
   heartbeatCount = 0;
   grantLookups = 0;
+  statusLookups = 0;
+  statusDelayMS = 0;
   releaseCount = 0;
 
   constructor() {
@@ -178,6 +180,12 @@ export class RemoteMCPScenario {
         }
 
         if (url.pathname === '/v2/account/status') {
+          this.statusLookups += 1;
+
+          if (this.statusDelayMS > 0) {
+            await new Promise<void>((resolve) => setTimeout(resolve, this.statusDelayMS));
+          }
+
           return Response.json({
             ok: true,
             data: {

@@ -34,7 +34,7 @@ Nuwa 是讓不同平台的 AI 同事直接通訊的系統。每個辦公室可�
 → 取得公開地址，開始使用 sendToAgent
 ```
 
-使用者通常不需要接觸 Runtime／Resume 憑證。MCP 的私密 D1 保存這些憑證的加密資料，模型只接觸公開地址。OAuth Access Token 更新不應改變原 Grant 的 Session；真正更換 Grant 則不能藉人設名稱或 Email 自動取回別人的 Session。當其他 Runtime 有有效 Lease 時，必須拒絕接管。
+使用者通常不需要接觸 Runtime／Resume 憑證。MCP 的私密 D1 保存這些憑證的加密資料，模型只接觸公開地址。OAuth Access Token 更新不應改變原 Grant 的 Session；真正更換 Grant 時預設建立新 Agent；但經組織擁有者明確要求，可用 `agentAddressSelectSession({address})` 選回同 Organization 內閒置的舊 Session。Server 內部更新加密綁定，保留原 Session ID、Wake、名冊與路由；不要求模型輸入 Resume Token。若該 Session 有有效 Runtime Lease，仍須拒絕接管。
 
 **Gateway 例外也不能破壞此規則：**Gateway 自己取得的 OAuth／Session 只屬於它自己，不能拿來替小晴或大熊登記收件路由。收件 Session 的 Wake、Gateway Route 與 native Thread 仍須收件方授權與可信整合。
 

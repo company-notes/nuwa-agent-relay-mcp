@@ -37,6 +37,7 @@ export class SessionBindings {
   private static readonly SESSION_ID =
     /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
   private static readonly GRANT = /^[a-f0-9]{64}$/;
+  private static readonly LEASE_REFRESH_MARGIN_MS = 30_000;
   private readonly tokenCipher: RuntimeTokenCipher;
 
   constructor(
@@ -145,11 +146,12 @@ export class SessionBindings {
     try {
       await client.release(row.sessionID, runtimeToken);
     } catch (error) {
-      if (!SessionBindings.isLostLease(error)) {
+      if (!SessionBindings.isLostLease(error) && !(error instanceof APIError &&
+          error.status === 404 && error.code === 'session_not_found')) {
         throw error;
       }
 
-      SessionBindings.logger.error('stale_lease_binding_revoked', { status: 409 });
+      SessionBindings.logger.exception('stale_lease_binding_revoked', error);
     }
 
     const deleted = await this.env.BINDINGS_DB.prepare(
@@ -323,7 +325,9 @@ export class SessionBindings {
           'The bound Session Organization is no longer authorized.');
       }
 
-      const renewed = renewRuntime || Date.parse(existing.expiresAt) <= Date.now()
+      const needsRenewal = renewRuntime || Date.parse(existing.expiresAt) <=
+        Date.now() + SessionBindings.LEASE_REFRESH_MARGIN_MS;
+      const renewed = needsRenewal
         ? await this.renew(client, key, existing, status.organization.slug)
         : existing;
 
@@ -526,7 +530,7 @@ export class SessionBindings {
 
   async authorize(): Promise<BoundSession> {
     // Relay validates the current Runtime and returns its renewed expiry.
-    // Only an expired local record needs recovery before forwarding the call.
+    // Refresh only when the local lease may expire during the outgoing call.
     const { key, row } = await this.ensureBound(undefined, false);
 
     if (row.expiresAt <= new Date().toISOString()) {

@@ -46,7 +46,7 @@ export class OAuthResourceServer {
 
     // The backend is the single source of truth for OAuth account validity.
     // No bearer token is cached across clients or MCP requests.
-    const url = new URL('/v2/account/status', this.env.ADDRESS_API_URL);
+    const url = new URL('/v2/account/status?include_grant=1', this.env.ADDRESS_API_URL);
     let status: Response;
 
     try {

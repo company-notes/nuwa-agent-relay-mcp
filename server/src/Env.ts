@@ -1,3 +1,7 @@
+export interface BackgroundTasks {
+  waitUntil(promise: Promise<unknown>): void;
+}
+
 export interface WorkerService {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
 }

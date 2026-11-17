@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import type { BindingDatabase, BindingStatement, Env } from '../src/Env';
+import type { BackgroundTasks, BindingDatabase, BindingStatement, Env } from '../src/Env';
 import { HTTPMCPApplication } from '../src/Index';
 
 export const SESSION_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -25,6 +25,7 @@ class MemoryStatement implements BindingStatement {
   constructor(
     private readonly store: Map<string, BindingRecord>,
     private readonly sql: string,
+    private readonly expiryWriteGate?: Promise<void>,
   ) {}
 
   bind(...values: string[]): MemoryStatement {
@@ -60,6 +61,7 @@ class MemoryStatement implements BindingStatement {
     }
 
     if (this.sql.startsWith('UPDATE remote_session_bindings SET expires_at')) {
+      await this.expiryWriteGate;
       const [expiresAt, key, sessionID, encryptedRuntimeToken] = this.parameters;
       const current = this.store.get(key);
 
@@ -107,15 +109,29 @@ class MemoryStatement implements BindingStatement {
 
 export class MemoryBindingDatabase implements BindingDatabase {
   readonly rows = new Map<string, BindingRecord>();
+  expiryWriteGate?: Promise<void>;
 
   prepare(sql: string): BindingStatement {
-    return new MemoryStatement(this.rows, sql);
+    return new MemoryStatement(this.rows, sql, this.expiryWriteGate);
+  }
+}
+
+class TestBackgroundTasks implements BackgroundTasks {
+  private readonly pending: Promise<unknown>[] = [];
+
+  waitUntil(promise: Promise<unknown>): void {
+    this.pending.push(promise);
+  }
+
+  async drain(): Promise<void> {
+    await Promise.all(this.pending.splice(0));
   }
 }
 
 export class RemoteMCPScenario {
   private readonly originalFetch = globalThis.fetch;
   readonly database = new MemoryBindingDatabase();
+  readonly background = new TestBackgroundTasks();
   readonly calls: Array<{ url: URL; headers: Headers; body: unknown }> = [];
   readonly activeLeases = new Map<string, string>();
   readonly env: Env;
@@ -142,7 +158,7 @@ export class RemoteMCPScenario {
       ADDRESS_WORKER: { fetch: (input, init) => globalThis.fetch(input, init) },
       RELAY_WORKER: { fetch: (input, init) => globalThis.fetch(input, init) },
     };
-    this.application = new HTTPMCPApplication(this.env);
+    this.application = new HTTPMCPApplication(this.env, this.background);
   }
 
   private static principal(authorization: string | null): string | null {
@@ -416,6 +432,7 @@ export class RemoteMCPScenario {
 
   async tool(
     name: string, argumentsValue: Record<string, unknown>, token = 'oauth-a',
+    waitForBackground = true,
   ): Promise<{ result: { content: Array<{ text: string }>; isError?: boolean } }> {
     const response = await this.application.handle(new Request(
       'https://mcp.agent-relay.company-notes.com/mcp', {
@@ -434,6 +451,10 @@ export class RemoteMCPScenario {
     ));
 
     assert.equal(response.status, 200);
+
+    if (waitForBackground) {
+      await this.background.drain();
+    }
 
     return response.json() as Promise<{
       result: { content: Array<{ text: string }>; isError?: boolean };

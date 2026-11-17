@@ -1,6 +1,6 @@
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/server';
 
-import type { Env } from './Env';
+import type { BackgroundTasks, Env } from './Env';
 import { NuwaMCPServer } from './MCPServer';
 import { AGENT_SKILL_MD } from './SkillDocument';
 import { OAuthResourceServer, type AuthenticatedRequest } from './OAuthResourceServer';
@@ -12,7 +12,10 @@ import { OnboardingPage } from './OnboardingPage';
 
 export class HTTPMCPApplication {
   private static readonly logger = Logger.forModule('mcp');
-  constructor(private readonly env: Env) {}
+  constructor(
+    private readonly env: Env,
+    private readonly tasks: BackgroundTasks,
+  ) {}
 
   async handle(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -88,7 +91,9 @@ export class HTTPMCPApplication {
       });
 
       stage = 'register_tools';
-      const server = new NuwaMCPServer(this.env, result.authorization, address).createServer();
+      const server = new NuwaMCPServer(
+        this.env, result.authorization, address, this.tasks,
+      ).createServer();
 
       stage = 'connect_transport';
       await server.connect(transport);
@@ -110,7 +115,7 @@ export class HTTPMCPApplication {
 }
 
 export default {
-  fetch(request: Request, env: Env): Promise<Response> {
-    return new HTTPMCPApplication(env).handle(request);
+  fetch(request: Request, env: Env, context: BackgroundTasks): Promise<Response> {
+    return new HTTPMCPApplication(env, context).handle(request);
   },
 };

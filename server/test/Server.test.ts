@@ -467,6 +467,47 @@ test('expired or replaced Runtime cannot create a Relay message', async () => {
   }
 });
 
+test('a submitted office message returns before the confirmed Lease is synchronized', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    assert.equal((await scenario.bind()).status, 201);
+    const row = [...scenario.database.rows.values()][0];
+    row.expiresAt = new Date(Date.now() + 60_000).toISOString();
+    const previousExpiry = row.expiresAt;
+    scenario.database.expiryWriteGate = gate;
+
+    const sent = scenario.tool('sendToAgent', {
+      from: '小晴', to: '大熊', message: 'Please confirm the release.',
+    }, 'oauth-a', false);
+    const result = await Promise.race([sent, new Promise<never>((_resolve, reject) => {
+      timeout = setTimeout(() => reject(new Error('Message response waited for Lease bookkeeping.')), 5_000);
+    })]);
+
+    assert.equal(result.result.isError, undefined);
+    assert.equal(scenario.calls.length, 1);
+    assert.equal(scenario.relayLeaseChecks, 1);
+    assert.equal(scenario.heartbeatCount, 0);
+    assert.equal(row.expiresAt, previousExpiry);
+
+    release();
+    await scenario.background.drain();
+    assert.ok(row.expiresAt > previousExpiry, 'The tracked task must persist the confirmed expiry');
+  } finally {
+    clearTimeout(timeout);
+    release();
+    await scenario.background.drain();
+    scenario.restore();
+  }
+});
+
 test('an outdated local lease record retains the same active Runtime after Relay renewal', async () => {
   const scenario = new RemoteMCPScenario();
   scenario.install();

@@ -1,4 +1,4 @@
-import type { Env } from './Env';
+import type { BackgroundTasks, Env } from './Env';
 import { Logger } from './Logger';
 
 export class APIError extends Error {
@@ -146,6 +146,7 @@ export class RelayAPIClient extends HTTPAPIClient {
     env: Env,
     authorization: string,
     private readonly boundSession: () => Promise<BoundSession>,
+    private readonly tasks: BackgroundTasks,
     requester: typeof fetch = (input, init) => env.RELAY_WORKER.fetch(input, init),
   ) {
     super(env.RELAY_API_URL, authorization, requester);
@@ -166,7 +167,7 @@ export class RelayAPIClient extends HTTPAPIClient {
         const expiresAt = response.headers.get('x-nuwa-lease-expires-at');
 
         if (expiresAt) {
-          await onRenewed(expiresAt);
+          this.tasks.waitUntil(onRenewed(expiresAt));
         }
       },
     });

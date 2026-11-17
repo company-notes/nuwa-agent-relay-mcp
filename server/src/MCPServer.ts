@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/server';
 
-import type { Env } from './Env';
+import type { BackgroundTasks, Env } from './Env';
 import { AddressAPIClient, RelayAPIClient } from './APIClients';
 import { AddressTools } from './AddressTools';
 import { GatewayTools } from './GatewayTools';
@@ -12,6 +12,7 @@ export class NuwaMCPServer {
     private readonly env: Env,
     private readonly authorization: string,
     private readonly address: AddressAPIClient,
+    private readonly tasks: BackgroundTasks,
   ) {}
 
   createServer(): McpServer {
@@ -44,7 +45,7 @@ export class NuwaMCPServer {
       (persona) => bindings.ensure(persona),
       (address) => bindings.selectSession(address)).install();
     const relay = new RelayAPIClient(this.env, this.authorization,
-      () => bindings.authorize());
+      () => bindings.authorize(), this.tasks);
 
     new RelayTools(server, relay).install();
     new GatewayTools(server, relay).install();

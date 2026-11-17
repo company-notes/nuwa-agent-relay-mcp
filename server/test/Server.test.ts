@@ -315,6 +315,43 @@ test('another OAuth grant receives a separate Agent and never borrows the first 
   }
 });
 
+test('new OAuth grant reselects its idle original Gateway Session without re-enrolling coworkers', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const original = await scenario.tool('agentAddressEnsureIdentity', {});
+    const replacement = await scenario.tool('agentAddressEnsureIdentity', {}, 'oauth-b');
+    assert.equal(original.result.isError, undefined);
+    assert.equal(replacement.result.isError, undefined);
+
+    const address = 'nuwa/reviewer-a/main';
+    const blocked = await scenario.tool('agentAddressSelectSession', { address }, 'oauth-b');
+    assert.equal(blocked.result.isError, true);
+    assert.equal(scenario.database.rows.get('b'.repeat(64))?.sessionID, SESSION_B);
+
+    scenario.activeLeases.delete(SESSION_A);
+
+    const recovered = await scenario.tool('agentAddressSelectSession', { address }, 'oauth-b');
+    assert.equal(recovered.result.isError, undefined);
+    const selected = JSON.parse(recovered.result.content[0].text);
+    assert.equal(selected.sessionID, SESSION_A);
+    assert.equal(selected.canonical, address);
+    assert.equal(scenario.database.rows.get('b'.repeat(64))?.sessionID, SESSION_A);
+    assert.doesNotMatch(JSON.stringify(recovered), /resumeToken|runtimeToken|resume_secret/);
+
+    const sent = await scenario.tool('sendToAgent', {
+      to: '小安', message: 'Gateway restored original Session.',
+    }, 'oauth-b');
+    assert.equal(sent.result.isError, undefined);
+    assert.equal(scenario.calls[0].url.searchParams.get('session_id'), SESSION_A);
+    assert.equal(scenario.calls[0].headers.get('x-nuwa-runtime-token'),
+      RUNTIME_SECRET + '_recovered');
+  } finally {
+    scenario.restore();
+  }
+});
+
 test('revoking a private binding releases the Lease and blocks future Relay requests', async () => {
   const scenario = new RemoteMCPScenario();
   scenario.install();

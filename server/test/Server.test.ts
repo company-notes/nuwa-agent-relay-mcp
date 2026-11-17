@@ -477,6 +477,15 @@ test('an outdated local lease record retains the same active Runtime after Relay
     assert.equal(scenario.claimCount, 0);
     assert.equal(scenario.calls[0].url.searchParams.get('session_id'), SESSION_A);
     assert.ok(Date.parse(row.expiresAt) > Date.now());
+
+    row.expiresAt = new Date(Date.now() + 5000).toISOString();
+    const next = await scenario.tool('sendToAgent', {
+      to: '大熊', message: 'Keep the Session when its lease is about to expire.',
+    });
+    assert.equal(next.result.isError, undefined);
+    assert.equal(scenario.heartbeatCount, 2);
+    assert.equal(scenario.resumeCount, 1);
+    assert.equal(scenario.calls[1].url.searchParams.get('session_id'), SESSION_A);
   } finally {
     scenario.restore();
   }

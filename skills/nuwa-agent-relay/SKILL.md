@@ -166,7 +166,8 @@ Agent Address. Do not ask for internal addresses in a normal conversation.
    A successful send returns a new Relay `threadId`. To reply to an existing
    conversation use `relayReplyThread` with that saved Thread ID; **no name
    lookup or new Thread creation** is necessary. Use `relayMessage` with
-   `contextLimit: 8` when context is needed.
+   `contextLimit: 8` when context is needed. On a shared office connection,
+   also supply your own enrolled name as `from` when reading a message.
 5. For task delegation use `relaySendHandoff`, `relayAgentInbox`,
    `relayAcceptHandoff` and `relayReplyHandoff` as appropriate.
    Use `relayReceipt`, `relayInbox` and `relayWakeEvents` for

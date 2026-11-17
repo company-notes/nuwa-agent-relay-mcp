@@ -37,6 +37,7 @@ export class HTTPAPIClient {
       body?: Record<string, unknown>;
       query?: Record<string, string>;
       timeoutMs?: number;
+      onResponse?: (response: Response) => Promise<void>;
     } = {},
   ): Promise<unknown> {
     if (!path.startsWith('/') || path.startsWith('//')) {
@@ -89,6 +90,10 @@ export class HTTPAPIClient {
         'Backend connection failed. Check its progress before retrying.');
     }
 
+    if (response.ok && options.onResponse) {
+      await options.onResponse(response);
+    }
+
     return this.readResponse(response);
   }
 
@@ -128,7 +133,11 @@ export class HTTPAPIClient {
   }
 }
 
-export type BoundSession = { sessionID: string; runtimeToken: string };
+export type BoundSession = {
+  sessionID: string;
+  runtimeToken: string;
+  onRenewed: (expiresAt: string) => Promise<void>;
+};
 
 export class RelayAPIClient extends HTTPAPIClient {
   constructor(
@@ -147,34 +156,57 @@ export class RelayAPIClient extends HTTPAPIClient {
     query?: Record<string, string>,
     timeoutMs?: number,
   ): Promise<unknown> {
-    const { sessionID, runtimeToken } = await this.boundSession();
+    const { sessionID, runtimeToken, onRenewed } = await this.boundSession();
 
-    return this.request(method, path, { sessionID, runtimeToken, body, query, timeoutMs });
+    return this.request(method, path, {
+      sessionID, runtimeToken, body, query, timeoutMs,
+      onResponse: async (response) => {
+        const expiresAt = response.headers.get('x-nuwa-lease-expires-at');
+
+        if (expiresAt) {
+          await onRenewed(expiresAt);
+        }
+      },
+    });
   }
 }
 
 export class AddressAPIClient extends HTTPAPIClient {
+  private verifiedAccount?: Promise<Record<string, unknown>>;
+  private statusConsumed = false;
+
   constructor(
     env: Env,
     authorization: string,
     requester: typeof fetch = (input, init) => env.ADDRESS_WORKER.fetch(input, init),
-    private verifiedStatus?: Response,
+    verifiedStatus?: Response,
   ) {
     super(env.ADDRESS_API_URL, authorization, requester);
+
+    if (verifiedStatus) {
+      this.verifiedAccount = this.readResponse(verifiedStatus) as Promise<Record<string, unknown>>;
+    }
   }
 
-  status(): Promise<unknown> {
-    // Only the current HTTP request may reuse its authentication response.
-    const verified = this.verifiedStatus;
-    this.verifiedStatus = undefined;
+  async status(): Promise<unknown> {
+    if (!this.verifiedAccount || this.statusConsumed) {
+      return this.request('GET', '/v2/account/status');
+    }
 
-    return verified
-      ? this.readResponse(verified)
-      : this.request('GET', '/v2/account/status');
+    this.statusConsumed = true;
+    const { grantFingerprint, ...status } = await this.verifiedAccount;
+
+    return status;
   }
 
-  grant(): Promise<unknown> {
-    return this.request('GET', '/v2/account/grant');
+  async grant(): Promise<unknown> {
+    if (!this.verifiedAccount) {
+      return this.request('GET', '/v2/account/grant');
+    }
+
+    const { grantFingerprint } = await this.verifiedAccount;
+
+    return { grantFingerprint };
   }
 
   registerOrganization(input: Record<string, unknown>): Promise<unknown> {

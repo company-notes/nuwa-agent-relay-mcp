@@ -368,6 +368,11 @@ export class SessionBindings {
     };
     const existing = await this.row(key);
 
+    if (existing && existing.organizationID !== status.organization.id) {
+      throw new APIError(403, 'binding_organization_changed',
+        'The bound Session Organization is no longer authorized.');
+    }
+
     if (target.runtime && Date.parse(target.runtime.expiresAt) > Date.now()) {
       if (existing?.sessionID === target.id) {
         return this.ensure(authorization);

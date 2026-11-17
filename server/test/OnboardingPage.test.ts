@@ -203,15 +203,21 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
 
   assert.match(send, /「大熊」助理/);
   assert.match(send, /密語是星河/);
+  assert.match(send, /直接發送一次/);
+  assert.match(send, /自己的 from/);
   assert.match(reply, /「小晴」助理/);
   assert.match(reply, /收到星河/);
   assert.match(reply, /接續原本的 Relay Thread/);
   assert.match(reply, /自己的 from/);
+  assert.match(reply, /不需要額外查詢/);
   assert.match(returned, /「小晴」助理/);
   assert.match(returned, /密語是月光/);
+  assert.match(returned, /直接發送一次/);
+  assert.match(returned, /自己的 from/);
   assert.match(verify, /「大熊」助理/);
   assert.match(verify, /收到月光/);
   assert.match(verify, /在那通 Relay Thread 回覆/);
+  assert.match(verify, /不需要額外查詢/);
 
   for (const prompt of [send, reply, returned, verify]) {
     assert.doesNotMatch(prompt,

@@ -65,7 +65,7 @@ export const ONBOARDING_SCRIPT = `
       '請透過 Nuwa 找「' + colleagueName('colleagueB') +
         '」助理聊一下。',
       '告訴他：「你好，我們來測試通話，密語是星河。收到後請回覆密語。」',
-      '請由 Relay 解析同事的唯一地址，並將這則新通話送到正確的收件人。'
+      '請直接發送一次，由 Relay 解析收件人；共用連線時填自己的 from。'
     ].join('\\n');
   }
 
@@ -74,7 +74,7 @@ export const ONBOARDING_SCRIPT = `
       '請查收剛才「' + colleagueName('colleagueA') +
         '」助理傳來的測試訊息，',
       '請用 Nuwa 接續原本的 Relay Thread 回覆：「收到星河！」，共用連線時填自己的 from。',
-      '並確認寄件方在原本的通話收到這則回覆。'
+      '已有完整訊息就直接回覆一次，不需要額外查詢；由驗收者確認對方收到。'
     ].join('\\n');
   }
 
@@ -83,7 +83,7 @@ export const ONBOARDING_SCRIPT = `
       '請透過 Nuwa 主動找「' + colleagueName('colleagueA') +
         '」助理聊一下。',
       '告訴他：「換我打給你了！這次密語是月光，請回覆密語。」',
-      '若有同名的助理或找不到人，先問我，不要猜測。'
+      '請直接發送一次；共用連線時填自己的 from。同名或找不到人才問我。'
     ].join('\\n');
   }
 
@@ -92,7 +92,7 @@ export const ONBOARDING_SCRIPT = `
       '請查收「' + colleagueName('colleagueB') +
         '」助理剛才主動打來的電話，',
       '請用 Nuwa 在那通 Relay Thread 回覆：「收到月光！」，共用連線時填自己的 from。',
-      '並確認寄件方收到原通話的回覆。'
+      '已有完整訊息就直接回覆一次，不需要額外查詢；由驗收者確認對方收到。'
     ].join('\\n');
   }
 

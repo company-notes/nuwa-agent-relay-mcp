@@ -396,7 +396,7 @@ export class SessionBindings {
 
       SessionBindings.checkLease(recovered, target.id, status.organization.slug);
 
-      if (existing && !await this.releaseBinding(client, key, existing)) {
+      if (existing && !(await this.releaseBinding(client, key, existing))) {
         throw new APIError(409, 'session_binding_changed',
           'The current OAuth grant binding changed during selection.');
       }

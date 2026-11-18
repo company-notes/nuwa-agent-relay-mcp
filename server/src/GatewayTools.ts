@@ -27,10 +27,12 @@ export class GatewayTools extends MCPToolSet {
 
   install(): void {
     this.register('relayGatewayEnrollOfficeCoworkers',
-      'Register this office\'s native Bots in ONE user-authorized operation. ' +
+      'Incrementally synchronize this office\'s native Bots in ONE user-authorized operation. ' +
       'Use real platform display names and verified native Bot IDs from the platform directory. ' +
       'The Relay creates or restores each real Organization Agent/Default Session, provisions ' +
-      'its transport mailbox, and attaches its incoming route to this Gateway\'s ONE verified Wake. ' +
+      'its transport mailbox, and attaches new shared members to this Gateway\'s ONE verified Wake. ' +
+      'The same Bot ID preserves identity when renamed; independently connected members keep their mode. ' +
+      'Omitted members are unchanged; remove a member only through the explicit removal tool. ' +
       'The returned addresses and routes are public metadata, never Runtime or Resume credentials. ' +
       'Already-enrolled coworkers use from when sending through the shared office connection.',
       { coworkers: GatewayTools.coworkers },
@@ -45,7 +47,7 @@ export class GatewayTools extends MCPToolSet {
 
     this.register('relayGatewayOfficeCoworkers',
       'Read the real display names, trusted native Bot IDs, Agent Addresses ' +
-      'and receiving-route state for this Gateway\'s own Organization office.',
+      'and receiving-route state (gateway, direct, inbox or inactive) for this Gateway\'s office.',
       {},
       () => this.client.call('GET', '/v2/gateway-office-coworkers'));
 
@@ -73,16 +75,18 @@ export class GatewayTools extends MCPToolSet {
         }));
 
     this.register('relayGatewayRemoveTeammate',
-      'On explicit user request, remove ONE approved or pending coworker by recipientName, ' +
-      'the real platform Bot display name. Relay resolves that name freshly and requires ' +
-      'a unique authorized identity; do not look it up with another MCP tool. ' +
-      'Alternatively use a verified recipientAddress. Provide exactly one of the two. ' +
-      'This cancels pending notifications and native Thread bindings.',
-      { ...GatewayTools.recipient },
-      ({ recipientName, recipientAddress }) => {
-        // MCPToolSet exposes validated arguments as unknown; narrow them
-        // before constructing the HTTP client's string-only query values.
+      'On explicit user request, remove ONE approved or pending coworker. ' +
+      'Prefer its trusted recipientBotID; alternatively supply its verified recipientAddress ' +
+      'or unique recipientName. Supply exactly one selector. ' +
+      'Only that shared membership, pending notifications and its native route are revoked; ' +
+      'the Agent identity, mailbox, messages and Relay Threads remain.',
+      { ...GatewayTools.recipient, recipientBotID: GatewayTools.route.recipientBotID.optional() },
+      ({ recipientName, recipientAddress, recipientBotID }) => {
         const query: Record<string, string> = {};
+
+        if (typeof recipientBotID === 'string') {
+          query.recipient_bot_id = recipientBotID;
+        }
 
         if (typeof recipientName === 'string') {
           query.recipient_name = recipientName;
@@ -102,15 +106,20 @@ export class GatewayTools extends MCPToolSet {
       () => this.client.call('GET', '/v2/gateway-invitation'));
 
     this.register('relayGatewayApproveInvitation',
-      'Approve this coworker\'s pending Gateway invitation only with explicit authorization ' +
-      'from the actual coworker Session owner. Office-wide discovery or owner consent for the ' +
-      'Gateway does not approve another Session. Never call from Gateway on behalf of a coworker.',
-      {},
-      () => this.client.call('PUT', '/v2/gateway-invitation'));
+      'Approve this coworker\'s pending Gateway invitation with the actual recipient Session. ' +
+      'For an explicit switch to the shared office connection, set shareConnection:true. ' +
+      'This authorizes shared office speaking and replaces the independent Wake with the verified Gateway. ' +
+      'The original address, Session, mailbox and Relay Threads are preserved. ' +
+      'An approval without shareConnection authorizes only the receiving route.',
+      { shareConnection: z.boolean().optional() },
+      ({ shareConnection }) => this.client.call('PUT', '/v2/gateway-invitation',
+        shareConnection === true ? { shareConnection: true } : undefined));
 
     this.register('relayGatewayDeclineInvitation',
-      'On explicit user request, decline or revoke the current coworker\'s shared Gateway ' +
-      'route. No other coworkers are affected.',
+      'On explicit user request, decline a pending invitation or leave this coworker\'s shared Gateway. ' +
+      'Leaving preserves the original native identity, mailbox and Relay Threads, removes shared speaking ' +
+      'permission and switches receiving to the independent Inbox. Configure a direct Wake if needed. ' +
+      'The chosen independent mode survives later office synchronization.',
       {},
       () => this.client.call('DELETE', '/v2/gateway-invitation'));
   }

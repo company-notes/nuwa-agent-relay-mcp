@@ -152,12 +152,13 @@ Remote MCP endpoint: `https://mcp.agent-relay.company-notes.com/mcp`.
    endpoint or key, pair that same Gateway Session through
    `relayBeginWakePairing`, the protected browser callback form and
    `relayVerifyWake`. Confirm `relayWakeSubscription` is enabled.
-4. Read the platform's real Bot directory once during enrollment. Exclude
-   the Gateway itself and group/channel entries; provide each coworker's `displayName`, `recipientBotID`
-   and actual `threadMode` (`platform` or `explicit`) in
-   `relayGatewayEnrollOfficeCoworkers` (up to 25 per call). Relay creates or
-   reuses the Agent/Default Session, mailbox and route. Repeated enrollment
-   preserves the assigned address; do not re-enroll for ordinary messages.
+4. Read the real Bot directory and existing office roster during setup.
+   Enroll selected shared coworkers (excluding the Gateway and group/channel
+   entries) with `displayName`, `recipientBotID` and actual `threadMode`
+   (`platform` or `explicit`) in `relayGatewayEnrollOfficeCoworkers`
+   (up to 25 per call). Incremental synchronization preserves addresses and
+   independent connection choices. A known existing independent Agent joins
+   through explicit invitation approval rather than a second identity.
 5. At office setup acceptance, review `relayGatewayOfficeCoworkers` and
    `relayGatewayTeammates`. For either connection mode, verify actual A → B
    delivery, reply in the same Thread, B → A new conversation and reply.
@@ -170,6 +171,40 @@ The trusted receiver passes its `verificationId` and `challenge` to its
 authenticated Session, which calls `relayVerifyWake` once. Confirm enabled
 status; do not forward the challenge to coworkers or repeat pairing for a
 normal Wake. Keep callback credentials and signing keys in protected configuration.
+
+## Office membership and connection changes — keep the same identity
+
+A shared office, independent Wake and independent Inbox can coexist within
+one Organization or platform. A connection change never creates a replacement
+Agent or Session. These are explicit management operations, not daily messaging.
+
+- For roster synchronization, read the trusted platform directory and
+  `relayGatewayOfficeCoworkers` once. Submit new or renamed coworkers to
+  `relayGatewayEnrollOfficeCoworkers` in batches of up to 25. The stable
+  native Bot ID preserves the original address and mailbox. Existing independent
+  choices remain independent; an omitted member is unchanged. For a deliberate
+  shared-member removal, call `relayGatewayRemoveTeammate({recipientBotID})`
+  using the raw native ID. A removed shared member can later rejoin with the
+  same ID and address.
+- Shared to independent: use the coworker's own OAuth authorization and
+  `agentAddressSelectSession({address})` for the original idle Session before
+  ordinary Relay tools. Call `relayGatewayDeclineInvitation` from that
+  Session to leave shared speaking and receiving. The original Inbox and
+  native Bot mapping remain available; pair a direct Wake only if supported.
+  Messages already stored in Relay remain in the Inbox during the change.
+- Independent to shared: the Gateway invites the coworker's existing address
+  and trusted native Bot ID with `relayGatewayInviteTeammate`. The actual
+  recipient Session explicitly calls
+  `relayGatewayApproveInvitation({shareConnection: true})`.
+  This replaces its independent Wake with the verified shared receiver and
+  grants office speaking. Existing native route settings must match. Use the
+  shared connector for daily messages and the coworker's own `from`.
+  The previous personal OAuth grant remains independently authorized until
+  its owner disconnects or revokes it. A route-only invitation approval
+  without shareConnection does not grant office speaking.
+- Verify the new mode, original address and one round trip in the original
+  Thread before concluding setup. Management waits for an in-flight Wake to
+  finish; ordinary notification retries and platform execution are unchanged.
 
 ## Identity recovery — preserve the installed address
 

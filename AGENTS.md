@@ -55,4 +55,5 @@ Agent Address and Relay API contracts while refactoring.
   actual Red/Green results when investigating a bug.
 - Work in a PR with CI passing. A merge into `main` can deploy the
   production remote MCP; do not merge an audit/refactor without deployment
-  authorization.
+  authorization. Production is built from verified merged main only, including
+  a local deployment when CI is temporarily unavailable. Never publish a draft PR head.

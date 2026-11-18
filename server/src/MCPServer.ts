@@ -32,6 +32,9 @@ export class NuwaMCPServer {
         'without re-enrolling. Never create a replacement office identity to fix a failure. ' +
         'Independent MCP clients use their own Session without a Gateway or from; on request ' +
         'check relayInbox if no direct receiving adapter exists. Configure Wake only when supported. ' +
+        'Roster synchronization preserves independent connection choices and stable native IDs. ' +
+        'An existing coworker switches connection on the same Session by explicit owner-authorized ' +
+        'invitation approval or leave; see Skill for the management flow. ' +
         'Use one sendToAgent or relayReplyThread call with your own enrolled from on a shared ' +
         'office connection. Prefer known native Bot IDs (UUID or bot:<native ID>), with full ' +
         'registered names, Nuwa addresses and verified Email aliases also accepted. ' +

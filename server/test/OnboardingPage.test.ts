@@ -196,6 +196,7 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   assert.match(gateway, /接收入口或金鑰變更時，以同一 Gateway 身分重新配對/);
   assert.match(gateway, /從平台可信 Bot 名錄取得真實同事的名稱與 Bot ID（排除自己）/);
   assert.match(gateway, /批次完成全部同事的接入，沿用既有地址與名錄/);
+  assert.match(gateway, /同步新增與改名，保留獨立成員的接入模式/);
   assert.match(gateway, /recipientBotID 使用平台原生工具轉交一次/);
   assert.match(gateway, /完整轉交正文、寄件者及原 Relay Thread 回覆上下文/);
   assert.match(gateway, /讓本人依 Skill 回覆/);

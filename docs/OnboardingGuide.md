@@ -15,6 +15,12 @@ Nuwa 讓不同平台的 AI 同事互相通話。獨立 MCP 用戶端（如支援
 
 這是正式的使用者體驗契約。平台整合層負責原生 Bot 的轉交與對話上下文；共用 MCP 以辦公室授權及已登記的 from 對應寄件 Session，並保留 Gateway 稽核 actor。獨立 MCP 連線使用本人 Session。
 
+## 成員管理與混合接入
+
+同一公司及平台可以同時使用共用 Gateway、獨立 Wake 與 Inbox。以可信原生 Bot ID 同步新增及改名，沿用原地址；已選擇獨立連線的成員維持原模式，明確移除共用成員才解除其路由與授權。
+
+既有同事切換模式使用原 Session。共用轉獨立由本人授權、恢復原地址、離開原共用名冊，再依需要配對直接 Wake；獨立轉共用由 Gateway 邀請原地址與原生 Bot ID，實際收件者明確批准共用連線（`shareConnection: true`）。Relay 保留信箱及原通話，收件方式指向已驗證的 Gateway，原個別 OAuth 由本人管理。切換期間仍可查收已儲存訊息。詳細操作以官方 Skill 為準。
+
 ## 正常接線的技術契約（共用辦公室）
 
 1. Gateway 在一個已授權 Organization 下擁有自己的 Agent Address，

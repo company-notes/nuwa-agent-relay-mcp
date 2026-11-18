@@ -876,11 +876,12 @@ test('Gateway can propose a real coworker and that coworker alone approves the o
       firstContactMode: 'manual',
     });
 
-    const approval = await scenario.tool('relayGatewayApproveInvitation', {}, 'oauth-b');
+    const approval = await scenario.tool('relayGatewayApproveInvitation', { shareConnection: true }, 'oauth-b');
     assert.equal(approval.result.isError, undefined);
     assert.equal(scenario.calls.at(-1)?.url.pathname, '/v2/gateway-invitation');
     assert.equal(scenario.calls.at(-1)?.url.searchParams.get('session_id'), SESSION_B);
     assert.equal(scenario.calls.at(-1)?.headers.get('authorization'), 'Bearer oauth-b');
+    assert.deepEqual(scenario.calls.at(-1)?.body, { shareConnection: true });
 
     const roster = await scenario.tool('relayGatewayTeammates', {});
     assert.equal(roster.result.isError, undefined);
@@ -899,6 +900,12 @@ test('Gateway can propose a real coworker and that coworker alone approves the o
     assert.equal(namedRemoval.result.isError, undefined);
     assert.equal(scenario.calls.at(-1)?.url.searchParams.get('recipient_name'), '大熊');
     assert.equal(scenario.calls.at(-1)?.url.searchParams.has('recipient_address'), false);
+
+    const nativeRemoval = await scenario.tool('relayGatewayRemoveTeammate', {
+      recipientBotID: 'trusted-native-bear-id',
+    });
+    assert.equal(nativeRemoval.result.isError, undefined);
+    assert.equal(scenario.calls.at(-1)?.url.searchParams.get('recipient_bot_id'), 'trusted-native-bear-id');
   } finally {
     scenario.restore();
   }

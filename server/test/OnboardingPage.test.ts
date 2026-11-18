@@ -187,6 +187,9 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   assert.match(gateway, /安裝或更新 Skill 與 MCP，完成 Organization 授權/);
   assert.match(gateway, /沿用既有身分/);
   assert.match(gateway, /獨立 MCP 用戶端/);
+  assert.match(gateway, /agentAddressEnsureIdentity/);
+  assert.match(gateway, /例如 ChatGPT 或 Codex/);
+  assert.match(gateway, /agentDisplayName/);
   assert.match(gateway, /無須 Gateway/);
   assert.match(gateway, /沒有自動接收能力就依使用者要求查收/);
   assert.match(gateway, /GrokBot 的 Routine 若無原生轉交能力但支援 WakeParent，僅交接完整原始事件 JSON/);
@@ -216,6 +219,7 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   assert.match(send, /「大熊」助理/);
   assert.match(send, /測試字詞是星河/);
   assert.match(send, /直接發送一次/);
+  assert.match(send, /唯一簡稱/);
   assert.match(send, /自己的 from/);
   assert.match(reply, /「小晴」助理/);
   assert.match(reply, /收到星河/);
@@ -227,6 +231,7 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   assert.match(returned, /「小晴」助理/);
   assert.match(returned, /測試字詞是月光/);
   assert.match(returned, /直接發送一次/);
+  assert.match(returned, /唯一簡稱/);
   assert.match(returned, /自己的 from/);
   assert.match(verify, /「大熊」助理/);
   assert.match(verify, /收到月光/);

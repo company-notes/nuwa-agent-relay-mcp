@@ -209,7 +209,7 @@ test('Skill-first OAuth alone privately creates one persistent Agent/Session and
   }
 });
 
-test('an existing coworker restores its own identity and updates its native display name only during setup', async () => {
+test('an existing unnamed ChatGPT client sets its own display name without replacing its Session', async () => {
   const scenario = new RemoteMCPScenario();
   scenario.install();
 
@@ -222,7 +222,7 @@ test('an existing coworker restores its own identity and updates its native disp
     assert.equal(scenario.displayNameUpdates.length, 0);
 
     const updated = await scenario.tool('agentAddressEnsureIdentity', {
-      agentDisplayName: '大熊',
+      agentDisplayName: 'ChatGPT',
     });
     const same = JSON.parse(updated.result.content[0].text) as {
       sessionID: string; canonical: string; created: boolean;
@@ -233,7 +233,7 @@ test('an existing coworker restores its own identity and updates its native disp
     assert.equal(same.created, false);
     assert.equal(scenario.claimCount, 1);
     assert.deepEqual(scenario.displayNameUpdates, [{
-      agentID: 'agent-a', name: '大熊', principal: 'a',
+      agentID: 'agent-a', name: 'ChatGPT', principal: 'a',
     }]);
 
     const secondGrant = await scenario.tool('agentAddressEnsureIdentity', {}, 'oauth-b');
@@ -248,7 +248,7 @@ test('an existing coworker restores its own identity and updates its native disp
     assert.equal(scenario.displayNameUpdates[0].agentID, 'agent-a');
 
     const sent = await scenario.tool('sendToAgent', {
-      to: '大熊', message: 'Normal call should not rename any Agent.',
+      to: '小晴', message: 'Normal call should not rename any Agent.',
     });
     assert.equal(sent.result.isError, undefined);
     assert.equal(scenario.displayNameUpdates.length, 2);

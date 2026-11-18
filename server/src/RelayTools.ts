@@ -10,13 +10,21 @@ export class RelayTools extends MCPToolSet {
   private static readonly FROM = 'On a shared office connection, pass your own ' +
     RelayTools.IDENTITY + ' as from; prefer the known native Bot ID. Omit from on an independent Session.';
 
-  private readonly schemas = {
+  private static readonly subject = z.string().min(1).max(255);
+  private static readonly optionalSubject = RelayTools.subject.optional();
+
+  private static readonly schemas = {
     messageID: z.string().uuid(),
     threadID: z.string().uuid(),
     body: z.string().min(1).max(100_000),
     to: z.string().min(1).max(255).describe(RelayTools.IDENTITY),
     from: z.string().trim().min(1).max(255).optional().describe(RelayTools.FROM),
-    subject: z.string().min(1).max(255),
+    subject: RelayTools.subject,
+    optionalSubject: RelayTools.optionalSubject,
+    contextLimit: z.number().int().min(1).max(12).optional(),
+    refreshArchive: z.boolean().optional(),
+    verificationId: z.string().uuid(),
+    challenge: z.string().regex(/^[a-f0-9]{64}$/),
     artifactLinks: z.array(z.url()).max(20).optional(),
   };
 
@@ -41,7 +49,7 @@ export class RelayTools extends MCPToolSet {
   }
 
   private registerInboxTools(): void {
-    const { threadID, messageID, from } = this.schemas;
+    const { threadID, messageID, from, contextLimit } = RelayTools.schemas;
 
     this.register('relayInbox',
       'List messages addressed to the bound Session without marking them read.',
@@ -63,7 +71,7 @@ export class RelayTools extends MCPToolSet {
       'Read one authorized message, optionally with up to 12 preceding Thread messages. ' +
       'Use only when content or history is missing, not before replying to a complete Wake. ' +
       RelayTools.FROM,
-      { messageID, from, contextLimit: z.number().int().min(1).max(12).optional() },
+      { messageID, from, contextLimit },
       ({ messageID, from, contextLimit }) => this.client.call('GET',
         '/v2/messages/' + encodeURIComponent(messageID as string), undefined, {
           ...(from ? { from: String(from) } : {}),
@@ -72,7 +80,7 @@ export class RelayTools extends MCPToolSet {
   }
 
   private registerMessageTools(): void {
-    const { to, from, body, subject, artifactLinks, threadID } = this.schemas;
+    const { to, from, body, optionalSubject, artifactLinks, threadID } = RelayTools.schemas;
 
     this.register('sendToAgent',
       'Send to a ' + RelayTools.IDENTITY + ', creating a new Relay Thread. ' +
@@ -82,7 +90,7 @@ export class RelayTools extends MCPToolSet {
       'Use relayReplyThread to continue an existing Thread; submission is not delivery. ' +
       RelayTools.FROM + ' ' +
       'Relay maps it to the coworker Session and records the shared Gateway actor.',
-      { to, from, message: body, subject: subject.optional(), artifactLinks },
+      { to, from, message: body, subject: optionalSubject, artifactLinks },
       ({ to, from, message, subject, artifactLinks }) =>
         this.client.call('POST', '/v2/messages', {
           to, body: message,
@@ -105,7 +113,7 @@ export class RelayTools extends MCPToolSet {
   }
 
   private registerHandoffTools(): void {
-    const { to, subject, body, artifactLinks, messageID } = this.schemas;
+    const { to, subject, body, artifactLinks, messageID } = RelayTools.schemas;
 
     this.register('relaySendHandoff',
       'Delegate work to an Agent or exact Session.',
@@ -130,11 +138,11 @@ export class RelayTools extends MCPToolSet {
   }
 
   private registerReceiptTools(): void {
-    const { messageID } = this.schemas;
+    const { messageID, refreshArchive } = RelayTools.schemas;
 
     this.register('relayReceipt',
       'Inspect independently confirmed mail arrival and explicit Session read receipts.',
-      { messageID, refreshArchive: z.boolean().optional() },
+      { messageID, refreshArchive },
       ({ messageID, refreshArchive }) => this.client.call('GET',
         '/v2/messages/' + encodeURIComponent(messageID as string) + '/receipt',
         undefined, refreshArchive ? { refresh: 'archive' } : undefined));
@@ -148,6 +156,8 @@ export class RelayTools extends MCPToolSet {
   }
 
   private registerWakeTools(): void {
+    const { verificationId, challenge } = RelayTools.schemas;
+
     this.register('relayBeginWakePairing',
       'Create an OAuth-protected private browser link for Session Wake pairing.',
       {},
@@ -159,10 +169,7 @@ export class RelayTools extends MCPToolSet {
       'nuwa.wake.verification event, never the Webhook URL or sender key. ' +
       'A received HTTP 2xx does not activate Wake without this confirmation. ' +
       'Do not call on behalf of another Agent or attempt to guess a proof.',
-      {
-        verificationId: z.string().uuid(),
-        challenge: z.string().regex(/^[a-f0-9]{64}$/),
-      },
+      { verificationId, challenge },
       ({ verificationId, challenge }) =>
         this.client.call('POST', '/v2/wake-subscription/verification', {
           verificationId, challenge,

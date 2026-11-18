@@ -7,6 +7,19 @@ import { MCPToolSet } from './ToolSet';
 /** The organization-owned office Gateway manages its own native Bot directory. */
 export class GatewayTools extends MCPToolSet {
   private static readonly OFFICE_ENROLLMENT_TIMEOUT_MS = 90_000;
+  private static readonly recipient = {
+    recipientName: z.string().trim().min(1).max(120).optional(),
+    recipientAddress: z.string().trim().min(3).max(255).optional(),
+  };
+  private static readonly route = {
+    recipientBotID: z.string().regex(/^[A-Za-z0-9._:-]{1,192}$/),
+    threadMode: z.enum(['platform', 'explicit']),
+    firstContactMode: z.enum(['manual', 'automatic']).optional(),
+  };
+  private static readonly coworkers = z.array(z.object({
+    displayName: z.string().trim().min(1).max(120),
+    ...GatewayTools.route,
+  })).min(1).max(25);
 
   constructor(server: McpServer, private readonly client: RelayAPIClient) {
     super(server);
@@ -20,14 +33,7 @@ export class GatewayTools extends MCPToolSet {
       'its transport mailbox, and attaches its incoming route to this Gateway\'s ONE verified Wake. ' +
       'The returned addresses and routes are public metadata, never Runtime or Resume credentials. ' +
       'Already-enrolled coworkers use from when sending through the shared office connection.',
-      {
-        coworkers: z.array(z.object({
-          displayName: z.string().trim().min(1).max(120),
-          recipientBotID: z.string().regex(/^[A-Za-z0-9._:-]{1,192}$/),
-          threadMode: z.enum(['platform', 'explicit']),
-          firstContactMode: z.enum(['manual', 'automatic']).optional(),
-        })).min(1).max(25),
-      },
+      { coworkers: GatewayTools.coworkers },
       ({ coworkers }) => this.client.call('POST', '/v2/gateway-office-coworkers', {
         coworkers: (coworkers as Array<{
           displayName: string; recipientBotID: string; threadMode: string;
@@ -57,13 +63,7 @@ export class GatewayTools extends MCPToolSet {
       'tool or ask Gateway to invent a canonical address. Alternatively provide recipientAddress. ' +
       'Supply exactly ONE of recipientName or recipientAddress. Approval is pending until the ' +
       'recipient authorizes with its OWN Session; do not assume name discovery grants consent.',
-      {
-        recipientName: z.string().trim().min(1).max(120).optional(),
-        recipientAddress: z.string().trim().min(3).max(255).optional(),
-        recipientBotID: z.string().regex(/^[A-Za-z0-9._:-]{1,192}$/),
-        threadMode: z.enum(['platform', 'explicit']),
-        firstContactMode: z.enum(['manual', 'automatic']).optional(),
-      },
+      { ...GatewayTools.recipient, ...GatewayTools.route },
       ({ recipientName, recipientAddress, recipientBotID, threadMode, firstContactMode }) =>
         this.client.call('POST', '/v2/gateway-teammates', {
           ...(recipientName ? { recipientName } : {}),
@@ -78,10 +78,7 @@ export class GatewayTools extends MCPToolSet {
       'a unique authorized identity; do not look it up with another MCP tool. ' +
       'Alternatively use a verified recipientAddress. Provide exactly one of the two. ' +
       'This cancels pending notifications and native Thread bindings.',
-      {
-        recipientName: z.string().trim().min(1).max(120).optional(),
-        recipientAddress: z.string().trim().min(3).max(255).optional(),
-      },
+      { ...GatewayTools.recipient },
       ({ recipientName, recipientAddress }) => {
         // MCPToolSet exposes validated arguments as unknown; narrow them
         // before constructing the HTTP client's string-only query values.

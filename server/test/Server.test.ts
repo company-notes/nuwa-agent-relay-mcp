@@ -616,6 +616,8 @@ test('one MCP send call passes the familiar Bot name unchanged to Relay for rout
     const schemas = JSON.stringify(await scenario.toolSchemas());
     assert.doesNotMatch(schemas, /agentAddressFindByName/);
     assert.match(schemas, /Relay resolves names in/);
+    assert.deepEqual(await scenario.toolSchemas(), JSON.parse(schemas),
+      'Static tool definitions remain identical across independent MCP requests.');
   } finally {
     scenario.restore();
   }

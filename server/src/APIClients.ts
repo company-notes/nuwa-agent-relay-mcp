@@ -138,7 +138,7 @@ export class HTTPAPIClient {
 export type BoundSession = {
   sessionID: string;
   runtimeToken: string;
-  onRenewed: (expiresAt: string) => Promise<void>;
+  onRenewed: (expiresAt: string, canonicalAddress?: string) => Promise<void>;
 };
 
 export class RelayAPIClient extends HTTPAPIClient {
@@ -167,7 +167,7 @@ export class RelayAPIClient extends HTTPAPIClient {
         const expiresAt = response.headers.get('x-nuwa-lease-expires-at');
 
         if (expiresAt) {
-          this.tasks.waitUntil(onRenewed(expiresAt));
+          this.tasks.waitUntil(onRenewed(expiresAt, response.headers.get('x-nuwa-canonical-address') ?? undefined));
         }
       },
     });
@@ -266,7 +266,7 @@ export class AddressAPIClient extends HTTPAPIClient {
 
   heartbeat(sessionID: string, runtimeToken: string): Promise<unknown> {
     return this.request('PATCH', AddressAPIClient.runtimeLeasePath(sessionID),
-      { body: { runtimeToken } });
+      { body: { runtimeToken }, query: { include_identity: '1' } });
   }
 
   release(sessionID: string, runtimeToken: string): Promise<unknown> {

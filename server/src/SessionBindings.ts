@@ -31,7 +31,11 @@ type ResumeResponse = {
 };
 
 type ClaimResponse = ResumeResponse & { resumeToken: string };
-type Lease = { expiresAt: string };
+type Lease = {
+  expiresAt: string;
+  organization: { id: string; slug: string };
+  session: Session;
+};
 
 export class SessionBindings {
   private static readonly logger = Logger.forModule('session.binding');
@@ -187,7 +191,9 @@ export class SessionBindings {
     }
   }
 
-  private async saveExpiry(key: string, row: BindingRow, expiresAt: string): Promise<void> {
+  private async saveExpiry(
+    key: string, row: BindingRow, expiresAt: string, canonicalAddress?: string,
+  ): Promise<void> {
     if (!expiresAt || !Number.isFinite(Date.parse(expiresAt)) ||
         Date.parse(expiresAt) <= Date.now()) {
       throw new APIError(502, 'invalid_lease_renewal',
@@ -195,10 +201,13 @@ export class SessionBindings {
     }
 
     const result = await this.env.BINDINGS_DB.prepare(
-      `UPDATE remote_session_bindings SET expires_at = MAX(expires_at, ?)
+      `UPDATE remote_session_bindings SET expires_at = MAX(expires_at, ?),
+          canonical_address = CASE WHEN ? >= expires_at THEN COALESCE(NULLIF(?, ''), canonical_address)
+                              ELSE canonical_address END
         WHERE grant_fingerprint = ? AND session_id = ?
           AND encrypted_runtime_token = ?`,
-    ).bind(expiresAt, key, row.sessionID, row.encryptedRuntimeToken).run();
+    ).bind(expiresAt, expiresAt, canonicalAddress ?? '', key, row.sessionID,
+      row.encryptedRuntimeToken).run();
 
     if (result.meta.changes !== 1) {
       throw new APIError(409, 'session_binding_revoked',
@@ -206,9 +215,11 @@ export class SessionBindings {
     }
   }
 
-  private async recordRelayRenewal(key: string, row: BindingRow, expiresAt: string): Promise<void> {
+  private async recordRelayRenewal(
+    key: string, row: BindingRow, expiresAt: string, canonicalAddress?: string,
+  ): Promise<void> {
     try {
-      await this.saveExpiry(key, row, expiresAt);
+      await this.saveExpiry(key, row, expiresAt, canonicalAddress);
     } catch (error) {
       // Relay has already completed the operation. Do not turn an accepted
       // message into a retryable failure merely because expiry bookkeeping failed.
@@ -228,10 +239,10 @@ export class SessionBindings {
       );
       const updated = await this.env.BINDINGS_DB.prepare(
         `UPDATE remote_session_bindings
-            SET encrypted_runtime_token = ?, expires_at = ?
+            SET encrypted_runtime_token = ?, expires_at = ?, canonical_address = ?
           WHERE grant_fingerprint = ? AND session_id = ?
             AND encrypted_runtime_token = ?`,
-      ).bind(encrypted, resumed.leaseExpiresAt, key, row.sessionID,
+      ).bind(encrypted, resumed.leaseExpiresAt, resumed.session.canonical, key, row.sessionID,
         row.encryptedRuntimeToken).run();
 
       if (updated.meta.changes !== 1) {
@@ -239,7 +250,10 @@ export class SessionBindings {
           'The Session binding changed while acquiring a new Runtime.');
       }
 
-      return { ...row, encryptedRuntimeToken: encrypted, expiresAt: resumed.leaseExpiresAt };
+      return {
+        ...row, encryptedRuntimeToken: encrypted, expiresAt: resumed.leaseExpiresAt,
+        canonicalAddress: resumed.session.canonical,
+      };
     } catch (error) {
       if (resumed.runtimeToken) {
         try {
@@ -274,9 +288,9 @@ export class SessionBindings {
         throw new APIError(502, 'invalid_resume_result', 'Agent Address changed a renewed Runtime.');
       }
 
-      await this.saveExpiry(key, row, resumed.leaseExpiresAt);
+      await this.saveExpiry(key, row, resumed.leaseExpiresAt, resumed.session.canonical);
 
-      return { ...row, expiresAt: resumed.leaseExpiresAt };
+      return { ...row, expiresAt: resumed.leaseExpiresAt, canonicalAddress: resumed.session.canonical };
     }
 
     return this.persistRecoveredRuntime(client, key, row, organizationSlug, resumed);
@@ -293,9 +307,15 @@ export class SessionBindings {
         throw new APIError(409, 'runtime_not_owner', 'This Runtime no longer owns the Session.');
       }
 
-      await this.saveExpiry(key, row, lease.expiresAt);
+      if (lease.organization?.id !== row.organizationID || lease.session?.id !== row.sessionID ||
+          lease.session.canonical.split('/')[0] !== lease.organization.slug) {
+        throw new APIError(409, 'binding_identity_mismatch',
+          'The renewed Runtime no longer matches the authorized identity.');
+      }
 
-      return { ...row, expiresAt: lease.expiresAt };
+      await this.saveExpiry(key, row, lease.expiresAt, lease.session.canonical);
+
+      return { ...row, expiresAt: lease.expiresAt, canonicalAddress: lease.session.canonical };
     }
 
     return this.recoverExpired(client, key, row, organizationSlug);
@@ -306,10 +326,26 @@ export class SessionBindings {
     const key = await this.principal(client);
     const row = await this.row(key);
 
-    return row
-      ? { ...SessionBindings.publicResult(row, false), leaseExpired:
-        row.expiresAt <= new Date().toISOString() }
-      : { bound: false };
+    if (!row) {
+      return { bound: false };
+    }
+
+    const status = await client.status() as AccountStatus;
+
+    if (status.organization?.id !== row.organizationID) {
+      throw new APIError(403, 'binding_organization_changed', 'The bound Organization is no longer authorized.');
+    }
+
+    const current = await client.getSession(row.sessionID) as Session;
+
+    if (current.id !== row.sessionID || current.canonical.split('/')[0] !== status.organization.slug) {
+      throw new APIError(409, 'binding_identity_mismatch', 'The Session no longer matches this binding.');
+    }
+
+    return {
+      ...SessionBindings.publicResult({ ...row, canonicalAddress: current.canonical }, false),
+      leaseExpired: row.expiresAt <= new Date().toISOString(),
+    };
   }
 
   private async updateOwnDisplayName(
@@ -319,8 +355,7 @@ export class SessionBindings {
       id?: string; agentId?: string; canonical?: string;
     };
 
-    if (!own || own.id !== row.sessionID ||
-        own.canonical !== row.canonicalAddress || !own.agentId) {
+    if (!own || own.id !== row.sessionID || !own.agentId) {
       throw new APIError(409, 'binding_identity_mismatch',
         'The authorized Agent/Session no longer matches this private binding.');
     }
@@ -449,11 +484,6 @@ export class SessionBindings {
     ) as ClaimResponse;
 
     try {
-      if (recovered.session?.canonical !== target.canonical) {
-        throw new APIError(502, 'invalid_resume_result',
-          'Agent Address recovered a different Session address.');
-      }
-
       SessionBindings.checkLease(recovered, target.id, status.organization.slug);
 
       if (existing && !(await this.releaseBinding(client, key, existing))) {
@@ -569,7 +599,7 @@ export class SessionBindings {
       runtimeToken: await this.tokenCipher.decrypt(
         row.encryptedRuntimeToken, key, row.sessionID,
       ),
-      onRenewed: (expiresAt) => this.recordRelayRenewal(key, row, expiresAt),
+      onRenewed: (expiresAt, canonicalAddress) => this.recordRelayRenewal(key, row, expiresAt, canonicalAddress),
     };
   }
 

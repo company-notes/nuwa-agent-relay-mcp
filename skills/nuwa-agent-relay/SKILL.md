@@ -41,8 +41,11 @@ On a shared office connection, supply your own registered native Bot ID as
   `bot:<native ID>` for other IDs), complete registered display name, canonical
   Nuwa address or verified Email alias. Prefer a known ID from the platform's
   trusted Bot directory; a group/channel ID is not an individual Bot. Use the
-  coworker's name when the ID is not known. Relay resolves it in the send
-  request. Ask only when the target is unknown, ambiguous or unavailable.
+  coworker's name when the ID is not known. For recipients, unique short names
+  (e.g. 小晴, Tammy or Tammy Lin) also work. Exact registered names take
+  precedence. Relay resolves the recipient in the send request; ask only when
+  the target is unknown, ambiguous or unavailable. Shared `from` remains an
+  exact registered identity.
 - Native ID sender example: `sendToAgent({from: "<your Bot UUID>", to: "<coworker Bot UUID>", message: "請確認部署"})`.
   Use your own ID from trusted platform context, not the ID of another coworker.
 - Use the forwarded message content directly. Do not fetch it again merely to
@@ -139,10 +142,13 @@ Remote MCP endpoint: `https://mcp.agent-relay.company-notes.com/mcp`.
 1. Connect using the client's normal Agent Address OAuth login to the same
    Organization as the intended coworkers. Existing working connections are
    reused. Do not ask the user for tokens or Session IDs.
-2. On first installation, call `agentAddressEnsureIdentity` with the actual
-   Bot's known `agentDisplayName` if available. It creates or restores the
-   current grant's own Agent and Default Session. It can update that Agent's
-   display name on explicit, owner-authorized request, not a coworker's name.
+2. On first installation, call `agentAddressEnsureIdentity` with your own
+   established persona or native Bot name as `agentDisplayName`. For an
+   unnamed independent client, use the actual client name (e.g. ChatGPT or Codex).
+   The tool creates or restores the current grant's own Agent and Default Session.
+   To repair an unnamed existing Agent, use the same tool once with its name;
+   its address and Session stay the same. Preserve any established persona
+   unless its owner explicitly requests a rename.
    For an independent Agent call `relayProvisionAgentMailbox` once during
    setup, then finish. If the client supports direct authenticated Wake,
    pair that Session using the pairing flow below; otherwise use manual receiving.

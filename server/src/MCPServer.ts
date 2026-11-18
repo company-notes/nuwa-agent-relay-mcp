@@ -24,8 +24,10 @@ export class NuwaMCPServer {
         'messages and work Handoffs. Agent Address owns Session identity and exclusive Runtime ' +
         'leases. For first installation call agentAddressEnsureIdentity; the server ' +
         'privately claims or restores this OAuth grant\'s own Agent and Default Session. ' +
-        'Pass an optional established persona name as agentDisplayName, but never ask the ' +
-        'user for Session IDs, Runtime tokens, Resume tokens, or manual binding during ' +
+        'Supply your own established persona or native Bot name as agentDisplayName at setup; ' +
+        'for an unnamed independent client use its actual client name (e.g. ChatGPT or Codex). ' +
+        'Repair an unnamed existing binding once; preserve established names unless the owner requests a rename. ' +
+        'Never ask the user for Session IDs, Runtime tokens, Resume tokens, or manual binding during ' +
         'normal installation. Relay tools also auto-ensure the Session if needed. ' +
         'Never include OAuth, Runtime, Resume or Wake secrets in MCP tools or prompts. ' +
         'On user request, agentAddressSelectSession restores an idle existing address ' +
@@ -38,6 +40,8 @@ export class NuwaMCPServer {
         'Use one sendToAgent or relayReplyThread call with your own enrolled from on a shared ' +
         'office connection. Prefer known native Bot IDs (UUID or bot:<native ID>), with full ' +
         'registered names, Nuwa addresses and verified Email aliases also accepted. ' +
+        'For message recipients, use the supplied short name directly; the server accepts unique short names, ' +
+        'prefers an exact registered name and rejects ambiguity. Shared from uses the registered identity. ' +
         'Use forwarded message content directly; only fetch history if needed. ' +
         'Call directly when the schema is available, following required platform tool discovery. ' +
         'Forward the original Thread ID and recipientBotID as the coworker\'s own from ' +

@@ -36,7 +36,7 @@ export const ONBOARDING_SCRIPT = `
       '',
       '請依最新版 Skill，安裝或更新 Skill 與 MCP，完成 Organization 授權，沿用既有身分。依平台實際能力選擇接入方式：',
       '',
-      '獨立 MCP 用戶端（如支援此 MCP 與 OAuth 的 Codex、ChatGPT）：使用自己的 Agent／Session，完成信箱設定即可通訊。獨立連線省略 from；平台允許時直接呼叫。沒有自動接收能力就依使用者要求查收；支援直接 Wake 時才設定。無須 Gateway。回報自己的地址及收件方式。',
+      '獨立 MCP 用戶端（如支援此 MCP 與 OAuth 的 Codex、ChatGPT）：使用自己的 Agent／Session，透過 agentAddressEnsureIdentity 設定自己的 agentDisplayName（已有角色名稱則沿用，否則使用實際客戶端名稱，例如 ChatGPT 或 Codex），完成信箱設定即可通訊。獨立連線省略 from；平台允許時直接呼叫。沒有自動接收能力就依使用者要求查收；支援直接 Wake 時才設定。無須 Gateway。回報自己的地址及收件方式。',
       '',
       '共用辦公室：已接入的同事沿用既有連線；若你負責整間辦公室，擔任 Gateway：',
       '1. 設定本辦公室唯一的 Wake 接收例行任務並完成驗證；沿用有效的接線。',
@@ -58,7 +58,7 @@ export const ONBOARDING_SCRIPT = `
       '請透過 Nuwa 找「' + colleagueName('colleagueB') +
         '」助理聊一下。',
       '告訴他：「你好，我們來測試通話，測試字詞是星河。收到後請回覆這個字詞。」',
-      '請直接發送一次，優先使用已知的 Bot ID，否則填完整登記名稱，由 Relay 解析；共用連線時填自己的 from。'
+      '請直接發送一次，優先使用已知的 Bot ID，否則填同事名稱或唯一簡稱，由 Relay 解析；共用連線時填自己的 from。'
     ].join('\\n');
   }
 
@@ -76,7 +76,7 @@ export const ONBOARDING_SCRIPT = `
       '請透過 Nuwa 主動找「' + colleagueName('colleagueA') +
         '」助理聊一下。',
       '告訴他：「換我打給你了！這次測試字詞是月光，請回覆這個字詞。」',
-      '請直接發送一次，優先使用已知的 Bot ID，否則填完整登記名稱；共用連線時填自己的 from。同名或找不到人才問我。'
+      '請直接發送一次，優先使用已知的 Bot ID，否則填同事名稱或唯一簡稱；共用連線時填自己的 from。同名或找不到人才問我。'
     ].join('\\n');
   }
 

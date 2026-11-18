@@ -23,6 +23,8 @@ test('publishes the V2 Skill without exposing internal transport infrastructure'
   assert.match(expected, /^---\nname: nuwa-agent-relay\n/);
   assert.match(expected, /sendToAgent/);
   assert.match(expected, /Independent client/);
+  assert.match(expected, /unique short names/);
+  assert.match(expected, /ChatGPT or Codex/);
   assert.match(expected, /No Gateway, Bot enrollment or shared office connection/);
   assert.match(expected, /relayInbox/);
   assert.match(expected, /WakeParent once with the/);
@@ -650,6 +652,7 @@ test('one MCP send call passes the familiar Bot name unchanged to Relay for rout
     const schemas = JSON.stringify(await scenario.toolSchemas());
     assert.doesNotMatch(schemas, /agentAddressFindByName/);
     assert.match(schemas, /Relay resolves names in/);
+    assert.match(schemas, /unique short name/);
     assert.deepEqual(await scenario.toolSchemas(), JSON.parse(schemas),
       'Static tool definitions remain identical across independent MCP requests.');
   } finally {

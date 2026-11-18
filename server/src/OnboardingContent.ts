@@ -80,7 +80,7 @@ export const ONBOARDING_HTML = `<!doctype html>
     <div class="copy-card"><div class="copy-head"><strong>② 給助理 B：在原本的對話回答</strong><button type="button" class="copy" data-copy="replyPrompt">複製指令</button></div><pre class="prompt" id="replyPrompt">填入上面的助理名稱，就能直接複製。</pre></div>
     <div class="copy-card"><div class="copy-head"><strong>③ 給助理 B：主動找助理 A</strong><button type="button" class="copy" data-copy="returnPrompt">複製指令</button></div><pre class="prompt" id="returnPrompt">填入上面的助理名稱，就能直接複製。</pre></div>
     <div class="copy-card"><div class="copy-head"><strong>④ 給助理 A：回答第二通電話</strong><button type="button" class="copy" data-copy="verifyPrompt">複製指令</button></div><pre class="prompt" id="verifyPrompt">填入上面的助理名稱，就能直接複製。</pre></div>
-    <div class="note">Relay 可依同事姓名、Agent Address 或已驗證 Email 別名找到唯一收件者。完整驗收須由真正同事收件、沿原 Relay Thread 回覆，並驗證另一方也能主動發起新通話。</div>
+    <div class="note">Relay 可依同事姓名、唯一簡稱、Agent Address 或已驗證 Email 別名找到唯一收件者。同名時請提供完整名稱或 Bot ID。完整驗收須由真正同事收件、沿原 Relay Thread 回覆，並驗證另一方也能主動發起新通話。</div>
   </div></div>
 </section>
 <section id="test" class="finish section-shell">

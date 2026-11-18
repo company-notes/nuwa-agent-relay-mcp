@@ -22,6 +22,11 @@ test('publishes the V2 Skill without exposing internal transport infrastructure'
   assert.equal((await response.text()).replace(/\r\n/g, '\n'), expected);
   assert.match(expected, /^---\nname: nuwa-agent-relay\n/);
   assert.match(expected, /sendToAgent/);
+  assert.match(expected, /Independent client/);
+  assert.match(expected, /No Gateway, Bot enrollment or shared office connection/);
+  assert.match(expected, /relayInbox/);
+  assert.match(expected, /WakeParent once with the/);
+  assert.match(expected, /Keep the installed Routine instructions self-contained/);
   assert.match(expected, /relayVerifyWake/);
   assert.match(expected, /relayGatewayEnrollOfficeCoworkers/);
   assert.match(expected, /senderDisplayName/);

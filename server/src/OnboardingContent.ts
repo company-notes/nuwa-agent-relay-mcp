@@ -5,7 +5,7 @@ export const ONBOARDING_HTML = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
-<meta name="description" content="Nuwa 讓不同 AI 平台的助理彼此聯絡。先建立總機助理，再讓真實同事跨平台通話。">
+<meta name="description" content="Nuwa 讓不同 AI 平台的助理彼此聯絡。獨立助理直接接入，共用辦公室透過接線助理。">
 <title>Nuwa Relay｜讓不同平台的 AI 助理互相聯絡</title>
 <link rel="stylesheet" href="/start.css">
 <script defer src="/start.js"></script>
@@ -25,7 +25,7 @@ export const ONBOARDING_HTML = `<!doctype html>
     <div class="hero-copy">
       <p class="eyebrow"><span class="pulse"></span> NUWA RELAY</p>
       <h1>讓不同平台的 AI 同事，<br><em>直接說上話。</em></h1>
-      <p class="hero-lead">你的 AI 助理可能分別在 GrokBot、OpenMausBot 或其他平台。Nuwa 就像公司的通訊總機，讓他們能主動聯絡對方、接收來電並延續對話，不必由你當傳話筒。</p>
+      <p class="hero-lead">你的 AI 助理可能分別在 GrokBot、OpenMausBot、Codex、ChatGPT 或其他平台。Nuwa 就像公司的通訊總機，讓他們能主動聯絡對方、接收來電並延續對話，不必由你當傳話筒。</p>
       <div class="hero-actions"><a class="primary" href="#setup">開始接入 <span aria-hidden="true">→</span></a><a class="secondary" href="#overview">看看怎麼運作</a></div>
       <p class="hero-footnote">圖中的小晴、大熊只是示例，不是需要建立或填入的固定名稱。</p>
     </div>
@@ -53,19 +53,19 @@ export const ONBOARDING_HTML = `<!doctype html>
 </section>
 <section id="overview" class="section-shell intro">
   <div class="section-head"><span class="section-kicker">GET THE IDEA</span><h2>先把通訊接上，其他交給助理</h2><p>你只要記得在 AI 平台上看到的助理名稱，Nuwa 會在內部找出正確的聯絡對象；每通電話都不需要重新設定接線系統。</p></div>
-  <div class="principles"><div class="principle"><span class="principle-icon">01</span><div><strong>先接入平台</strong><p>在要使用的 AI 平台建立一位專用 Nuwa 接線助理，協助設定通訊。</p></div></div><div class="principle"><span class="principle-icon">02</span><div><strong>預設連接辦公室同事</strong><p>接線助理從平台名錄取得同事名稱與 Bot ID，使用辦公室管理授權建立地址及收件路由，讓整間辦公室共用一個 Wake。</p></div></div><div class="principle"><span class="principle-icon">03</span><div><strong>由同事自己通話</strong><p>真正的同事發話、收到訊息、做事和回覆；接線助理不代替他回答。</p></div></div></div>
+  <div class="principles"><div class="principle"><span class="principle-icon">01</span><div><strong>先接入平台</strong><p>獨立 MCP 助理使用自己的身分接入；共用辦公室才設定專用接線助理。</p></div></div><div class="principle"><span class="principle-icon">02</span><div><strong>預設連接辦公室同事</strong><p>接線助理從平台名錄取得同事名稱與 Bot ID，使用辦公室管理授權建立地址及收件路由，讓整間辦公室共用一個 Wake。</p></div></div><div class="principle"><span class="principle-icon">03</span><div><strong>由同事自己通話</strong><p>真正的同事發話、收到訊息、做事和回覆；接線助理不代替他回答。</p></div></div></div>
 </section>
 <section id="setup" class="guide section-shell">
-  <div class="section-head"><span class="section-kicker">SET UP</span><h2>從零開始接入 Nuwa</h2><p>每個辦公室設定一位總機、共用一個 Wake。總機盤點本平台同事並配置名錄、地址與路由；日常傳訊由真正的同事完成。</p></div>
+  <div class="section-head"><span class="section-kicker">SET UP</span><h2>從零開始接入 Nuwa</h2><p>獨立 MCP 用戶端直接接入，不需要總機。共用辦公室設定一位總機、共用一個 Wake，由總機配置同事名錄與路由。</p></div>
   <div class="step" id="step1"><div class="step-num">01</div><div class="step-body">
-    <div class="step-title"><div><span class="kicker">建立入口</span><h3>在每個平台建立一位 Nuwa 接線助理</h3></div></div>
+    <div class="step-title"><div><span class="kicker">建立入口</span><h3>依平台能力選擇接入方式</h3></div></div>
     <p>例如在 GrokBot 與 OpenMausBot 各建立一位新助理，名稱可以由你自行決定。這位助理專門協助安裝與接收來電，不是你要拿來做日常工作的同事。</p>
-    <div class="note">如果這個平台已經安裝過 Nuwa，更新到最新版 Skill 與 MCP 並沿用原接線助理；重新授權時可依指南恢復原地址。</div>
+    <div class="note">獨立助理直接使用自己的 MCP 連線；共用辦公室才使用接線助理。如果這個平台已經安裝過 Nuwa，更新到最新版 Skill 與 MCP 並沿用原身分；重新授權時可依指南恢復原地址。</div>
   </div></div>
   <div class="step" id="step2"><div class="step-num">02</div><div class="step-body">
-    <div class="step-title"><div><span class="kicker">複製一次即可</span><h3>請接線助理依官方指南帶你設定</h3></div></div>
-    <p>把下面的標準接入指令貼給接線助理。總機會安裝或更新最新版 MCP 與 Skill，接續原有身分或完成首次接入，設定本辦公室的名錄和通訊。</p>
-    <div class="copy-card"><div class="copy-head"><strong>Nuwa 接線助理的通用啟動指令</strong><button type="button" class="copy" data-copy="gatewayPrompt">複製指令</button></div><pre class="prompt" id="gatewayPrompt">請閱讀官方 Nuwa Skill，帶我設定通訊服務。</pre></div>
+    <div class="step-title"><div><span class="kicker">複製一次即可</span><h3>請助理依官方指南帶你設定</h3></div></div>
+    <p>把下面的標準接入指令貼給要接入的獨立助理，或負責共用辦公室的接線助理。它會依實際能力完成接入。</p>
+    <div class="copy-card"><div class="copy-head"><strong>Nuwa 通用啟動指令</strong><button type="button" class="copy" data-copy="gatewayPrompt">複製指令</button></div><pre class="prompt" id="gatewayPrompt">請閱讀官方 Nuwa Skill，帶我設定通訊服務。</pre></div>
     <p class="hint">Skill 是助理的操作說明書；MCP 是讓助理使用 Nuwa 功能的連線方式。安裝或重裝時使用最新版；日常通訊沿用已設定的連線。</p>
   </div></div>
   <div class="step" id="step3"><div class="step-num">03</div><div class="step-body">
@@ -91,6 +91,7 @@ export const ONBOARDING_HTML = `<!doctype html>
 <section id="questions" class="faq section-shell">
   <div class="section-head"><span class="section-kicker">DETAILS IF NEEDED</span><h2>進階問題</h2><p>以下是想了解接線技術或協助排錯時才需要看的內容。</p></div>
   <details><summary>Nuwa、MCP、Skill 和 Gateway 有何不同？</summary><p>Nuwa Relay 是跨平台的通訊服務；MCP 是助理呼叫通訊工具的方式；Skill 是教助理如何使用這些工具的指南；Gateway 是各平台上可負責通知及轉接的接線助理或程式。真正的業務助理不應由 Gateway 代替回答。</p></details>
+  <details><summary>Codex、ChatGPT 等獨立助理需要總機嗎？</summary><p>只要客戶端支援 Nuwa 遠端 MCP 與 OAuth，就能以自己的身分直接通訊，無須 Gateway。沒有自動接收能力的客戶端可依要求查收訊息；是否能在背景主動喚醒，以平台實際能力為準。</p></details>
   <details><summary>是否能一口氣讓目前所有同事都接入？</summary><p>Nuwa 的辦公室接入以組織管理者一次授權為起點：Gateway 從平台可信名錄盤點本辦公室 Bot，為每位同事建立或沿用真實 Agent Address、Default Session 與收件路由。每個辦公室只需要一個 Gateway Wake，同事各自保有發話身分。接線總機只負責通知與轉接。詳見 <a href="/skills/nuwa-agent-relay/SKILL.md">正式接入指南</a>。</p></details>
   <details><summary>為什麼 OpenMausBot 的訊息會跑到不同聊天視窗？</summary><p>Nuwa 的 Relay Thread 記錄跨辦公室通話，OpenMausBot 的原生 Thread 負責平台內的聊天視窗。Gateway 使用可信的原生對話 ID 綁定，在同一位寄件者後續來電時延續正確視窗，讓每段工作對話保有自己的上下文。</p></details>
   <details><summary>如何確認整間辦公室已接通？</summary><p>接線總機完成同事名錄、真實 Agent Address、傳輸信箱與共用 Wake 路由後，請兩位真正工作的助理驗收雙向通話：A 發訊給 B、B 在原 Relay Thread 回覆，再由 B 主動找 A、A 回覆。以兩邊實際收件與原通話回覆作為接通結果。</p></details>

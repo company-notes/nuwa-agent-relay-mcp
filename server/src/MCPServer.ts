@@ -30,6 +30,8 @@ export class NuwaMCPServer {
         'Never include OAuth, Runtime, Resume or Wake secrets in MCP tools or prompts. ' +
         'On user request, agentAddressSelectSession restores an idle existing address ' +
         'without re-enrolling. Never create a replacement office identity to fix a failure. ' +
+        'Independent MCP clients use their own Session without a Gateway or from; on request ' +
+        'check relayInbox if no direct receiving adapter exists. Configure Wake only when supported. ' +
         'Use one sendToAgent or relayReplyThread call with your own enrolled from on a shared ' +
         'office connection. Prefer known native Bot IDs (UUID or bot:<native ID>), with full ' +
         'registered names, Nuwa addresses and verified Email aliases also accepted. ' +
@@ -38,7 +40,9 @@ export class NuwaMCPServer {
         'Forward the original Thread ID and recipientBotID as the coworker\'s own from ' +
         'in a ready-to-use relayReplyThread call format (omit from for independent connections). ' +
         'For ordinary office Wake, dispatch once to recipientBotID using the native tool, ' +
-        'with zero MCP lookups or extra routing decisions, then stop. ' +
+        'with zero MCP lookups or extra routing decisions, then stop. For a restricted Routine, ' +
+        'choose a trusted WakeParent raw-event handoff at setup; the parent dispatches once. ' +
+        'Keep routine instructions self-contained without per-event Skill reads. ' +
         'Sending a message, confirmed mailbox arrival, successful Wake delivery and actual ' +
         'Agent startup are separate steps.',
     });

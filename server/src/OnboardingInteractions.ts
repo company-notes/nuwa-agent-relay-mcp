@@ -34,18 +34,22 @@ export const ONBOARDING_SCRIPT = `
       '官方 Skill：' + skillURL,
       'Nuwa MCP：' + mcpURL,
       '',
-      '你是本辦公室的 Gateway，請依最新版 Skill 完成以下工作：',
-      '1. 安裝或更新 Skill 與 MCP，完成 Organization 授權，沿用既有身分。',
-      '2. 設定本辦公室唯一的 Wake 接收例行任務並完成驗證；沿用有效的接線。',
+      '請依最新版 Skill，安裝或更新 Skill 與 MCP，完成 Organization 授權，沿用既有身分。依平台實際能力選擇接入方式：',
+      '',
+      '獨立 MCP 用戶端（如支援此 MCP 與 OAuth 的 Codex、ChatGPT）：使用自己的 Agent／Session，完成信箱設定即可通訊。獨立連線省略 from；平台允許時直接呼叫。沒有自動接收能力就依使用者要求查收；支援直接 Wake 時才設定。無須 Gateway。',
+      '',
+      '共用辦公室：已接入的同事沿用既有連線；若你負責整間辦公室，擔任 Gateway：',
+      '1. 設定本辦公室唯一的 Wake 接收例行任務並完成驗證；沿用有效的接線。',
       '   接收入口或金鑰變更時，以同一 Gateway 身分重新配對。',
-      '3. 從平台可信 Bot 名錄取得真實同事的名稱與 Bot ID（排除自己），',
+      '2. 從平台可信 Bot 名錄取得真實同事的名稱與 Bot ID（排除自己），',
       '   排除群組／頻道，批次完成全部同事的接入，沿用既有地址與名錄。',
-      '4. 收到正常 Wake 時，依 recipientBotID 使用平台原生工具轉交一次，',
+      '3. 收到正常 Wake 時，依 recipientBotID 使用平台原生工具轉交一次，',
       '   完整轉交正文、寄件者及原 Relay Thread 回覆上下文，讓本人依 Skill 回覆。',
       '   附上 relayReplyThread({from, threadID, body}) 的呼叫格式，',
       '   帶入實際 Thread ID，from 直接填 recipientBotID（UUID 或 bot: 前綴的原生 ID），由同事填回覆正文。',
-      '   獨立連線省略 from；平台允許時直接呼叫。Gateway 零 MCP 查詢，提交後結束。',
-      '5. 回報 Gateway 地址、Wake 狀態及已接入同事名單。'
+      '   安裝時確認 Routine 實際工具能力。能直接轉交就直接送；GrokBot 的 Routine 若只有 WakeParent，僅交接完整原始事件 JSON，由上層 Gateway 統一組合格式並原生轉交一次。',
+      '   Routine 使用自包含指令；日常不讀 Skill、不寫日誌。Gateway 零 MCP 查詢，提交後結束。',
+      '4. 回報 Gateway 地址、Wake 狀態及已接入同事名單。'
     ].join('\\n');
   }
 

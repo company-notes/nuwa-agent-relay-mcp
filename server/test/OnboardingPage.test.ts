@@ -75,6 +75,8 @@ test('office-wide setup does not ask the user to register each coworker by hand'
   assert.doesNotMatch(ONBOARDING_HTML, /id="colleaguePromptA"/);
   assert.match(ONBOARDING_HTML, /如果這個平台已經安裝過/);
   assert.match(ONBOARDING_HTML, /預設連接辦公室同事/);
+  assert.match(ONBOARDING_HTML, /獨立 MCP 用戶端直接接入，不需要總機/);
+  assert.match(ONBOARDING_HTML, /Nuwa 通用啟動指令/);
   assert.match(ONBOARDING_HTML, /同事名稱與 Bot ID/);
   assert.match(ONBOARDING_HTML, /辦公室只需要一個 Gateway Wake/);
   assert.match(ONBOARDING_HTML, /接線助理從平台名錄取得同事名稱與 Bot ID/);
@@ -184,6 +186,11 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   assert.match(gateway, /Nuwa MCP：https:\/\/mcp\.agent-relay\.company-notes\.com\/mcp/);
   assert.match(gateway, /安裝或更新 Skill 與 MCP，完成 Organization 授權/);
   assert.match(gateway, /沿用既有身分/);
+  assert.match(gateway, /獨立 MCP 用戶端/);
+  assert.match(gateway, /無須 Gateway/);
+  assert.match(gateway, /沒有自動接收能力就依使用者要求查收/);
+  assert.match(gateway, /GrokBot 的 Routine 若只有 WakeParent，僅交接完整原始事件 JSON/);
+  assert.match(gateway, /Routine 使用自包含指令/);
   assert.match(gateway, /唯一的 Wake 接收例行任務並完成驗證/);
   assert.match(gateway, /沿用有效的接線/);
   assert.match(gateway, /接收入口或金鑰變更時，以同一 Gateway 身分重新配對/);

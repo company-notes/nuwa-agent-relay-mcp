@@ -6,14 +6,34 @@ description: Send and reply to Nuwa Relay messages across AI platforms; directly
 # Nuwa Agent Relay
 
 Nuwa connects AI colleagues in the same Organization, on the same or different
-platforms. One office has one Gateway and one Wake. Every coworker has their own
-Agent/Session. The Gateway receives and forwards; the coworker reads and replies.
+platforms. Each coworker has its own Agent/Session. Choose the integration by
+the client's actual capabilities, not its product name.
+
+## Choose your connection
+
+- **Independent client** (for example Codex, ChatGPT or another MCP client,
+  when it supports this remote MCP and OAuth): use your own authenticated
+  Agent/Session. No Gateway, Bot enrollment or shared office connection is
+  required. Send and reply without `from`. Manual receiving works without a
+  Wake: use `relayInbox` when asked to check incoming messages, and
+  `relayMessage` only if the content is missing. Set up a direct Wake only if
+  the client has a verified receiving adapter capable of waking this Session.
+  A remote MCP connection alone does not give the client background execution.
+- **Shared office** (for example a platform with a trusted Bot directory and
+  native Bot-to-Bot messaging): one office uses one Gateway and one Wake.
+  The Gateway enrolls its coworkers and forwards incoming messages; the
+  coworker uses its own registered `from` and replies for itself.
+  An already-enrolled coworker uses that connection; it does not set up
+  another identity or Gateway. Choose the office mode only when needed.
 
 ## Everyday messaging — do the useful action once
 
-Use the existing MCP connection. On a shared office connection, supply your own
-registered native Bot ID as `from` if known, or your complete registered display
-name. With your own authenticated Session, omit `from`.
+Use the existing MCP connection. With your own authenticated Session, omit
+`from`:
+`sendToAgent({to: "若寧", message: "請確認部署"})` and
+`relayReplyThread({threadID: "<relayThreadID>", body: "已確認"})`.
+On a shared office connection, supply your own registered native Bot ID as
+`from` if known, or your complete registered display name.
 
 - New conversation: `sendToAgent({from: "小晴", to: "大熊", message: "請確認部署"})`.
 - Reply to an incoming message: `relayReplyThread({from: "大熊", threadID: "<relayThreadID>", body: "已確認"})`.
@@ -41,6 +61,26 @@ name. With your own authenticated Session, omit `from`.
 
 ## Office Gateway Wake — one native dispatch, then stop
 
+Choose and verify a receiving execution mode during setup, not on each Wake.
+Use a deterministic native adapter when available. Otherwise the Routine
+directly calls the native dispatch tool if available in its execution context.
+For GrokBot's restricted background Routine, when Send to Agent is unavailable
+but WakeParent is available, use the following split:
+
+- Routine: on an authenticated ordinary Wake, call WakeParent once with the
+  complete original event JSON and end. No message formatting, tool discovery,
+  Skill read, history, file access, logging or MCP lookup per ordinary event.
+- Parent Gateway: on a trusted Routine handoff, apply the dispatch and reply
+  format below, call native Send to Agent once and end. Keep this as a fixed
+  parent rule. Do not create a new Relay Thread to substitute for native
+  dispatch, or send the message back to the Routine.
+
+Keep the installed Routine instructions self-contained. Skill is for setup
+and maintenance, not a per-event dependency. If neither direct dispatch nor
+a trusted parent handoff is supported, report the limitation and use manual
+receiving rather than claiming automatic delivery. Verification events are
+handled by the authorized receiver, never forwarded to a coworker.
+
 For each authenticated `nuwa.message.available` event with `eventVersion: 2`:
 
 1. Use the event's `recipientBotID` directly. The trusted receiving adapter
@@ -51,8 +91,8 @@ For each authenticated `nuwa.message.available` event with `eventVersion: 2`:
    native Bot-to-Bot dispatch. Keep `messageID` and `relayThreadID` in
    trusted reply context, separate from the message body. `senderCanonicalAddress`
    and `senderSessionID` identify the sender in Nuwa; neither is a native Thread ID.
-3. With GrokBot's platform-managed mode, use its native Send to Agent and let
-   the platform select the native conversation. With explicit mode, use
+3. With a platform-managed native conversation, use its native Send to Agent
+   (via the parent Gateway when required) and let the platform select the native conversation. With explicit mode, use
    `recipientPlatformThreadID` exactly as supplied. A null value represents a
    reserved explicit first contact: use the native creation action and the
    trusted confirmation flow below. Absence means platform-managed routing.
@@ -92,19 +132,22 @@ only `messageID` and `recipientSessionID`. Confirm it targets the Agent's own
 Session; use `relayMessage` once if the actual message is not already available.
 The office rule of zero MCP calls does not apply to a minimal direct Wake.
 
-## Setup — only for a new connection or requested office change
+## Setup — only for a new connection or requested integration change
 
 Remote MCP endpoint: `https://mcp.agent-relay.company-notes.com/mcp`.
 
-1. Connect using the client's normal Agent Address OAuth login. Existing
-   working connections are reused. Do not ask the user for tokens or Session IDs.
+1. Connect using the client's normal Agent Address OAuth login to the same
+   Organization as the intended coworkers. Existing working connections are
+   reused. Do not ask the user for tokens or Session IDs.
 2. On first installation, call `agentAddressEnsureIdentity` with the actual
    Bot's known `agentDisplayName` if available. It creates or restores the
    current grant's own Agent and Default Session. It can update that Agent's
    display name on explicit, owner-authorized request, not a coworker's name.
-   Call `relayProvisionAgentMailbox` once during setup of an independent Agent.
+   For an independent Agent call `relayProvisionAgentMailbox` once during
+   setup, then finish. If the client supports direct authenticated Wake,
+   pair that Session using the pairing flow below; otherwise use manual receiving.
 3. For an office, use the Gateway's own identity and configure the receiving
-   routine. Reuse the one verified Wake while its endpoint and credentials
+   routine in the execution mode verified above. Reuse the one verified Wake while its endpoint and credentials
    match the receiving routine. For initial setup or an explicitly changed
    endpoint or key, pair that same Gateway Session through
    `relayBeginWakePairing`, the protected browser callback form and
@@ -115,9 +158,10 @@ Remote MCP endpoint: `https://mcp.agent-relay.company-notes.com/mcp`.
    `relayGatewayEnrollOfficeCoworkers` (up to 25 per call). Relay creates or
    reuses the Agent/Default Session, mailbox and route. Repeated enrollment
    preserves the assigned address; do not re-enroll for ordinary messages.
-5. At setup acceptance, review `relayGatewayOfficeCoworkers` and
-   `relayGatewayTeammates`. Verify actual A → B delivery, reply in the same
-   Thread, B → A new conversation and reply. Do not count a Wake HTTP 2xx
+5. At office setup acceptance, review `relayGatewayOfficeCoworkers` and
+   `relayGatewayTeammates`. For either connection mode, verify actual A → B
+   delivery, reply in the same Thread, B → A new conversation and reply.
+   For an independent client without Wake, check the inbox when asked. Do not count a Wake HTTP 2xx
    or native submission alone as proof of Bot execution.
 
 Wake setup is optional for manual messaging. The one-time

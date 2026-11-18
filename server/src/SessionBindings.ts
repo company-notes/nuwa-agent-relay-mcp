@@ -39,6 +39,7 @@ export class SessionBindings {
     /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
   private static readonly GRANT = /^[a-f0-9]{64}$/;
   private static readonly LEASE_REFRESH_MARGIN_MS = 30_000;
+  private static readonly RUNTIME_LABEL = 'nuwa-relay-remote-mcp';
   private readonly tokenCipher: RuntimeTokenCipher;
 
   constructor(
@@ -215,55 +216,6 @@ export class SessionBindings {
     }
   }
 
-  private async renew(
-    client: AddressAPIClient, key: string, row: BindingRow,
-    organizationSlug: string,
-  ): Promise<BindingRow> {
-    if (Date.parse(row.expiresAt) > Date.now()) {
-      const lease = await this.heartbeatIfOwned(client, key, row);
-
-      if (!lease) {
-        throw new APIError(409, 'runtime_not_owner', 'This Runtime no longer owns the Session.');
-      }
-
-      await this.saveExpiry(key, row, lease.expiresAt);
-
-      return { ...row, expiresAt: lease.expiresAt };
-    }
-
-    return this.recoverExpired(client, key, row, organizationSlug);
-  }
-
-  private async recoverExpired(
-    client: AddressAPIClient, key: string, row: BindingRow,
-    organizationSlug: string,
-  ): Promise<BindingRow> {
-    // Local expiry is only a hint. Address atomically renews the same owner
-    // or resumes an idle Session using the retained private capability.
-    const [runtimeToken, resumeToken] = await Promise.all([
-      this.tokenCipher.decrypt(row.encryptedRuntimeToken, key, row.sessionID),
-      this.tokenCipher.decrypt(row.encryptedResumeToken, 'resume:' + key, row.sessionID),
-    ]);
-    const resumed = await client.request('PUT',
-      '/v2/account/sessions/' + encodeURIComponent(row.sessionID) + '/runtime-lease',
-      { body: { runtimeToken, resumeToken, runtimeLabel: 'nuwa-relay-remote-mcp' } },
-    ) as ResumeResponse;
-
-    if (resumed.renewed) {
-      SessionBindings.checkLease(resumed, row.sessionID, organizationSlug);
-
-      if (resumed.runtimeToken !== runtimeToken) {
-        throw new APIError(502, 'invalid_resume_result', 'Agent Address changed a renewed Runtime.');
-      }
-
-      await this.saveExpiry(key, row, resumed.leaseExpiresAt);
-
-      return { ...row, expiresAt: resumed.leaseExpiresAt };
-    }
-
-    return this.persistRecoveredRuntime(client, key, row, organizationSlug, resumed);
-  }
-
   private async persistRecoveredRuntime(
     client: AddressAPIClient, key: string, row: BindingRow,
     organizationSlug: string, resumed: ResumeResponse,
@@ -299,6 +251,54 @@ export class SessionBindings {
 
       throw error;
     }
+  }
+
+  private async recoverExpired(
+    client: AddressAPIClient, key: string, row: BindingRow,
+    organizationSlug: string,
+  ): Promise<BindingRow> {
+    // Local expiry is only a hint. Address atomically renews the same owner
+    // or resumes an idle Session using the retained private capability.
+    const [runtimeToken, resumeToken] = await Promise.all([
+      this.tokenCipher.decrypt(row.encryptedRuntimeToken, key, row.sessionID),
+      this.tokenCipher.decrypt(row.encryptedResumeToken, 'resume:' + key, row.sessionID),
+    ]);
+    const resumed = await client.resumeRuntime(
+      row.sessionID, resumeToken, SessionBindings.RUNTIME_LABEL, runtimeToken,
+    ) as ResumeResponse;
+
+    if (resumed.renewed) {
+      SessionBindings.checkLease(resumed, row.sessionID, organizationSlug);
+
+      if (resumed.runtimeToken !== runtimeToken) {
+        throw new APIError(502, 'invalid_resume_result', 'Agent Address changed a renewed Runtime.');
+      }
+
+      await this.saveExpiry(key, row, resumed.leaseExpiresAt);
+
+      return { ...row, expiresAt: resumed.leaseExpiresAt };
+    }
+
+    return this.persistRecoveredRuntime(client, key, row, organizationSlug, resumed);
+  }
+
+  private async renew(
+    client: AddressAPIClient, key: string, row: BindingRow,
+    organizationSlug: string,
+  ): Promise<BindingRow> {
+    if (Date.parse(row.expiresAt) > Date.now()) {
+      const lease = await this.heartbeatIfOwned(client, key, row);
+
+      if (!lease) {
+        throw new APIError(409, 'runtime_not_owner', 'This Runtime no longer owns the Session.');
+      }
+
+      await this.saveExpiry(key, row, lease.expiresAt);
+
+      return { ...row, expiresAt: lease.expiresAt };
+    }
+
+    return this.recoverExpired(client, key, row, organizationSlug);
   }
 
   async status(): Promise<Record<string, unknown>> {
@@ -445,7 +445,7 @@ export class SessionBindings {
     await this.tokenCipher.requireKey();
     const recovered = await client.request('PUT',
       '/v2/account/sessions/' + encodeURIComponent(target.id) + '/owner-runtime-lease',
-      { body: { runtimeLabel: 'nuwa-relay-remote-mcp' } },
+      { body: { runtimeLabel: SessionBindings.RUNTIME_LABEL } },
     ) as ClaimResponse;
 
     try {
@@ -506,9 +506,8 @@ export class SessionBindings {
         'An authorized Organization is required to bind a Session.');
     }
 
-    const resumed = await client.request('PUT',
-      '/v2/account/sessions/' + encodeURIComponent(sessionID) + '/runtime-lease',
-      { body: { resumeToken, runtimeLabel: 'nuwa-relay-remote-mcp' } },
+    const resumed = await client.resumeRuntime(
+      sessionID, resumeToken, SessionBindings.RUNTIME_LABEL,
     ) as ResumeResponse;
 
     try {

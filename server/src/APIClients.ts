@@ -175,6 +175,10 @@ export class RelayAPIClient extends HTTPAPIClient {
 }
 
 export class AddressAPIClient extends HTTPAPIClient {
+  private static runtimeLeasePath(sessionID: string): string {
+    return '/v2/account/sessions/' + encodeURIComponent(sessionID) + '/runtime-lease';
+  }
+
   private verifiedAccount?: Promise<Record<string, unknown>>;
   private statusConsumed = false;
 
@@ -252,15 +256,21 @@ export class AddressAPIClient extends HTTPAPIClient {
       { body: { agentDisplayName: displayName } });
   }
 
+  resumeRuntime(
+    sessionID: string, resumeToken: string, runtimeLabel: string, runtimeToken?: string,
+  ): Promise<unknown> {
+    return this.request('PUT', AddressAPIClient.runtimeLeasePath(sessionID), {
+      body: { resumeToken, runtimeLabel, ...(runtimeToken ? { runtimeToken } : {}) },
+    });
+  }
+
   heartbeat(sessionID: string, runtimeToken: string): Promise<unknown> {
-    return this.request('PATCH',
-      '/v2/account/sessions/' + encodeURIComponent(sessionID) + '/runtime-lease',
+    return this.request('PATCH', AddressAPIClient.runtimeLeasePath(sessionID),
       { body: { runtimeToken } });
   }
 
   release(sessionID: string, runtimeToken: string): Promise<unknown> {
-    return this.request('DELETE',
-      '/v2/account/sessions/' + encodeURIComponent(sessionID) + '/runtime-lease',
+    return this.request('DELETE', AddressAPIClient.runtimeLeasePath(sessionID),
       { body: { runtimeToken } });
   }
 }

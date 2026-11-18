@@ -189,7 +189,7 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   assert.match(gateway, /獨立 MCP 用戶端/);
   assert.match(gateway, /無須 Gateway/);
   assert.match(gateway, /沒有自動接收能力就依使用者要求查收/);
-  assert.match(gateway, /GrokBot 的 Routine 若只有 WakeParent，僅交接完整原始事件 JSON/);
+  assert.match(gateway, /GrokBot 的 Routine 若無原生轉交能力但支援 WakeParent，僅交接完整原始事件 JSON/);
   assert.match(gateway, /Routine 使用自包含指令/);
   assert.match(gateway, /唯一的 Wake 接收例行任務並完成驗證/);
   assert.match(gateway, /沿用有效的接線/);

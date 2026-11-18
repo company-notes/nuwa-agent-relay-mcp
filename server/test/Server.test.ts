@@ -22,12 +22,28 @@ test('publishes the V2 Skill without exposing internal transport infrastructure'
   assert.equal((await response.text()).replace(/\r\n/g, '\n'), expected);
   assert.match(expected, /^---\nname: nuwa-agent-relay\n/);
   assert.match(expected, /sendToAgent/);
+  assert.match(expected, /Independent client/);
+  assert.match(expected, /No Gateway, Bot enrollment or shared office connection/);
+  assert.match(expected, /relayInbox/);
+  assert.match(expected, /WakeParent once with the/);
+  assert.match(expected, /Keep the installed Routine instructions self-contained/);
   assert.match(expected, /relayVerifyWake/);
   assert.match(expected, /relayGatewayEnrollOfficeCoworkers/);
   assert.match(expected, /senderDisplayName/);
   assert.match(expected, /relayThreadID/);
   assert.match(expected, /message content/i);
   assert.match(expected, /nuwa\.wake\.verification/);
+  assert.match(expected, /Zero MCP calls for ordinary office Wake dispatch/);
+  assert.match(expected, /agentAddressSelectSession/);
+  assert.match(expected, /relayReplyThread\(\{from:/);
+  assert.match(expected, /Do not fetch it again/);
+  assert.match(expected, /Call the tool directly when its schema is available/);
+  assert.match(expected, /Forward a ready-to-use reply call/);
+  assert.match(expected, /relayReplyThread\(\{from: "<actual recipientBotID>", threadID: "<actual relayThreadID>", body: "<reply>"\}\)/);
+  assert.match(expected, /group\/channel ID is not an individual Bot/);
+  assert.match(expected, /bot:<native ID>/);
+  assert.match(expected, /platform-required\s+tool discovery/);
+  assert.match(expected, /Omit `from`\s+on an independent connection/);
   assert.doesNotMatch(expected, /github\.com|\bHost\b|\bWork\b|work_address_id/);
 });
 
@@ -101,36 +117,50 @@ test('user binds a Session privately; Remote MCP sends with encrypted Runtime le
     assert.deepEqual(scenario.calls[0].body, {
       to: 'nuwa/author/main', body: 'Please review the change.', subject: 'Review request',
     });
-    assert.equal(scenario.heartbeatCount, 1);
+    assert.equal(scenario.heartbeatCount, 0);
+    assert.equal(scenario.relayLeaseChecks, 1);
     assert.doesNotMatch(JSON.stringify(sent), /runtime_private|resume_secret/);
   } finally {
     scenario.restore();
   }
 });
 
-test('a normal MCP send renews its Runtime with one grant lookup, not a second lookup', async () => {
+test('successive messages reuse the request account status without skipping Runtime verification', async (context) => {
   const scenario = new RemoteMCPScenario();
   scenario.install();
 
   try {
+    scenario.statusDelayMS = 50;
+    const started = performance.now();
     const first = await scenario.tool('sendToAgent', {
       to: '大熊', message: 'The first message should not repeat grant verification.',
     });
 
     assert.equal(first.result.isError, undefined);
-    assert.equal(scenario.grantLookups, 1);
+    assert.equal(scenario.grantLookups, 0);
     assert.equal(scenario.claimCount, 1);
+    assert.equal(scenario.statusLookups, 1, 'The first request must reuse its verified account status.');
 
     const second = await scenario.tool('sendToAgent', {
       to: '大熊', message: 'The next request must still authenticate separately.',
     });
 
     assert.equal(second.result.isError, undefined);
-    assert.equal(scenario.grantLookups, 2,
-      'Each tool call must authenticate its Grant exactly once.');
-    assert.equal(scenario.heartbeatCount, 1,
-      'The existing Runtime lease must still be verified.');
+    assert.equal(scenario.grantLookups, 0,
+      'The verified account response already includes the Grant.');
+    assert.equal(scenario.heartbeatCount, 0,
+      'No duplicate heartbeat before Relay authorization.');
+    assert.equal(scenario.relayLeaseChecks, 2);
     assert.equal(scenario.calls.length, 2);
+    context.diagnostic('Two sends with simulated 50 ms status latency: ' +
+      (performance.now() - started).toFixed(1) + ' ms; status calls: ' + scenario.statusLookups);
+    assert.equal(scenario.statusLookups, 2,
+      'One Account Status per HTTP request; never reuse it across requests.');
+
+    for (const call of scenario.calls) {
+      assert.equal(call.url.searchParams.get('session_id'), SESSION_A);
+      assert.equal(call.headers.get('x-nuwa-runtime-token'), RUNTIME_SECRET);
+    }
   } finally {
     scenario.restore();
   }
@@ -261,6 +291,8 @@ test('expired Runtime safely resumes the same saved Session after OAuth token re
     assert.equal(resumed.result.isError, undefined);
     assert.equal(JSON.parse(resumed.result.content[0].text).sessionID, SESSION_A);
     assert.equal(scenario.resumeCount, 1);
+    assert.equal(scenario.recoveryCount, 1);
+    assert.equal(scenario.heartbeatAttempts, 0);
     assert.equal(scenario.claimCount, 1);
     assert.doesNotMatch(JSON.stringify(resumed), /resume_secret|runtime_private/);
   } finally {
@@ -277,6 +309,7 @@ test('tool schemas expose neither Runtime/Resume capabilities nor caller Session
 
     assert.match(schemas, /sendToAgent/);
     assert.match(schemas, /agentAddressEnsureIdentity/);
+    assert.match(schemas, /agentAddressSelectSession/);
     assert.match(schemas, /relayBeginWakePairing/);
     assert.doesNotMatch(schemas, /runtimeToken|resumeToken|runtime_token|sessionID/);
     assert.doesNotMatch(schemas, /bearerToken|signingSecret/);
@@ -310,6 +343,64 @@ test('another OAuth grant receives a separate Agent and never borrows the first 
 
     assert.notEqual((await firstAgent.json() as { data: { sessionID: string } }).data.sessionID,
       (await secondAgent.json() as { data: { sessionID: string } }).data.sessionID);
+  } finally {
+    scenario.restore();
+  }
+});
+
+test('new OAuth grant reselects its idle original Gateway Session without re-enrolling coworkers', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const original = await scenario.tool('agentAddressEnsureIdentity', {});
+    const replacement = await scenario.tool('agentAddressEnsureIdentity', {}, 'oauth-b');
+    assert.equal(original.result.isError, undefined);
+    assert.equal(replacement.result.isError, undefined);
+
+    const address = 'nuwa/reviewer-a/main';
+    const blocked = await scenario.tool('agentAddressSelectSession', { address }, 'oauth-b');
+    assert.equal(blocked.result.isError, true);
+    assert.equal(scenario.database.rows.get('b'.repeat(64))?.sessionID, SESSION_B);
+
+    scenario.activeLeases.delete(SESSION_A);
+
+    const recovered = await scenario.tool('agentAddressSelectSession', { address }, 'oauth-b');
+    assert.equal(recovered.result.isError, undefined);
+    const selected = JSON.parse(recovered.result.content[0].text);
+    assert.equal(selected.sessionID, SESSION_A);
+    assert.equal(selected.canonical, address);
+    assert.equal(scenario.database.rows.get('b'.repeat(64))?.sessionID, SESSION_A);
+    assert.doesNotMatch(JSON.stringify(recovered), /resumeToken|runtimeToken|resume_secret/);
+
+    const sent = await scenario.tool('sendToAgent', {
+      from: '小晴', to: '小安', message: 'Gateway restored original Session.',
+    }, 'oauth-b');
+    assert.equal(sent.result.isError, undefined);
+    assert.equal(scenario.calls[0].url.searchParams.get('session_id'), SESSION_A);
+    assert.equal(scenario.calls[0].headers.get('x-nuwa-runtime-token'),
+      RUNTIME_SECRET + '_recovered');
+    assert.deepEqual(scenario.calls[0].body, {
+      from: '小晴', to: '小安', body: 'Gateway restored original Session.',
+    });
+
+    const replied = await scenario.tool('relayReplyThread', {
+      from: '小安', threadID: THREAD_ID, body: '小晴，收到。',
+    }, 'oauth-b');
+    assert.equal(replied.result.isError, undefined);
+    assert.equal(scenario.calls[1].url.pathname, '/v2/threads/' + THREAD_ID + '/messages');
+    assert.equal(scenario.calls[1].url.searchParams.get('session_id'), SESSION_A);
+    assert.deepEqual(scenario.calls[1].body, { from: '小安', body: '小晴，收到。' });
+    const message = await scenario.tool('relayMessage', {
+      from: '小晴', messageID: MESSAGE_ID, contextLimit: 8,
+    }, 'oauth-b');
+    assert.equal(message.result.isError, undefined);
+    assert.equal(scenario.calls[2].url.pathname, '/v2/messages/' + MESSAGE_ID);
+    assert.equal(scenario.calls[2].url.searchParams.get('session_id'), SESSION_A);
+    assert.equal(scenario.calls[2].url.searchParams.get('from'), '小晴');
+    assert.equal(scenario.calls[2].url.searchParams.get('context_limit'), '8');
+    assert.equal(scenario.calls.length, 3,
+      'Address recovery, send, reply and read need no new office configuration.');
   } finally {
     scenario.restore();
   }
@@ -365,7 +456,7 @@ test('revoking a binding clears stale credentials even after Runtime lease was i
   }
 });
 
-test('expired or replaced Runtime fails closed before touching the Relay service', async () => {
+test('expired or replaced Runtime cannot create a Relay message', async () => {
   const scenario = new RemoteMCPScenario();
   scenario.install();
 
@@ -379,6 +470,108 @@ test('expired or replaced Runtime fails closed before touching the Relay service
 
     assert.equal(rejected.result.isError, true);
     assert.equal(scenario.calls.length, 0);
+    assert.equal(scenario.relayLeaseChecks, 1);
+  } finally {
+    scenario.restore();
+  }
+});
+
+test('a submitted office message returns before the confirmed Lease is synchronized', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    assert.equal((await scenario.bind()).status, 201);
+    const row = [...scenario.database.rows.values()][0];
+    row.expiresAt = new Date(Date.now() + 60_000).toISOString();
+    const previousExpiry = row.expiresAt;
+    scenario.database.expiryWriteGate = gate;
+
+    const sent = scenario.tool('sendToAgent', {
+      from: '小晴', to: '大熊', message: 'Please confirm the release.',
+    }, 'oauth-a', false);
+    const result = await Promise.race([sent, new Promise<never>((_resolve, reject) => {
+      timeout = setTimeout(() => reject(new Error('Message response waited for Lease bookkeeping.')), 5_000);
+    })]);
+
+    assert.equal(result.result.isError, undefined);
+    assert.equal(scenario.calls.length, 1);
+    assert.equal(scenario.relayLeaseChecks, 1);
+    assert.equal(scenario.heartbeatCount, 0);
+    assert.equal(row.expiresAt, previousExpiry);
+
+    release();
+    await scenario.background.drain();
+    assert.ok(row.expiresAt > previousExpiry, 'The tracked task must persist the confirmed expiry');
+  } finally {
+    clearTimeout(timeout);
+    release();
+    await scenario.background.drain();
+    scenario.restore();
+  }
+});
+
+test('an outdated local lease record retains the same active Runtime after Relay renewal', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    assert.equal((await scenario.bind()).status, 201);
+    const row = [...scenario.database.rows.values()][0];
+    row.expiresAt = new Date(Date.now() - 1000).toISOString();
+
+    const sent = await scenario.tool('sendToAgent', {
+      to: '大熊', message: 'Continue using the existing Session.',
+    });
+
+    assert.equal(sent.result.isError, undefined);
+    assert.equal(scenario.resumeCount, 1);
+    assert.equal(scenario.recoveryCount, 1);
+    assert.equal(scenario.heartbeatCount, 0);
+    assert.equal(scenario.heartbeatAttempts, 0);
+    assert.equal(scenario.claimCount, 0);
+    assert.equal(scenario.calls[0].url.searchParams.get('session_id'), SESSION_A);
+    assert.ok(Date.parse(row.expiresAt) > Date.now());
+
+    row.expiresAt = new Date(Date.now() + 5000).toISOString();
+    const next = await scenario.tool('sendToAgent', {
+      to: '大熊', message: 'Keep the Session when its lease is about to expire.',
+    });
+    assert.equal(next.result.isError, undefined);
+    assert.equal(scenario.heartbeatCount, 1);
+    assert.equal(scenario.recoveryCount, 1);
+    assert.equal(scenario.resumeCount, 1);
+    assert.equal(scenario.calls[1].url.searchParams.get('session_id'), SESSION_A);
+  } finally {
+    scenario.restore();
+  }
+});
+
+test('expired local binding cannot replace a different active Runtime', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    await scenario.bind();
+    const row = [...scenario.database.rows.values()][0];
+    row.expiresAt = new Date(Date.now() - 1000).toISOString();
+    scenario.activeLeases.set(SESSION_A, 'runtime_other_owner');
+
+    const rejected = await scenario.tool('sendToAgent', {
+      to: '大熊', message: 'Do not deliver this message.',
+    });
+
+    assert.equal(rejected.result.isError, true);
+    assert.equal(scenario.recoveryCount, 1);
+    assert.equal(scenario.heartbeatAttempts, 0);
+    assert.equal(scenario.calls.length, 0);
+    assert.equal(scenario.activeLeases.get(SESSION_A), 'runtime_other_owner');
   } finally {
     scenario.restore();
   }
@@ -457,6 +650,8 @@ test('one MCP send call passes the familiar Bot name unchanged to Relay for rout
     const schemas = JSON.stringify(await scenario.toolSchemas());
     assert.doesNotMatch(schemas, /agentAddressFindByName/);
     assert.match(schemas, /Relay resolves names in/);
+    assert.deepEqual(await scenario.toolSchemas(), JSON.parse(schemas),
+      'Static tool definitions remain identical across independent MCP requests.');
   } finally {
     scenario.restore();
   }
@@ -681,11 +876,12 @@ test('Gateway can propose a real coworker and that coworker alone approves the o
       firstContactMode: 'manual',
     });
 
-    const approval = await scenario.tool('relayGatewayApproveInvitation', {}, 'oauth-b');
+    const approval = await scenario.tool('relayGatewayApproveInvitation', { shareConnection: true }, 'oauth-b');
     assert.equal(approval.result.isError, undefined);
     assert.equal(scenario.calls.at(-1)?.url.pathname, '/v2/gateway-invitation');
     assert.equal(scenario.calls.at(-1)?.url.searchParams.get('session_id'), SESSION_B);
     assert.equal(scenario.calls.at(-1)?.headers.get('authorization'), 'Bearer oauth-b');
+    assert.deepEqual(scenario.calls.at(-1)?.body, { shareConnection: true });
 
     const roster = await scenario.tool('relayGatewayTeammates', {});
     assert.equal(roster.result.isError, undefined);
@@ -704,67 +900,55 @@ test('Gateway can propose a real coworker and that coworker alone approves the o
     assert.equal(namedRemoval.result.isError, undefined);
     assert.equal(scenario.calls.at(-1)?.url.searchParams.get('recipient_name'), '大熊');
     assert.equal(scenario.calls.at(-1)?.url.searchParams.has('recipient_address'), false);
+
+    const nativeRemoval = await scenario.tool('relayGatewayRemoveTeammate', {
+      recipientBotID: 'trusted-native-bear-id',
+    });
+    assert.equal(nativeRemoval.result.isError, undefined);
+    assert.equal(scenario.calls.at(-1)?.url.searchParams.get('recipient_bot_id'), 'trusted-native-bear-id');
   } finally {
     scenario.restore();
   }
 });
 
 
-test('office Gateway explicitly delegates a named coworker call and original Thread reply', async () => {
+test('enrolled GrokBot coworkers send and reply by native IDs with no extra office configuration', async () => {
   const scenario = new RemoteMCPScenario();
   scenario.install();
 
   try {
     const schemas = JSON.stringify(await scenario.toolSchemas());
-    assert.match(schemas, /relayGatewayOfficeDelegation/);
-    assert.match(schemas, /relayGatewayCoworkerPassphrase/);
-
-    const activated = await scenario.tool('relayGatewayOfficeDelegation', { enabled: true });
-    assert.equal(activated.result.isError, undefined);
-    assert.equal(scenario.calls.at(-1)?.url.pathname, '/v2/gateway-office-delegation');
+    assert.doesNotMatch(schemas, /relayGatewayOfficeDelegation|relayGatewayCoworkerPassphrase/);
+    assert.doesNotMatch(schemas, /passphrase/);
 
     const enrolled = await scenario.tool('relayGatewayEnrollOfficeCoworkers', {
       coworkers: [
-        { displayName: '小晴', recipientBotID: 'xiaoqing-native', threadMode: 'platform',
-          passphrase: 'xiaoqing-private-phrase-2026' },
+        { displayName: '小晴', recipientBotID: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', threadMode: 'platform' },
+        { displayName: '小安', recipientBotID: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', threadMode: 'platform' },
       ],
     });
     assert.equal(enrolled.result.isError, undefined);
-    assert.deepEqual(scenario.calls.at(-1)?.body, {
-      coworkers: [
-        { displayName: '小晴', recipientBotID: 'xiaoqing-native', threadMode: 'platform',
-          firstContactMode: 'manual', passphrase: 'xiaoqing-private-phrase-2026' },
-      ],
-    });
 
     const called = await scenario.tool('sendToAgent', {
-      from: '小晴', passphrase: 'xiaoqing-private-phrase-2026',
-      to: '大熊', message: '請幫我確認 NUWA-GROK-01。',
+      from: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', to: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', message: '請幫我確認 NUWA-GROK-01。',
     });
     assert.equal(called.result.isError, undefined);
     assert.equal(scenario.calls.at(-1)?.url.pathname, '/v2/messages');
     assert.deepEqual(scenario.calls.at(-1)?.body, {
-      from: '小晴', passphrase: 'xiaoqing-private-phrase-2026',
-      to: '大熊', body: '請幫我確認 NUWA-GROK-01。',
+      from: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', to: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', body: '請幫我確認 NUWA-GROK-01。',
     });
 
     const replied = await scenario.tool('relayReplyThread', {
-      from: '小晴', passphrase: 'xiaoqing-private-phrase-2026',
-      threadID: THREAD_ID, body: '原 Thread 回覆。',
+      from: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', threadID: THREAD_ID, body: '小晴，已收到。',
     });
     assert.equal(replied.result.isError, undefined);
     assert.equal(scenario.calls.at(-1)?.url.pathname,
       '/v2/threads/' + THREAD_ID + '/messages');
     assert.deepEqual(scenario.calls.at(-1)?.body, {
-      from: '小晴', passphrase: 'xiaoqing-private-phrase-2026', body: '原 Thread 回覆。',
+      from: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', body: '小晴，已收到。',
     });
-
-    const rotated = await scenario.tool('relayGatewayCoworkerPassphrase', {
-      recipientBotID: 'xiaoqing-native', passphrase: 'xiaoqing-new-private-phrase-2026',
-    });
-    assert.equal(rotated.result.isError, undefined);
-    assert.equal(scenario.calls.at(-1)?.url.pathname,
-      '/v2/gateway-office-coworkers/xiaoqing-native/passphrase');
+    assert.equal(scenario.calls.length, 3,
+      'Enrollment, send and reply need no extra administrative MCP call.');
   } finally {
     scenario.restore();
   }

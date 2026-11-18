@@ -1,6 +1,11 @@
 import type { Env } from './Env';
 import { Logger } from './Logger';
 
+export type AuthenticatedRequest = {
+  authorization: string;
+  status: Response;
+};
+
 export class OAuthResourceServer {
   private static readonly logger = Logger.forModule('mcp');
   private static readonly RESOURCE_PATH = '/mcp';
@@ -31,7 +36,7 @@ export class OAuthResourceServer {
     });
   }
 
-  async authenticate(request: Request): Promise<string | Response> {
+  async authenticate(request: Request): Promise<AuthenticatedRequest | Response> {
     const origin = new URL(request.url).origin;
     const authorization = request.headers.get('authorization');
 
@@ -41,7 +46,7 @@ export class OAuthResourceServer {
 
     // The backend is the single source of truth for OAuth account validity.
     // No bearer token is cached across clients or MCP requests.
-    const url = new URL('/v2/account/status', this.env.ADDRESS_API_URL);
+    const url = new URL('/v2/account/status?include_grant=1', this.env.ADDRESS_API_URL);
     let status: Response;
 
     try {
@@ -77,6 +82,6 @@ export class OAuthResourceServer {
       return Response.json({ error: 'oauth_upstream_unavailable' }, { status: 502 });
     }
 
-    return authorization;
+    return { authorization, status };
   }
 }

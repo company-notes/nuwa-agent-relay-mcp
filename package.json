@@ -10,7 +10,7 @@
   "scripts": {
     "check": "tsc --noEmit",
     "style:check": "node scripts/check-code-principles.mjs",
-    "test": "node --import tsx --test server/test/*.test.ts && node --test scripts/GuardBindingD1.checks.mjs scripts/WranglerRunner.checks.mjs",
+    "test": "node --import tsx --test server/test/*.test.ts && node --test scripts/GuardBindingD1.checks.mjs scripts/WranglerRunner.checks.mjs scripts/GenerateSkill.checks.mjs",
     "build": "wrangler deploy --dry-run",
     "dev": "wrangler dev",
     "deploy": "node scripts/GuardBindingD1.mjs --remote --require-migrated && wrangler deploy --config .wrangler.deploy.jsonc",

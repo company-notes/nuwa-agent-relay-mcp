@@ -32,6 +32,22 @@ Agent Address and Relay API contracts while refactoring.
 
 ## Verification and rollout
 
+- Keep already released identity recovery and ordinary messaging together. A new
+  deployment must retain `agentAddressSelectSession`, `sendToAgent`, and
+  `relayReplyThread`; verify the recovered Gateway can send and reply using its
+  original address without re-pairing Wake or re-enrolling coworkers. Integrate
+  concurrent fixes before deploying; do not deploy an older sibling branch
+  over a previously released feature.
+- Ordinary Relay calls use one Account Status/Grant snapshot per HTTP request
+  and one authoritative Runtime check/renewal in Relay. The MCP binding only
+  resumes or refreshes when required and records the lease returned by Relay.
+  Keep this single path; do not add duplicate identity lookups or per-message
+  mailbox setup. Deploy matching Agent Address, Relay API, then MCP versions.
+- Keep the public Skill and onboarding prompt centered on normal operations:
+  one send/reply, zero MCP calls during ordinary office Wake dispatch, one
+  native dispatch, and no routine diagnostics or reinstallation. Preserve
+  the separate explicit first-contact and minimal direct Wake flows.
+
 - Remote MCP: `npm ci && npm run check && npm test && npm run build`.
 - Studio: run the Python tests for the supported Linux and Windows targets
   through CI; keep deployment preview separate from production.
@@ -39,4 +55,5 @@ Agent Address and Relay API contracts while refactoring.
   actual Red/Green results when investigating a bug.
 - Work in a PR with CI passing. A merge into `main` can deploy the
   production remote MCP; do not merge an audit/refactor without deployment
-  authorization.
+  authorization. Production is built from verified merged main only, including
+  a local deployment when CI is temporarily unavailable. Never publish a draft PR head.

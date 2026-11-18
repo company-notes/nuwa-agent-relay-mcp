@@ -29,41 +29,36 @@ export const ONBOARDING_SCRIPT = `
 
   function gatewaySetup() {
     return [
-      '請為目前這個 AI 平台設定 Nuwa 辦公室總機，讓同一 Organization 的各辦公室',
-      '可以互相傳訊、委派工作及接續對話。',
+      '請將目前這個 AI 平台接入 Nuwa，讓同一 Organization 的 AI 同事可以互相聯絡。',
       '',
-      '先閱讀官方 Nuwa Skill：' + skillURL,
-      'Nuwa MCP 入口：' + mcpURL,
+      '官方 Skill：' + skillURL,
+      'Nuwa MCP：' + mcpURL,
       '',
-      '你是本辦公室的 Gateway，負責一次完成接線設定與維護分機名錄。',
-      'Relay 通知你有來電時，使用平台原有的 Bot 傳訊能力，將訊息',
-      '轉交給 Relay 已指定的 Bot ID。由真正的同事閱讀、工作與回覆。',
+      '請依最新版 Skill，安裝或更新 Skill 與 MCP，完成 Organization 授權，沿用既有身分。依平台實際能力選擇接入方式：',
       '',
-      '請依以下標準流程接入整間辦公室：',
-      '1. 使用本辦公室既有的 Nuwa Skill、MCP 和受權 Gateway 身分。',
-      '2. 由 Gateway 建立並驗證一個共用 Wake 接收入口。',
-      '3. 從平台可信 Bot 名錄盤點所有現有同事的顯示名稱與 Bot ID。',
-      '4. 以 Organization 的管理授權，為同事建立或沿用真正的 Agent Address、',
-      '   Default Session 與所需的 MailTrigger 傳輸信箱，登記 Bot ID 與收件路由。',
-      '5. 將各同事的來電統一交由本辦公室 Gateway 接收 Wake；由 Gateway',
-      '   精確轉交給被指定的同事，並保留每位同事各自的發話身分。',
-      '6. 核對名錄、地址、接線路由、真實 Bot 收件與原通話回覆，再回報接通名單。',
+      '獨立 MCP 用戶端（如支援此 MCP 與 OAuth 的 Codex、ChatGPT）：使用自己的 Agent／Session，完成信箱設定即可通訊。獨立連線省略 from；平台允許時直接呼叫。沒有自動接收能力就依使用者要求查收；支援直接 Wake 時才設定。無須 Gateway。回報自己的地址及收件方式。',
       '',
-      '日常通訊時，同事可直接以姓名、Agent Address 或已驗證 Email 別名',
-      '呼叫 sendToAgent；Relay 在同一次請求內解析唯一收件者。',
-      '回覆已有通話時接續原 Relay Thread；發新通話時建立新的 Relay Thread。',
-      '',
-      '請從確認本辦公室 Gateway 接入狀態開始，每次只引導我完成下一項操作。',
-      '所有憑證使用平台的受保護授權流程，不在聊天中要求我輸入任何金鑰。'
+      '共用辦公室：已接入的同事沿用既有連線；若你負責整間辦公室，擔任 Gateway：',
+      '1. 設定本辦公室唯一的 Wake 接收例行任務並完成驗證；沿用有效的接線。',
+      '   接收入口或金鑰變更時，以同一 Gateway 身分重新配對。',
+      '2. 從平台可信 Bot 名錄取得真實同事的名稱與 Bot ID（排除自己），',
+      '   排除群組／頻道，批次完成全部同事的接入，沿用既有地址與名錄。同步新增與改名，保留獨立成員的接入模式；移除需明確授權。',
+      '3. 收到正常 Wake 時，依 recipientBotID 使用平台原生工具轉交一次，',
+      '   完整轉交正文、寄件者及原 Relay Thread 回覆上下文，讓本人依 Skill 回覆。',
+      '   附上 relayReplyThread({from, threadID, body}) 的呼叫格式，',
+      '   帶入實際 Thread ID，from 直接填 recipientBotID（UUID 或 bot: 前綴的原生 ID），由同事填回覆正文。',
+      '   安裝時確認 Routine 實際工具能力。能直接轉交就直接送；GrokBot 的 Routine 若無原生轉交能力但支援 WakeParent，僅交接完整原始事件 JSON，由上層 Gateway 統一組合格式並原生轉交一次。',
+      '   Routine 使用自包含指令；日常不讀 Skill、不寫日誌。Gateway 零 MCP 查詢，提交後結束。',
+      '4. 回報 Gateway 地址、Wake 狀態及已接入同事名單。'
     ].join('\\n');
   }
 
   function sendPrompt() {
     return [
-      '請透過 Nuwa 找另一間辦公室的「' + colleagueName('colleagueB') +
+      '請透過 Nuwa 找「' + colleagueName('colleagueB') +
         '」助理聊一下。',
-      '告訴他：「你好，我們來測試通話，密語是星河。收到後請回覆密語。」',
-      '請由 Relay 解析同事的唯一地址，並將這則新通話送到正確的收件人。'
+      '告訴他：「你好，我們來測試通話，測試字詞是星河。收到後請回覆這個字詞。」',
+      '請直接發送一次，優先使用已知的 Bot ID，否則填完整登記名稱，由 Relay 解析；共用連線時填自己的 from。'
     ].join('\\n');
   }
 
@@ -71,17 +66,17 @@ export const ONBOARDING_SCRIPT = `
     return [
       '請查收剛才「' + colleagueName('colleagueA') +
         '」助理傳來的測試訊息，',
-      '請用 Nuwa 接續原本的 Relay Thread 回覆：「收到星河！」',
-      '並確認寄件方在原本的通話收到這則回覆。'
+      '請用 Nuwa 接續原本的 Relay Thread 回覆：「收到星河！」，共用連線時填自己的 from。',
+      '實際收到完整訊息後直接回覆一次，不需要額外查詢；若已回覆，回報結果即可。'
     ].join('\\n');
   }
 
   function returnPrompt() {
     return [
-      '請透過 Nuwa 主動找另一間辦公室的「' + colleagueName('colleagueA') +
+      '請透過 Nuwa 主動找「' + colleagueName('colleagueA') +
         '」助理聊一下。',
-      '告訴他：「換我打給你了！這次密語是月光，請回覆密語。」',
-      '若有同名的助理或找不到人，先問我，不要猜測。'
+      '告訴他：「換我打給你了！這次測試字詞是月光，請回覆這個字詞。」',
+      '請直接發送一次，優先使用已知的 Bot ID，否則填完整登記名稱；共用連線時填自己的 from。同名或找不到人才問我。'
     ].join('\\n');
   }
 
@@ -89,8 +84,8 @@ export const ONBOARDING_SCRIPT = `
     return [
       '請查收「' + colleagueName('colleagueB') +
         '」助理剛才主動打來的電話，',
-      '請用 Nuwa 在那通 Relay Thread 回覆：「收到月光！」',
-      '並確認寄件方收到原通話的回覆。'
+      '請用 Nuwa 在那通 Relay Thread 回覆：「收到月光！」，共用連線時填自己的 from。',
+      '實際收到完整訊息後直接回覆一次，不需要額外查詢；若已回覆，回報結果即可。'
     ].join('\\n');
   }
 

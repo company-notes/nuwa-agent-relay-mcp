@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import type { BindingDatabase, BindingStatement, Env } from '../src/Env';
+import type { BackgroundTasks, BindingDatabase, BindingStatement, Env } from '../src/Env';
 import { HTTPMCPApplication } from '../src/Index';
 
 export const SESSION_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -25,6 +25,7 @@ class MemoryStatement implements BindingStatement {
   constructor(
     private readonly store: Map<string, BindingRecord>,
     private readonly sql: string,
+    private readonly expiryWriteGate?: Promise<void>,
   ) {}
 
   bind(...values: string[]): MemoryStatement {
@@ -60,6 +61,7 @@ class MemoryStatement implements BindingStatement {
     }
 
     if (this.sql.startsWith('UPDATE remote_session_bindings SET expires_at')) {
+      await this.expiryWriteGate;
       const [expiresAt, key, sessionID, encryptedRuntimeToken] = this.parameters;
       const current = this.store.get(key);
 
@@ -68,7 +70,7 @@ class MemoryStatement implements BindingStatement {
         return { meta: { changes: 0 } };
       }
 
-      current.expiresAt = expiresAt;
+      current.expiresAt = current.expiresAt > expiresAt ? current.expiresAt : expiresAt;
 
       return { meta: { changes: 1 } };
     }
@@ -107,15 +109,29 @@ class MemoryStatement implements BindingStatement {
 
 export class MemoryBindingDatabase implements BindingDatabase {
   readonly rows = new Map<string, BindingRecord>();
+  expiryWriteGate?: Promise<void>;
 
   prepare(sql: string): BindingStatement {
-    return new MemoryStatement(this.rows, sql);
+    return new MemoryStatement(this.rows, sql, this.expiryWriteGate);
+  }
+}
+
+class TestBackgroundTasks implements BackgroundTasks {
+  private readonly pending: Promise<unknown>[] = [];
+
+  waitUntil(promise: Promise<unknown>): void {
+    this.pending.push(promise);
+  }
+
+  async drain(): Promise<void> {
+    await Promise.all(this.pending.splice(0));
   }
 }
 
 export class RemoteMCPScenario {
   private readonly originalFetch = globalThis.fetch;
   readonly database = new MemoryBindingDatabase();
+  readonly background = new TestBackgroundTasks();
   readonly calls: Array<{ url: URL; headers: Headers; body: unknown }> = [];
   readonly activeLeases = new Map<string, string>();
   readonly env: Env;
@@ -123,11 +139,16 @@ export class RemoteMCPScenario {
   organizationID = 'org-a';
   organizationExists = true;
   resumeCount = 0;
+  recoveryCount = 0;
+  heartbeatAttempts = 0;
   claimCount = 0;
   readonly displayNameUpdates: Array<{ agentID: string; name: string; principal: string }> = [];
   registerOrganizationCount = 0;
   heartbeatCount = 0;
+  relayLeaseChecks = 0;
   grantLookups = 0;
+  statusLookups = 0;
+  statusDelayMS = 0;
   releaseCount = 0;
 
   constructor() {
@@ -139,7 +160,7 @@ export class RemoteMCPScenario {
       ADDRESS_WORKER: { fetch: (input, init) => globalThis.fetch(input, init) },
       RELAY_WORKER: { fetch: (input, init) => globalThis.fetch(input, init) },
     };
-    this.application = new HTTPMCPApplication(this.env);
+    this.application = new HTTPMCPApplication(this.env, this.background);
   }
 
   private static principal(authorization: string | null): string | null {
@@ -178,12 +199,20 @@ export class RemoteMCPScenario {
         }
 
         if (url.pathname === '/v2/account/status') {
+          this.statusLookups += 1;
+
+          if (this.statusDelayMS > 0) {
+            await new Promise<void>((resolve) => setTimeout(resolve, this.statusDelayMS));
+          }
+
           return Response.json({
             ok: true,
             data: {
               account: { email: 'user@example.com' },
               organization: this.organizationExists
                 ? { id: this.organizationID, slug: 'nuwa' } : null,
+              ...(url.searchParams.get('include_grant') === '1'
+                ? { grantFingerprint: principal } : {}),
             },
           });
         }
@@ -195,6 +224,43 @@ export class RemoteMCPScenario {
           return Response.json({
             ok: true, data: { id: this.organizationID, slug: 'nuwa' },
           }, { status: 201 });
+        }
+
+        if (url.pathname === '/v2/account/addresses' && init?.method === 'GET') {
+          const address = url.searchParams.get('address');
+
+          if (address !== 'nuwa/reviewer-a/main') {
+            return Response.json({ ok: false, error: { code: 'session_not_found' } }, {
+              status: 404,
+            });
+          }
+
+          return Response.json({ ok: true, data: {
+            id: SESSION_A,
+            canonical: address,
+            runtime: this.activeLeases.has(SESSION_A)
+              ? { expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() }
+              : null,
+          } });
+        }
+
+        if (url.pathname === '/v2/account/sessions/' + SESSION_A + '/owner-runtime-lease' &&
+            init?.method === 'PUT') {
+          if (this.activeLeases.has(SESSION_A)) {
+            return Response.json({ ok: false, error: { code: 'session_in_use' } }, {
+              status: 409,
+            });
+          }
+
+          const runtime = RUNTIME_SECRET + '_recovered';
+          this.activeLeases.set(SESSION_A, runtime);
+
+          return Response.json({ ok: true, data: {
+            session: { id: SESSION_A, canonical: 'nuwa/reviewer-a/main' },
+            runtimeToken: runtime,
+            resumeToken: RESUME_SECRET + '_owner',
+            leaseExpiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+          } });
         }
 
         if (url.pathname === '/v2/account/agent-runtime-leases' && init?.method === 'POST') {
@@ -231,6 +297,21 @@ export class RemoteMCPScenario {
           const runtime = sessionID === SESSION_B ? RUNTIME_SECRET + '_b' : RUNTIME_SECRET;
 
           if (init?.method === 'PUT') {
+            if (body?.runtimeToken) {
+              this.recoveryCount += 1;
+              const owner = this.activeLeases.get(sessionID);
+
+              if (owner && owner === body.runtimeToken) {
+                return Response.json({ ok: true, data: {
+                  session: { id: sessionID, canonical: 'nuwa/reviewer-' +
+                    (sessionID === SESSION_B ? 'b' : 'a') + '/main' },
+                  runtimeToken: owner,
+                  leaseExpiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+                  renewed: true,
+                } });
+              }
+            }
+
             this.resumeCount += 1;
 
             if (body?.resumeToken !== RESUME_SECRET || this.activeLeases.has(sessionID)) {
@@ -250,6 +331,10 @@ export class RemoteMCPScenario {
                 leaseExpiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
               },
             });
+          }
+
+          if (init?.method === 'PATCH') {
+            this.heartbeatAttempts += 1;
           }
 
           if (body?.runtimeToken !== this.activeLeases.get(sessionID)) {
@@ -320,12 +405,25 @@ export class RemoteMCPScenario {
       }
 
       assert.equal(url.origin, this.env.RELAY_API_URL);
+      this.relayLeaseChecks += 1;
+      const sessionID = url.searchParams.get('session_id') ?? '';
+      const runtime = this.activeLeases.get(sessionID);
+
+      if (!runtime || headers.get('x-nuwa-runtime-token') !== runtime) {
+        return Response.json({ ok: false, error: { code: 'runtime_not_owner' } }, {
+          status: 409,
+        });
+      }
+
       this.calls.push({ url, headers, body });
 
       return Response.json({ ok: true, data: {
         id: MESSAGE_ID, threadId: THREAD_ID,
         recentThreadMessages: [{ body: 'Previous context' }],
-      } }, { status: init?.method === 'POST' ? 201 : 200 });
+      } }, {
+        status: init?.method === 'POST' ? 201 : 200,
+        headers: { 'x-nuwa-lease-expires-at': new Date(Date.now() + 15 * 60_000).toISOString() },
+      });
     };
   }
 
@@ -355,6 +453,7 @@ export class RemoteMCPScenario {
 
   async tool(
     name: string, argumentsValue: Record<string, unknown>, token = 'oauth-a',
+    waitForBackground = true,
   ): Promise<{ result: { content: Array<{ text: string }>; isError?: boolean } }> {
     const response = await this.application.handle(new Request(
       'https://mcp.agent-relay.company-notes.com/mcp', {
@@ -373,6 +472,10 @@ export class RemoteMCPScenario {
     ));
 
     assert.equal(response.status, 200);
+
+    if (waitForBackground) {
+      await this.background.drain();
+    }
 
     return response.json() as Promise<{
       result: { content: Array<{ text: string }>; isError?: boolean };

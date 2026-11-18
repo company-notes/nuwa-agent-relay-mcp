@@ -75,6 +75,8 @@ test('office-wide setup does not ask the user to register each coworker by hand'
   assert.doesNotMatch(ONBOARDING_HTML, /id="colleaguePromptA"/);
   assert.match(ONBOARDING_HTML, /如果這個平台已經安裝過/);
   assert.match(ONBOARDING_HTML, /預設連接辦公室同事/);
+  assert.match(ONBOARDING_HTML, /獨立 MCP 用戶端直接接入，不需要總機/);
+  assert.match(ONBOARDING_HTML, /Nuwa 通用啟動指令/);
   assert.match(ONBOARDING_HTML, /同事名稱與 Bot ID/);
   assert.match(ONBOARDING_HTML, /辦公室只需要一個 Gateway Wake/);
   assert.match(ONBOARDING_HTML, /接線助理從平台名錄取得同事名稱與 Bot ID/);
@@ -105,15 +107,13 @@ test('real HTTP routes keep Skill and OAuth protected', async () => {
   }
 
   assert.doesNotThrow(() => new Script(ONBOARDING_SCRIPT));
-  assert.match(ONBOARDING_SCRIPT, /先閱讀官方 Nuwa Skill/);
-  assert.match(ONBOARDING_SCRIPT, /使用本辦公室既有的 Nuwa Skill、MCP/);
-  assert.match(ONBOARDING_SCRIPT, /以 Organization 的管理授權/);
-  assert.match(ONBOARDING_SCRIPT, /真正的 Agent Address/);
-  assert.match(ONBOARDING_SCRIPT, /sendToAgent/);
-  assert.match(ONBOARDING_SCRIPT, /密語是星河/);
-  assert.match(ONBOARDING_SCRIPT, /密語是月光/);
+  assert.match(ONBOARDING_SCRIPT, /依最新版 Skill/);
+  assert.match(ONBOARDING_SCRIPT, /安裝或更新 Skill 與 MCP/);
+  assert.match(ONBOARDING_SCRIPT, /完成 Organization 授權/);
+  assert.match(ONBOARDING_SCRIPT, /測試字詞是星河/);
+  assert.match(ONBOARDING_SCRIPT, /測試字詞是月光/);
   assert.doesNotMatch(ONBOARDING_SCRIPT,
-    /agentAddressEnsureIdentity|relayProvisionAgentMailbox|relayWakeSubscription|relayReplyThread/);
+    /agentAddressEnsureIdentity|relayProvisionAgentMailbox|relayWakeSubscription/);
   assert.doesNotMatch(ONBOARDING_SCRIPT, /relayRegisterWake|relayVerifyWake|remote-bind/);
   assert.doesNotMatch(ONBOARDING_SCRIPT, /(?:fetch|XMLHttpRequest|sendBeacon)\s*\(/);
 
@@ -182,15 +182,31 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
 
   const gateway = elements.get('gatewayPrompt')!.textContent;
 
-  assert.match(gateway, /從平台可信 Bot 名錄盤點/);
-  assert.match(gateway, /為同事建立或沿用真正的 Agent Address/);
-  assert.doesNotMatch(gateway, /核對他們的 Nuwa 地址/);
-  assert.match(gateway, /使用本辦公室既有的 Nuwa Skill、MCP/);
-  assert.match(gateway, /共用 Wake 接收入口/);
-  assert.match(gateway, /Organization 的管理授權/);
-  assert.match(gateway, /MailTrigger 傳輸信箱/);
-  assert.match(gateway, /姓名、Agent Address 或已驗證 Email 別名/);
-  assert.doesNotMatch(gateway, /小晴|大熊|Cosmo|nuwa\/xiaoqing/);
+  assert.match(gateway, /官方 Skill：https:\/\/mcp\.agent-relay\.company-notes\.com\/skills\/nuwa-agent-relay\/SKILL\.md/);
+  assert.match(gateway, /Nuwa MCP：https:\/\/mcp\.agent-relay\.company-notes\.com\/mcp/);
+  assert.match(gateway, /安裝或更新 Skill 與 MCP，完成 Organization 授權/);
+  assert.match(gateway, /沿用既有身分/);
+  assert.match(gateway, /獨立 MCP 用戶端/);
+  assert.match(gateway, /無須 Gateway/);
+  assert.match(gateway, /沒有自動接收能力就依使用者要求查收/);
+  assert.match(gateway, /GrokBot 的 Routine 若無原生轉交能力但支援 WakeParent，僅交接完整原始事件 JSON/);
+  assert.match(gateway, /Routine 使用自包含指令/);
+  assert.match(gateway, /唯一的 Wake 接收例行任務並完成驗證/);
+  assert.match(gateway, /沿用有效的接線/);
+  assert.match(gateway, /接收入口或金鑰變更時，以同一 Gateway 身分重新配對/);
+  assert.match(gateway, /從平台可信 Bot 名錄取得真實同事的名稱與 Bot ID（排除自己）/);
+  assert.match(gateway, /批次完成全部同事的接入，沿用既有地址與名錄/);
+  assert.match(gateway, /同步新增與改名，保留獨立成員的接入模式/);
+  assert.match(gateway, /recipientBotID 使用平台原生工具轉交一次/);
+  assert.match(gateway, /完整轉交正文、寄件者及原 Relay Thread 回覆上下文/);
+  assert.match(gateway, /讓本人依 Skill 回覆/);
+  assert.match(gateway, /relayReplyThread\(\{from, threadID, body\}\)/);
+  assert.match(gateway, /帶入實際 Thread ID，from 直接填 recipientBotID/);
+  assert.match(gateway, /排除群組／頻道/);
+  assert.match(gateway, /獨立連線省略 from；平台允許時直接呼叫/);
+  assert.match(gateway, /零 MCP 查詢，提交後結束/);
+  assert.match(gateway, /回報 Gateway 地址、Wake 狀態及已接入同事名單/);
+  assert.doesNotMatch(gateway, /MailTrigger|Default Session|sendToAgent|agentAddressSelectSession|歷史查詢|小晴|大熊|Cosmo|nuwa\/xiaoqing/);
 
   const send = elements.get('sendPrompt')!.textContent;
   const reply = elements.get('replyPrompt')!.textContent;
@@ -198,15 +214,24 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   const verify = elements.get('verifyPrompt')!.textContent;
 
   assert.match(send, /「大熊」助理/);
-  assert.match(send, /密語是星河/);
+  assert.match(send, /測試字詞是星河/);
+  assert.match(send, /直接發送一次/);
+  assert.match(send, /自己的 from/);
   assert.match(reply, /「小晴」助理/);
   assert.match(reply, /收到星河/);
   assert.match(reply, /接續原本的 Relay Thread/);
+  assert.match(reply, /自己的 from/);
+  assert.match(reply, /不需要額外查詢/);
+  assert.match(reply, /實際收到完整訊息後直接回覆一次/);
+  assert.match(reply, /若已回覆，回報結果即可/);
   assert.match(returned, /「小晴」助理/);
-  assert.match(returned, /密語是月光/);
+  assert.match(returned, /測試字詞是月光/);
+  assert.match(returned, /直接發送一次/);
+  assert.match(returned, /自己的 from/);
   assert.match(verify, /「大熊」助理/);
   assert.match(verify, /收到月光/);
   assert.match(verify, /在那通 Relay Thread 回覆/);
+  assert.match(verify, /不需要額外查詢/);
 
   for (const prompt of [send, reply, returned, verify]) {
     assert.doesNotMatch(prompt,

@@ -1,4 +1,4 @@
-import type { Env } from './Env';
+import type { BackgroundTasks, Env } from './Env';
 import { Logger } from './Logger';
 
 export class APIError extends Error {
@@ -37,6 +37,7 @@ export class HTTPAPIClient {
       body?: Record<string, unknown>;
       query?: Record<string, string>;
       timeoutMs?: number;
+      onResponse?: (response: Response) => Promise<void>;
     } = {},
   ): Promise<unknown> {
     if (!path.startsWith('/') || path.startsWith('//')) {
@@ -89,6 +90,16 @@ export class HTTPAPIClient {
         'Backend connection failed. Check its progress before retrying.');
     }
 
+    const result = await this.readResponse(response);
+
+    if (options.onResponse) {
+      await options.onResponse(response);
+    }
+
+    return result;
+  }
+
+  protected async readResponse(response: Response): Promise<unknown> {
     if (response.status >= 300 && response.status < 400) {
       throw new APIError(502, 'unexpected_redirect', 'Backend API unexpectedly redirected.');
     }
@@ -124,13 +135,18 @@ export class HTTPAPIClient {
   }
 }
 
-export type BoundSession = { sessionID: string; runtimeToken: string };
+export type BoundSession = {
+  sessionID: string;
+  runtimeToken: string;
+  onRenewed: (expiresAt: string) => Promise<void>;
+};
 
 export class RelayAPIClient extends HTTPAPIClient {
   constructor(
     env: Env,
     authorization: string,
     private readonly boundSession: () => Promise<BoundSession>,
+    private readonly tasks: BackgroundTasks,
     requester: typeof fetch = (input, init) => env.RELAY_WORKER.fetch(input, init),
   ) {
     super(env.RELAY_API_URL, authorization, requester);
@@ -143,27 +159,64 @@ export class RelayAPIClient extends HTTPAPIClient {
     query?: Record<string, string>,
     timeoutMs?: number,
   ): Promise<unknown> {
-    const { sessionID, runtimeToken } = await this.boundSession();
+    const { sessionID, runtimeToken, onRenewed } = await this.boundSession();
 
-    return this.request(method, path, { sessionID, runtimeToken, body, query, timeoutMs });
+    return this.request(method, path, {
+      sessionID, runtimeToken, body, query, timeoutMs,
+      onResponse: async (response) => {
+        const expiresAt = response.headers.get('x-nuwa-lease-expires-at');
+
+        if (expiresAt) {
+          this.tasks.waitUntil(onRenewed(expiresAt));
+        }
+      },
+    });
   }
 }
 
 export class AddressAPIClient extends HTTPAPIClient {
+  private static runtimeLeasePath(sessionID: string): string {
+    return '/v2/account/sessions/' + encodeURIComponent(sessionID) + '/runtime-lease';
+  }
+
+  private verifiedAccount?: Promise<Record<string, unknown>>;
+  private statusConsumed = false;
+
   constructor(
     env: Env,
     authorization: string,
     requester: typeof fetch = (input, init) => env.ADDRESS_WORKER.fetch(input, init),
+    private readonly verifiedStatus?: Response,
   ) {
     super(env.ADDRESS_API_URL, authorization, requester);
   }
 
-  status(): Promise<unknown> {
-    return this.request('GET', '/v2/account/status');
+  private accountSnapshot(response: Response): Promise<Record<string, unknown>> {
+    this.verifiedAccount ??= this.readResponse(response) as
+      Promise<Record<string, unknown>>;
+
+    return this.verifiedAccount;
   }
 
-  grant(): Promise<unknown> {
-    return this.request('GET', '/v2/account/grant');
+  async status(): Promise<unknown> {
+    if (!this.verifiedStatus || this.statusConsumed) {
+      return this.request('GET', '/v2/account/status');
+    }
+
+    this.statusConsumed = true;
+    const { grantFingerprint, ...status } = await this.accountSnapshot(this.verifiedStatus);
+
+    return status;
+  }
+
+  async grant(): Promise<unknown> {
+    if (!this.verifiedStatus) {
+      return this.request('GET', '/v2/account/grant');
+    }
+
+    const { grantFingerprint } = await this.accountSnapshot(this.verifiedStatus);
+
+    return { grantFingerprint };
   }
 
   registerOrganization(input: Record<string, unknown>): Promise<unknown> {
@@ -203,15 +256,21 @@ export class AddressAPIClient extends HTTPAPIClient {
       { body: { agentDisplayName: displayName } });
   }
 
+  resumeRuntime(
+    sessionID: string, resumeToken: string, runtimeLabel: string, runtimeToken?: string,
+  ): Promise<unknown> {
+    return this.request('PUT', AddressAPIClient.runtimeLeasePath(sessionID), {
+      body: { resumeToken, runtimeLabel, ...(runtimeToken ? { runtimeToken } : {}) },
+    });
+  }
+
   heartbeat(sessionID: string, runtimeToken: string): Promise<unknown> {
-    return this.request('PATCH',
-      '/v2/account/sessions/' + encodeURIComponent(sessionID) + '/runtime-lease',
+    return this.request('PATCH', AddressAPIClient.runtimeLeasePath(sessionID),
       { body: { runtimeToken } });
   }
 
   release(sessionID: string, runtimeToken: string): Promise<unknown> {
-    return this.request('DELETE',
-      '/v2/account/sessions/' + encodeURIComponent(sessionID) + '/runtime-lease',
+    return this.request('DELETE', AddressAPIClient.runtimeLeasePath(sessionID),
       { body: { runtimeToken } });
   }
 }

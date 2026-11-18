@@ -1,9 +1,10 @@
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/server';
 
-import type { Env } from './Env';
+import type { BackgroundTasks, Env } from './Env';
 import { NuwaMCPServer } from './MCPServer';
 import { AGENT_SKILL_MD } from './SkillDocument';
-import { OAuthResourceServer } from './OAuthResourceServer';
+import { OAuthResourceServer, type AuthenticatedRequest } from './OAuthResourceServer';
+import { AddressAPIClient } from './APIClients';
 import { Logger } from './Logger';
 import { SessionBindings } from './SessionBindings';
 import { SessionBindingController } from './SessionBindingController';
@@ -11,7 +12,10 @@ import { OnboardingPage } from './OnboardingPage';
 
 export class HTTPMCPApplication {
   private static readonly logger = Logger.forModule('mcp');
-  constructor(private readonly env: Env) {}
+  constructor(
+    private readonly env: Env,
+    private readonly tasks: BackgroundTasks,
+  ) {}
 
   async handle(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -48,7 +52,7 @@ export class HTTPMCPApplication {
       return new Response('Not found', { status: 404 });
     }
 
-    let result: string | Response;
+    let result: AuthenticatedRequest | Response;
 
     try {
       result = await oauth.authenticate(request);
@@ -62,11 +66,13 @@ export class HTTPMCPApplication {
       return result;
     }
 
+    const address = new AddressAPIClient(this.env, result.authorization, undefined, result.status);
+
     if (url.pathname === '/session-bindings') {
       try {
         return await new SessionBindingController(
-          new SessionBindings(this.env),
-        ).handle(request, result);
+          new SessionBindings(this.env, address),
+        ).handle(request);
       } catch (error) {
         HTTPMCPApplication.logger.exception('session_binding_failed', error);
 
@@ -85,7 +91,9 @@ export class HTTPMCPApplication {
       });
 
       stage = 'register_tools';
-      const server = new NuwaMCPServer(this.env, result).createServer();
+      const server = new NuwaMCPServer(
+        this.env, result.authorization, address, this.tasks,
+      ).createServer();
 
       stage = 'connect_transport';
       await server.connect(transport);
@@ -107,7 +115,7 @@ export class HTTPMCPApplication {
 }
 
 export default {
-  fetch(request: Request, env: Env): Promise<Response> {
-    return new HTTPMCPApplication(env).handle(request);
+  fetch(request: Request, env: Env, context: BackgroundTasks): Promise<Response> {
+    return new HTTPMCPApplication(env, context).handle(request);
   },
 };

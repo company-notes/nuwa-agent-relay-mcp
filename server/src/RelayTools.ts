@@ -5,14 +5,26 @@ import { RelayAPIClient } from './APIClients';
 import { MCPToolSet } from './ToolSet';
 
 export class RelayTools extends MCPToolSet {
-  private readonly schemas = {
+  private static readonly IDENTITY = 'registered native Bot UUID (or bot:<native ID>), ' +
+    'complete registered display name, canonical Nuwa address or verified Email alias';
+  private static readonly FROM = 'On a shared office connection, pass your own ' +
+    RelayTools.IDENTITY + ' as from; prefer the known native Bot ID. Omit from on an independent Session.';
+
+  private static readonly subject = z.string().min(1).max(255);
+  private static readonly optionalSubject = RelayTools.subject.optional();
+
+  private static readonly schemas = {
     messageID: z.string().uuid(),
     threadID: z.string().uuid(),
     body: z.string().min(1).max(100_000),
-    to: z.string().min(1).max(255),
-    from: z.string().trim().min(1).max(255).optional(),
-    passphrase: z.string().min(16).max(128).optional(),
-    subject: z.string().min(1).max(255),
+    to: z.string().min(1).max(255).describe(RelayTools.IDENTITY),
+    from: z.string().trim().min(1).max(255).optional().describe(RelayTools.FROM),
+    subject: RelayTools.subject,
+    optionalSubject: RelayTools.optionalSubject,
+    contextLimit: z.number().int().min(1).max(12).optional(),
+    refreshArchive: z.boolean().optional(),
+    verificationId: z.string().uuid(),
+    challenge: z.string().regex(/^[a-f0-9]{64}$/),
     artifactLinks: z.array(z.url()).max(20).optional(),
   };
 
@@ -37,7 +49,7 @@ export class RelayTools extends MCPToolSet {
   }
 
   private registerInboxTools(): void {
-    const { threadID, messageID } = this.schemas;
+    const { threadID, messageID, from, contextLimit } = RelayTools.schemas;
 
     this.register('relayInbox',
       'List messages addressed to the bound Session without marking them read.',
@@ -56,55 +68,52 @@ export class RelayTools extends MCPToolSet {
         '/v2/threads/' + encodeURIComponent(threadID as string)));
 
     this.register('relayMessage',
-      'Read one authorized message, optionally with up to 12 preceding Thread messages.',
-      { messageID, contextLimit: z.number().int().min(1).max(12).optional() },
-      ({ messageID, contextLimit }) => this.client.call('GET',
-        '/v2/messages/' + encodeURIComponent(messageID as string),
-        undefined,
-        contextLimit === undefined
-          ? undefined : { context_limit: String(contextLimit) }));
+      'Read one authorized message, optionally with up to 12 preceding Thread messages. ' +
+      'Use only when content or history is missing, not before replying to a complete Wake. ' +
+      RelayTools.FROM,
+      { messageID, from, contextLimit },
+      ({ messageID, from, contextLimit }) => this.client.call('GET',
+        '/v2/messages/' + encodeURIComponent(messageID as string), undefined, {
+          ...(from ? { from: String(from) } : {}),
+          ...(contextLimit === undefined ? {} : { context_limit: String(contextLimit) }),
+        }));
   }
 
   private registerMessageTools(): void {
-    const { to, from, passphrase, body, subject, artifactLinks, threadID } = this.schemas;
+    const { to, from, body, optionalSubject, artifactLinks, threadID } = RelayTools.schemas;
 
     this.register('sendToAgent',
-      'Send to a canonical Agent/Session address OR the familiar display name of a ' +
-      'registered coworker, creating a new Relay Thread. Relay resolves names in ' +
-      'this SAME request; never call another MCP tool or ask Gateway to look up ' +
-      'the destination. Ambiguous or unknown names are rejected before delivery. ' +
+      'Send to a ' + RelayTools.IDENTITY + ', creating a new Relay Thread. ' +
+      'Prefer a known native Bot ID from the trusted platform directory, not a group/channel ID. ' +
+      'Relay resolves names in this SAME request, as well as native Bot IDs and aliases; ' +
+      'no extra MCP lookup is needed. Ambiguous or unknown targets are rejected before delivery. ' +
       'Use relayReplyThread to continue an existing Thread; submission is not delivery. ' +
-      'When the owning office Gateway explicitly enabled delegation, optional from selects an ' +
-      'active coworker by name, verified Email or canonical address. The sender is auditable as ' +
-      'Gateway-delegated, not platform-attested. A configured coworker passphrase is mandatory; ' +
-      'do not claim model-visible passphrases prove native platform identity.',
-      { to, from, passphrase, message: body, subject: subject.optional(), artifactLinks },
-      ({ to, from, passphrase, message, subject, artifactLinks }) =>
+      RelayTools.FROM + ' ' +
+      'Relay maps it to the coworker Session and records the shared Gateway actor.',
+      { to, from, message: body, subject: optionalSubject, artifactLinks },
+      ({ to, from, message, subject, artifactLinks }) =>
         this.client.call('POST', '/v2/messages', {
           to, body: message,
           ...(from ? { from } : {}),
-          ...(passphrase ? { passphrase } : {}),
           ...(subject ? { subject } : {}),
           ...(artifactLinks ? { artifactLinks } : {}),
         }));
 
     this.register('relayReplyThread',
-      'Reply in the original Relay Thread as this actual Bot\'s authenticated Session. ' +
-      'Use the trusted relayThreadID forwarded by the office Gateway. ' +
-      'An explicitly enabled Gateway may select its active coworker through from, ' +
-      'with that coworker\'s optional configured passphrase. ' +
-      'The server records the Gateway actor separately and never asserts platform attestation.',
-      { threadID, from, passphrase, body, artifactLinks },
-      ({ threadID, from, passphrase, body: text, artifactLinks }) =>
+      'Reply in the original Relay Thread using this Session or an enrolled office coworker. ' +
+      'Use the trusted relayThreadID forwarded by the office Gateway directly; no message lookup required. ' +
+      'The Wake recipientBotID is the replying Bot\'s own ID (raw UUID or bot:<native ID>). ' +
+      RelayTools.FROM + ' Relay records its coworker Session and the Gateway audit actor.',
+      { threadID, from, body, artifactLinks },
+      ({ threadID, from, body: text, artifactLinks }) =>
         this.client.call('POST',
           '/v2/threads/' + encodeURIComponent(threadID as string) + '/messages',
           { body: text, ...(from ? { from } : {}),
-            ...(passphrase ? { passphrase } : {}),
             ...(artifactLinks ? { artifactLinks } : {}) }));
   }
 
   private registerHandoffTools(): void {
-    const { to, subject, body, artifactLinks, messageID } = this.schemas;
+    const { to, subject, body, artifactLinks, messageID } = RelayTools.schemas;
 
     this.register('relaySendHandoff',
       'Delegate work to an Agent or exact Session.',
@@ -129,11 +138,11 @@ export class RelayTools extends MCPToolSet {
   }
 
   private registerReceiptTools(): void {
-    const { messageID } = this.schemas;
+    const { messageID, refreshArchive } = RelayTools.schemas;
 
     this.register('relayReceipt',
       'Inspect independently confirmed mail arrival and explicit Session read receipts.',
-      { messageID, refreshArchive: z.boolean().optional() },
+      { messageID, refreshArchive },
       ({ messageID, refreshArchive }) => this.client.call('GET',
         '/v2/messages/' + encodeURIComponent(messageID as string) + '/receipt',
         undefined, refreshArchive ? { refresh: 'archive' } : undefined));
@@ -147,6 +156,8 @@ export class RelayTools extends MCPToolSet {
   }
 
   private registerWakeTools(): void {
+    const { verificationId, challenge } = RelayTools.schemas;
+
     this.register('relayBeginWakePairing',
       'Create an OAuth-protected private browser link for Session Wake pairing.',
       {},
@@ -158,10 +169,7 @@ export class RelayTools extends MCPToolSet {
       'nuwa.wake.verification event, never the Webhook URL or sender key. ' +
       'A received HTTP 2xx does not activate Wake without this confirmation. ' +
       'Do not call on behalf of another Agent or attempt to guess a proof.',
-      {
-        verificationId: z.string().uuid(),
-        challenge: z.string().regex(/^[a-f0-9]{64}$/),
-      },
+      { verificationId, challenge },
       ({ verificationId, challenge }) =>
         this.client.call('POST', '/v2/wake-subscription/verification', {
           verificationId, challenge,

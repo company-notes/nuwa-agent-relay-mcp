@@ -1,9 +1,15 @@
 import { APIError } from './APIClients';
 
 export class RuntimeTokenCipher {
+  private key?: Promise<CryptoKey>;
+
   constructor(private readonly encodedKey: string) {}
 
-  async requireKey(): Promise<CryptoKey> {
+  requireKey(): Promise<CryptoKey> {
+    return this.key ??= this.importKey();
+  }
+
+  private async importKey(): Promise<CryptoKey> {
     const encoded = this.encodedKey;
 
     if (!encoded || !/^[A-Za-z0-9+/]{43}=$/.test(encoded)) {

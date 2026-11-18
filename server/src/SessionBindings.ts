@@ -27,6 +27,7 @@ type ResumeResponse = {
   session: Session;
   runtimeToken: string;
   leaseExpiresAt: string;
+  renewed?: true;
 };
 
 type ClaimResponse = ResumeResponse & { resumeToken: string };
@@ -218,29 +219,55 @@ export class SessionBindings {
     client: AddressAPIClient, key: string, row: BindingRow,
     organizationSlug: string,
   ): Promise<BindingRow> {
-    const wasActive = Date.parse(row.expiresAt) > Date.now();
-    const lease = await this.heartbeatIfOwned(client, key, row);
+    if (Date.parse(row.expiresAt) > Date.now()) {
+      const lease = await this.heartbeatIfOwned(client, key, row);
 
-    if (lease) {
+      if (!lease) {
+        throw new APIError(409, 'runtime_not_owner', 'This Runtime no longer owns the Session.');
+      }
+
       await this.saveExpiry(key, row, lease.expiresAt);
 
       return { ...row, expiresAt: lease.expiresAt };
     }
 
-    if (wasActive) {
-      throw new APIError(409, 'runtime_not_owner', 'This Runtime no longer owns the Session.');
-    }
+    return this.recoverExpired(client, key, row, organizationSlug);
+  }
 
-    // An expired lease may be safely resumed only with this grant's
-    // previously encrypted, privately retained Resume capability.
-    const resumeToken = await this.tokenCipher.decrypt(
-      row.encryptedResumeToken, 'resume:' + key, row.sessionID,
-    );
+  private async recoverExpired(
+    client: AddressAPIClient, key: string, row: BindingRow,
+    organizationSlug: string,
+  ): Promise<BindingRow> {
+    // Local expiry is only a hint. Address atomically renews the same owner
+    // or resumes an idle Session using the retained private capability.
+    const [runtimeToken, resumeToken] = await Promise.all([
+      this.tokenCipher.decrypt(row.encryptedRuntimeToken, key, row.sessionID),
+      this.tokenCipher.decrypt(row.encryptedResumeToken, 'resume:' + key, row.sessionID),
+    ]);
     const resumed = await client.request('PUT',
       '/v2/account/sessions/' + encodeURIComponent(row.sessionID) + '/runtime-lease',
-      { body: { resumeToken, runtimeLabel: 'nuwa-relay-remote-mcp' } },
+      { body: { runtimeToken, resumeToken, runtimeLabel: 'nuwa-relay-remote-mcp' } },
     ) as ResumeResponse;
 
+    if (resumed.renewed) {
+      SessionBindings.checkLease(resumed, row.sessionID, organizationSlug);
+
+      if (resumed.runtimeToken !== runtimeToken) {
+        throw new APIError(502, 'invalid_resume_result', 'Agent Address changed a renewed Runtime.');
+      }
+
+      await this.saveExpiry(key, row, resumed.leaseExpiresAt);
+
+      return { ...row, expiresAt: resumed.leaseExpiresAt };
+    }
+
+    return this.persistRecoveredRuntime(client, key, row, organizationSlug, resumed);
+  }
+
+  private async persistRecoveredRuntime(
+    client: AddressAPIClient, key: string, row: BindingRow,
+    organizationSlug: string, resumed: ResumeResponse,
+  ): Promise<BindingRow> {
     try {
       SessionBindings.checkLease(resumed, row.sessionID, organizationSlug);
 

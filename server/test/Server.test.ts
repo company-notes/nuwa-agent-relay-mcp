@@ -286,6 +286,8 @@ test('expired Runtime safely resumes the same saved Session after OAuth token re
     assert.equal(resumed.result.isError, undefined);
     assert.equal(JSON.parse(resumed.result.content[0].text).sessionID, SESSION_A);
     assert.equal(scenario.resumeCount, 1);
+    assert.equal(scenario.recoveryCount, 1);
+    assert.equal(scenario.heartbeatAttempts, 0);
     assert.equal(scenario.claimCount, 1);
     assert.doesNotMatch(JSON.stringify(resumed), /resume_secret|runtime_private/);
   } finally {
@@ -525,7 +527,9 @@ test('an outdated local lease record retains the same active Runtime after Relay
 
     assert.equal(sent.result.isError, undefined);
     assert.equal(scenario.resumeCount, 1);
-    assert.equal(scenario.heartbeatCount, 1);
+    assert.equal(scenario.recoveryCount, 1);
+    assert.equal(scenario.heartbeatCount, 0);
+    assert.equal(scenario.heartbeatAttempts, 0);
     assert.equal(scenario.claimCount, 0);
     assert.equal(scenario.calls[0].url.searchParams.get('session_id'), SESSION_A);
     assert.ok(Date.parse(row.expiresAt) > Date.now());
@@ -535,9 +539,34 @@ test('an outdated local lease record retains the same active Runtime after Relay
       to: '大熊', message: 'Keep the Session when its lease is about to expire.',
     });
     assert.equal(next.result.isError, undefined);
-    assert.equal(scenario.heartbeatCount, 2);
+    assert.equal(scenario.heartbeatCount, 1);
+    assert.equal(scenario.recoveryCount, 1);
     assert.equal(scenario.resumeCount, 1);
     assert.equal(scenario.calls[1].url.searchParams.get('session_id'), SESSION_A);
+  } finally {
+    scenario.restore();
+  }
+});
+
+test('expired local binding cannot replace a different active Runtime', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    await scenario.bind();
+    const row = [...scenario.database.rows.values()][0];
+    row.expiresAt = new Date(Date.now() - 1000).toISOString();
+    scenario.activeLeases.set(SESSION_A, 'runtime_other_owner');
+
+    const rejected = await scenario.tool('sendToAgent', {
+      to: '大熊', message: 'Do not deliver this message.',
+    });
+
+    assert.equal(rejected.result.isError, true);
+    assert.equal(scenario.recoveryCount, 1);
+    assert.equal(scenario.heartbeatAttempts, 0);
+    assert.equal(scenario.calls.length, 0);
+    assert.equal(scenario.activeLeases.get(SESSION_A), 'runtime_other_owner');
   } finally {
     scenario.restore();
   }

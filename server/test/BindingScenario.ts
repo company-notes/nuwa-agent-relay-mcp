@@ -139,6 +139,8 @@ export class RemoteMCPScenario {
   organizationID = 'org-a';
   organizationExists = true;
   resumeCount = 0;
+  recoveryCount = 0;
+  heartbeatAttempts = 0;
   claimCount = 0;
   readonly displayNameUpdates: Array<{ agentID: string; name: string; principal: string }> = [];
   registerOrganizationCount = 0;
@@ -295,6 +297,21 @@ export class RemoteMCPScenario {
           const runtime = sessionID === SESSION_B ? RUNTIME_SECRET + '_b' : RUNTIME_SECRET;
 
           if (init?.method === 'PUT') {
+            if (body?.runtimeToken) {
+              this.recoveryCount += 1;
+              const owner = this.activeLeases.get(sessionID);
+
+              if (owner && owner === body.runtimeToken) {
+                return Response.json({ ok: true, data: {
+                  session: { id: sessionID, canonical: 'nuwa/reviewer-' +
+                    (sessionID === SESSION_B ? 'b' : 'a') + '/main' },
+                  runtimeToken: owner,
+                  leaseExpiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+                  renewed: true,
+                } });
+              }
+            }
+
             this.resumeCount += 1;
 
             if (body?.resumeToken !== RESUME_SECRET || this.activeLeases.has(sessionID)) {
@@ -314,6 +331,10 @@ export class RemoteMCPScenario {
                 leaseExpiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
               },
             });
+          }
+
+          if (init?.method === 'PATCH') {
+            this.heartbeatAttempts += 1;
           }
 
           if (body?.runtimeToken !== this.activeLeases.get(sessionID)) {

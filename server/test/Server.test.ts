@@ -259,6 +259,41 @@ test('an existing unnamed ChatGPT client sets its own display name without repla
   }
 });
 
+test('keeps the same independent Session after an Organization and Agent rename', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const original = await scenario.tool('agentAddressEnsureIdentity', {});
+    const identity = JSON.parse(original.result.content[0].text);
+    const row = [...scenario.database.rows.values()][0];
+
+    scenario.renameAddress('nuwa-team', identity.sessionID, 'chatgpt');
+    const sent = await scenario.tool('sendToAgent', { to: '小晴', message: 'Same identity after rename.' });
+    assert.equal(sent.result.isError, undefined);
+    assert.equal(scenario.heartbeatCount, 0);
+    assert.equal(row.sessionID, identity.sessionID);
+    assert.equal(row.canonicalAddress, 'nuwa-team/chatgpt/main');
+
+    const updated = await scenario.tool('agentAddressEnsureIdentity', { agentDisplayName: 'ChatGPT' });
+    const result = JSON.parse(updated.result.content[0].text);
+    assert.equal(updated.result.isError, undefined);
+    assert.equal(result.sessionID, identity.sessionID);
+    assert.equal(result.canonical, 'nuwa-team/chatgpt/main');
+    assert.equal(scenario.claimCount, 1);
+
+    scenario.renameAddress('nuwa-ai', identity.sessionID, 'assistant');
+    row.expiresAt = new Date(Date.now() - 60_000).toISOString();
+
+    const restored = await scenario.tool('agentAddressEnsureIdentity', {});
+    assert.equal(restored.result.isError, undefined);
+    assert.equal(JSON.parse(restored.result.content[0].text).canonical, 'nuwa-ai/assistant/main');
+    assert.equal(scenario.claimCount, 1);
+  } finally {
+    scenario.restore();
+  }
+});
+
 test('first OAuth login automatically creates a personal Organization when none exists', async () => {
   const scenario = new RemoteMCPScenario();
   scenario.organizationExists = false;

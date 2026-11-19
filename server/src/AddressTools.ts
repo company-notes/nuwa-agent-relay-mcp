@@ -105,9 +105,9 @@ export class AddressTools extends MCPToolSet {
         ? 'On explicit owner request after reauthorization, restore the known full idle work Session address. ' +
           'Use the existing work Agent and preserve the Session history. Report its canonical address.'
         : 'When the authorized user explicitly asks to restore a known Agent/Session address, ' +
-      'select it in the same Organization if no Runtime currently occupies it. ' +
-      'Preserves the old Agent, Session, mailbox, Gateway roster and Wake. ' +
-      'Never request private Resume or Runtime credentials in chat.',
+          'select it in the same Organization if no Runtime currently occupies it. ' +
+          'Preserves the old Agent, Session, mailbox, Gateway roster and Wake. ' +
+          'Never request private Resume or Runtime credentials in chat.',
       { address: selectedAddress },
       (value) => this.selectSession(value.address as string));
   }

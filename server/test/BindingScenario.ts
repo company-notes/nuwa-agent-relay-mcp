@@ -198,7 +198,7 @@ export class RemoteMCPScenario {
     // A refreshed token of the same OAuth grant maps to the same provider
     // principal. Another grant on the same Account is deliberately isolated.
     const id = token === 'oauth-a-refresh' ? 'a' :
-      token === 'oauth-b' ? 'b' : 'a';
+      token === 'oauth-b' ? 'b' : token === 'oauth-c' ? 'c' : 'a';
 
     return id.repeat(64);
   }
@@ -255,6 +255,16 @@ export class RemoteMCPScenario {
         if (url.pathname === '/v2/account/addresses' && init?.method === 'GET') {
           const address = url.searchParams.get('address');
 
+          const work = Array.from(this.workSessions.values()).find((session) => session.canonical === address);
+
+          if (work) {
+            return Response.json({ ok: true, data: {
+              id: work.id, agentId: work.agentId, canonical: work.canonical,
+              runtime: this.activeLeases.has(work.id)
+                ? { expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() } : null,
+            } });
+          }
+
           if (address !== 'nuwa/reviewer-a/main') {
             return Response.json({ ok: false, error: { code: 'session_not_found' } }, {
               status: 404,
@@ -267,6 +277,25 @@ export class RemoteMCPScenario {
             runtime: this.activeLeases.has(SESSION_A)
               ? { expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() }
               : null,
+          } });
+        }
+
+        const ownerLease = url.pathname.match(/^\/v2\/account\/sessions\/([0-9a-f-]+)\/owner-runtime-lease$/);
+        const selectedWork = ownerLease ? this.workSessions.get(ownerLease[1]) : undefined;
+
+        if (selectedWork && init?.method === 'PUT') {
+          if (this.activeLeases.has(selectedWork.id)) {
+            return Response.json({ ok: false, error: { code: 'session_in_use' } }, { status: 409 });
+          }
+
+          const runtimeToken = 'runtime_' + crypto.randomUUID();
+          selectedWork.resumeToken = 'resume_' + crypto.randomUUID();
+          this.activeLeases.set(selectedWork.id, runtimeToken);
+
+          return Response.json({ ok: true, data: {
+            session: { id: selectedWork.id, canonical: selectedWork.canonical, agentId: selectedWork.agentId },
+            runtimeToken, resumeToken: selectedWork.resumeToken,
+            leaseExpiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
           } });
         }
 
@@ -310,6 +339,10 @@ export class RemoteMCPScenario {
             };
             this.workSessions.set(session.id, session);
             this.activeLeases.set(session.id, claim.runtimeToken);
+          }
+
+          if (session.resumeToken !== claim.resumeToken) {
+            return Response.json({ ok: false, error: { code: 'claim_identity_mismatch' } }, { status: 409 });
           }
 
           return Response.json({ ok: true, data: {

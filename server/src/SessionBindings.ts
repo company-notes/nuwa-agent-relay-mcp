@@ -369,7 +369,7 @@ export class SessionBindings {
       return { bound: false };
     }
 
-    const status = accountStatus ?? await client.status() as AccountStatus;
+    const status = accountStatus ?? (await client.status() as AccountStatus);
 
     if (status.organization?.id !== row.organizationID) {
       throw new APIError(403, 'binding_organization_changed', 'The bound Organization is no longer authorized.');
@@ -731,10 +731,13 @@ export class SessionBindings {
       }
     }
 
+    // Changing the ciphertext also rejects any delayed Relay lease write-back
+    // from requests submitted before this explicit release.
+    const releasedRuntime = await this.tokenCipher.encrypt(runtime, key, row.sessionID);
     const updated = await this.env.BINDINGS_DB.prepare(
-      `UPDATE ${this.table} SET expires_at = ?
+      `UPDATE ${this.table} SET expires_at = ?, encrypted_runtime_token = ?
         WHERE ${this.keyColumn} = ? AND session_id = ? AND encrypted_runtime_token = ?`,
-    ).bind(new Date(0).toISOString(), key, row.sessionID, row.encryptedRuntimeToken).run();
+    ).bind(new Date(0).toISOString(), releasedRuntime, key, row.sessionID, row.encryptedRuntimeToken).run();
 
     if (updated.meta.changes !== 1) {
       throw new APIError(409, 'session_binding_changed', 'The work Session changed during release.');

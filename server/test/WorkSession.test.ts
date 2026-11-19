@@ -87,13 +87,45 @@ test('native work Sessions preserve addresses, isolate traffic and share Agent m
     assert.equal(resumed.canonical, first.canonical);
     assert.equal(resumed.created, false);
 
+    const oldAddress = first.canonical;
+    const renamedAddress = oldAddress + '-renamed';
+    scenario.workSessions.get(first.sessionID)!.canonical = renamedAddress;
+    const beforeStatus = scenario.heartbeatAttempts;
+    assert.equal(payload(await call('work-a', 'agentAddressGetStatus')).session.canonical, renamedAddress);
+    assert.equal(scenario.heartbeatAttempts, beforeStatus);
+
+    assert.equal((await call('work-b', 'agentAddressSelectSession', {
+      address: renamedAddress,
+    })).result.isError, true);
     const other = payload(await call('work-a', 'agentAddressGetStatus', {}, 'oauth-b'));
     assert.equal(other.session, null);
+    assert.equal((await call('work-a', 'agentAddressSelectSession', {
+      address: renamedAddress,
+    }, 'oauth-b')).result.isError, true);
+
+    const released = payload(await call('work-a', 'agentAddressReleaseWork'));
+    assert.equal(released.sessionID, first.sessionID);
+    assert.equal(scenario.activeLeases.has(first.sessionID), false);
+    assert.equal(scenario.activeLeases.has(second.sessionID), true);
+
+    const reopened = payload(await call('work-a', 'agentAddressStartWork'));
+    assert.equal(reopened.sessionID, first.sessionID);
+    assert.equal(reopened.canonical, renamedAddress);
+    payload(await call('work-a', 'agentAddressReleaseWork'));
+
+    const selected = payload(await call('work-a', 'agentAddressSelectSession', {
+      address: renamedAddress,
+    }, 'oauth-b'));
+    assert.equal(selected.sessionID, first.sessionID);
+    assert.equal(selected.canonical, renamedAddress);
+    assert.equal(payload(await call('work-a', 'agentAddressGetStatus')).session, null);
+    assert.equal((await call('work-a', 'agentAddressStartWork', name)).result.isError, true);
+    assert.equal(payload(await call('work-b', 'agentAddressGetStatus')).session.canonical, second.canonical);
     const grok = payload(await call('grok-work', 'agentAddressStartWork', {
       sessionName: 'review-api', sessionDisplayName: 'Review API',
-    }, 'oauth-b', 'grok-build'));
+    }, 'oauth-c', 'grok-build'));
     assert.notEqual(grok.sessionID, first.sessionID);
-    assert.equal(payload(await call('grok-work', 'agentAddressGetStatus', {}, 'oauth-b', 'grok-build')).session.canonical, grok.canonical);
+    assert.equal(payload(await call('grok-work', 'agentAddressGetStatus', {}, 'oauth-c', 'grok-build')).session.canonical, grok.canonical);
   } finally {
     scenario.restore();
     sqlite.database.close();

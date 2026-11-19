@@ -33,37 +33,37 @@ export class NuwaMCPServer {
           'for this work Session. A managed Agent mailbox is shared; native Wake requires a supported adapter. ' +
           'Runtime and Resume credentials remain private. '
         : 'Nuwa connects Organization/Agent/Session identities through asynchronous ' +
-        'messages and work Handoffs. Agent Address owns Session identity and exclusive Runtime ' +
-        'leases. For first installation call agentAddressEnsureIdentity; the server ' +
-        'privately claims or restores this OAuth grant\'s own Agent and Default Session. ' +
-        'Supply your own established persona or native Bot name as agentDisplayName at setup; ' +
-        'for an unnamed independent client use its actual client name (e.g. ChatGPT or Codex). ' +
-        'Repair an unnamed existing binding once; preserve established names unless the owner requests a rename. ' +
-        'Never ask the user for Session IDs, Runtime tokens, Resume tokens, or manual binding during ' +
-        'normal installation. Relay tools also auto-ensure the Session if needed. ' +
-        'Never include OAuth, Runtime, Resume or Wake secrets in MCP tools or prompts. ' +
-        'On user request, agentAddressSelectSession restores an idle existing address ' +
-        'without re-enrolling. Never create a replacement office identity to fix a failure. ' +
-        'Independent MCP clients use their own Session without a Gateway or from; on request ' +
-        'check relayInbox if no direct receiving adapter exists. Configure Wake only when supported. ' +
-        'Roster synchronization preserves independent connection choices and stable native IDs. ' +
-        'An existing coworker switches connection on the same Session by explicit owner-authorized ' +
-        'invitation approval or leave; see Skill for the management flow. ' +
-        'Use one sendToAgent or relayReplyThread call with your own enrolled from on a shared ' +
-        'office connection. Prefer known native Bot IDs (UUID or bot:<native ID>), with full ' +
-        'registered names, Nuwa addresses and verified Email aliases also accepted. ' +
-        'For message recipients, use the supplied short name directly; the server accepts unique short names, ' +
-        'prefers an exact registered name and rejects ambiguity. Shared from uses the registered identity. ' +
-        'Use forwarded message content directly; only fetch history if needed. ' +
-        'Call directly when the schema is available, following required platform tool discovery. ' +
-        'Forward the original Thread ID and recipientBotID as the coworker\'s own from ' +
-        'in a ready-to-use relayReplyThread call format (omit from for independent connections). ' +
-        'For ordinary office Wake, dispatch once to recipientBotID using the native tool, ' +
-        'with zero MCP lookups or extra routing decisions, then stop. For a restricted Routine, ' +
-        'choose a trusted WakeParent raw-event handoff at setup; the parent dispatches once. ' +
-        'Keep routine instructions self-contained without per-event Skill reads. ' +
-        'Sending a message, confirmed mailbox arrival, successful Wake delivery and actual ' +
-        'Agent startup are separate steps.',
+          'messages and work Handoffs. Agent Address owns Session identity and exclusive Runtime ' +
+          'leases. For first installation call agentAddressEnsureIdentity; the server ' +
+          'privately claims or restores this OAuth grant\'s own Agent and Default Session. ' +
+          'Supply your own established persona or native Bot name as agentDisplayName at setup; ' +
+          'for an unnamed independent client use its actual client name (e.g. ChatGPT or Codex). ' +
+          'Repair an unnamed existing binding once; preserve established names unless the owner requests a rename. ' +
+          'Never ask the user for Session IDs, Runtime tokens, Resume tokens, or manual binding during ' +
+          'normal installation. Relay tools also auto-ensure the Session if needed. ' +
+          'Never include OAuth, Runtime, Resume or Wake secrets in MCP tools or prompts. ' +
+          'On user request, agentAddressSelectSession restores an idle existing address ' +
+          'without re-enrolling. Never create a replacement office identity to fix a failure. ' +
+          'Independent MCP clients use their own Session without a Gateway or from; on request ' +
+          'check relayInbox if no direct receiving adapter exists. Configure Wake only when supported. ' +
+          'Roster synchronization preserves independent connection choices and stable native IDs. ' +
+          'An existing coworker switches connection on the same Session by explicit owner-authorized ' +
+          'invitation approval or leave; see Skill for the management flow. ' +
+          'Use one sendToAgent or relayReplyThread call with your own enrolled from on a shared ' +
+          'office connection. Prefer known native Bot IDs (UUID or bot:<native ID>), with full ' +
+          'registered names, Nuwa addresses and verified Email aliases also accepted. ' +
+          'For message recipients, use the supplied short name directly; the server accepts unique short names, ' +
+          'prefers an exact registered name and rejects ambiguity. Shared from uses the registered identity. ' +
+          'Use forwarded message content directly; only fetch history if needed. ' +
+          'Call directly when the schema is available, following required platform tool discovery. ' +
+          'Forward the original Thread ID and recipientBotID as the coworker\'s own from ' +
+          'in a ready-to-use relayReplyThread call format (omit from for independent connections). ' +
+          'For ordinary office Wake, dispatch once to recipientBotID using the native tool, ' +
+          'with zero MCP lookups or extra routing decisions, then stop. For a restricted Routine, ' +
+          'choose a trusted WakeParent raw-event handoff at setup; the parent dispatches once. ' +
+          'Keep routine instructions self-contained without per-event Skill reads. ' +
+          'Sending a message, confirmed mailbox arrival, successful Wake delivery and actual ' +
+          'Agent startup are separate steps.',
     });
 
     const bindings = new SessionBindings(this.env, this.address, this.work);

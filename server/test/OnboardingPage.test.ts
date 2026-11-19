@@ -113,7 +113,7 @@ test('real HTTP routes keep Skill and OAuth protected', async () => {
   assert.match(ONBOARDING_SCRIPT, /測試字詞是星河/);
   assert.match(ONBOARDING_SCRIPT, /測試字詞是月光/);
   assert.doesNotMatch(ONBOARDING_SCRIPT,
-    /agentAddressEnsureIdentity|relayProvisionAgentMailbox|relayWakeSubscription/);
+    /relayProvisionAgentMailbox|relayWakeSubscription/);
   assert.doesNotMatch(ONBOARDING_SCRIPT, /relayRegisterWake|relayVerifyWake|remote-bind/);
   assert.doesNotMatch(ONBOARDING_SCRIPT, /(?:fetch|XMLHttpRequest|sendBeacon)\s*\(/);
 

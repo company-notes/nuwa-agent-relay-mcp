@@ -15,7 +15,7 @@ export const ONBOARDING_SCRIPT = `
     },
     openmausbot: {
       name: 'OpenMausBot', office: true, separateConnectors: true, examples: ['Cosmo', '同事 B'],
-      setup: '確認接收 Routine 能呼叫 coordinate_bots、relayGatewayConfirmFirstContact 且可讀取可信原生回執，為同事設定 explicit／automatic。將 Skill 的 OpenMausBot 完整流程放入 Routine：recipientPlatformThreadID 為 null 時用 thread: "new" 轉交一次，立即用 Wake 的三個識別碼及原生回執呼叫 relayGatewayConfirmFirstContact，確認成功才結束；為字串時直接使用該 ID 轉交一次後結束。'
+      setup: '確認接收 Routine 能呼叫 coordinate_bots、relayGatewayConfirmFirstContact 且可讀取可信原生回執，為同事設定 explicit／automatic。將 Skill 的 OpenMausBot 完整流程放入 Routine（已安裝時完整替換既有轉交指令，沿用有效的 Wake 與名錄）：recipientPlatformThreadID 為 null 時用 thread: "new" 轉交一次，立即用 Wake 的三個識別碼及原生回執呼叫 relayGatewayConfirmFirstContact，確認成功才結束；為字串時直接使用該 ID 轉交一次後結束。'
     },
     rakazo: {
       name: 'Rakazo', office: true, examples: ['同事 A', '同事 B'],

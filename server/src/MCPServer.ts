@@ -6,6 +6,7 @@ import { AddressTools } from './AddressTools';
 import { GatewayTools } from './GatewayTools';
 import { RelayTools } from './RelayTools';
 import { SessionBindings } from './SessionBindings';
+import type { WorkContext } from './WorkContext';
 
 export class NuwaMCPServer {
   constructor(
@@ -13,6 +14,7 @@ export class NuwaMCPServer {
     private readonly authorization: string,
     private readonly address: AddressAPIClient,
     private readonly tasks: BackgroundTasks,
+    private readonly work?: WorkContext,
   ) {}
 
   createServer(): McpServer {
@@ -20,7 +22,16 @@ export class NuwaMCPServer {
       name: 'nuwa-agent-relay',
       version: '0.2.0',
     }, {
-      instructions: 'Nuwa connects Organization/Agent/Session identities through asynchronous ' +
+      instructions: this.work
+        ? 'Nuwa gives each native work Session its own canonical address under the established Agent. ' +
+          'At the beginning of a new work Session call agentAddressStartWork with a meaningful kebab-case ' +
+          'sessionName and sessionDisplayName, based on the user task. On native resume call it without names. ' +
+          'Report the returned address immediately as Active or Resumed work address. On an address question ' +
+          'use agentAddressGetStatus. Use the full canonical address to reach a particular work Session. ' +
+          'After initialization, sendToAgent and relayReplyThread directly without from. Use relayInbox ' +
+          'for this work Session. A managed Agent mailbox is shared; native Wake requires a supported adapter. ' +
+          'Runtime and Resume credentials remain private. '
+        : 'Nuwa connects Organization/Agent/Session identities through asynchronous ' +
         'messages and work Handoffs. Agent Address owns Session identity and exclusive Runtime ' +
         'leases. For first installation call agentAddressEnsureIdentity; the server ' +
         'privately claims or restores this OAuth grant\'s own Agent and Default Session. ' +
@@ -54,15 +65,22 @@ export class NuwaMCPServer {
         'Agent startup are separate steps.',
     });
 
-    const bindings = new SessionBindings(this.env, this.address);
-    new AddressTools(server, this.address,
-      (persona) => bindings.ensure(persona),
-      (address) => bindings.selectSession(address)).install();
+    const bindings = new SessionBindings(this.env, this.address, this.work);
     const relay = new RelayAPIClient(this.env, this.authorization,
       () => bindings.authorize(), this.tasks);
+    new AddressTools(server, this.address,
+      (persona) => bindings.ensure(persona),
+      (address) => bindings.selectSession(address),
+      () => bindings.getStatus(), this.work,
+      this.work ? (input) => bindings.startWork(input, (session) =>
+        new RelayAPIClient(this.env, this.authorization, async () => session, this.tasks)
+          .call('PUT', '/v2/agent-mailboxes')) : undefined).install();
 
-    new RelayTools(server, relay).install();
-    new GatewayTools(server, relay).install();
+    new RelayTools(server, relay, this.work).install();
+
+    if (!this.work) {
+      new GatewayTools(server, relay).install();
+    }
 
     return server;
   }

@@ -2,6 +2,8 @@ import { AddressAPIClient, APIError, type BoundSession } from './APIClients';
 import type { Env } from './Env';
 import { Logger } from './Logger';
 import { RuntimeTokenCipher } from './RuntimeTokenCipher';
+import type { WorkContext } from './WorkContext';
+import { WorkSessionRegistry, type WorkStart } from './WorkSessionRegistry';
 
 type BindingRow = {
   sessionID: string;
@@ -21,6 +23,7 @@ type GrantIdentity = { grantFingerprint: string };
 type Session = {
   id: string;
   canonical: string;
+  agentId?: string;
 };
 
 type ResumeResponse = {
@@ -30,7 +33,7 @@ type ResumeResponse = {
   renewed?: true;
 };
 
-type ClaimResponse = ResumeResponse & { resumeToken: string };
+export type ClaimResponse = ResumeResponse & { resumeToken: string };
 type Lease = {
   expiresAt: string;
   organization: { id: string; slug: string };
@@ -49,11 +52,20 @@ export class SessionBindings {
   constructor(
     private readonly env: Env,
     private readonly address: AddressAPIClient,
+    private readonly work?: WorkContext,
   ) {
     this.tokenCipher = new RuntimeTokenCipher(env.SESSION_BINDING_KEY);
   }
 
-  private async principal(client: AddressAPIClient): Promise<string> {
+  private get table(): string {
+    return this.work ? 'remote_work_session_bindings' : 'remote_session_bindings';
+  }
+
+  private get keyColumn(): string {
+    return this.work ? 'binding_key' : 'grant_fingerprint';
+  }
+
+  private async grant(client: AddressAPIClient): Promise<string> {
     // Agent Address validates the OAuth token, then derives this fingerprint
     // from its provider-authenticated, refresh-stable grant ID and Account ID.
     // Never use an account email, opaque access token or caller-supplied key.
@@ -67,6 +79,12 @@ export class SessionBindings {
     return grant.grantFingerprint;
   }
 
+  private async principal(client: AddressAPIClient): Promise<string> {
+    const grant = await this.grant(client);
+
+    return this.work ? this.work.key(grant) : grant;
+  }
+
   private async row(key: string): Promise<BindingRow | null> {
     return this.env.BINDINGS_DB.prepare(
       `SELECT session_id AS sessionID, organization_id AS organizationID,
@@ -74,7 +92,7 @@ export class SessionBindings {
               encrypted_runtime_token AS encryptedRuntimeToken,
               encrypted_resume_token AS encryptedResumeToken,
               expires_at AS expiresAt
-         FROM remote_session_bindings WHERE grant_fingerprint = ?`,
+         FROM ${this.table} WHERE ${this.keyColumn} = ?`,
     ).bind(key).first<BindingRow>();
   }
 
@@ -119,8 +137,8 @@ export class SessionBindings {
       claim.resumeToken, 'resume:' + key, claim.session.id,
     );
     const inserted = await this.env.BINDINGS_DB.prepare(
-      `INSERT OR IGNORE INTO remote_session_bindings
-        (grant_fingerprint, organization_id, session_id, canonical_address,
+      `INSERT OR IGNORE INTO ${this.table}
+        (${this.keyColumn}, organization_id, session_id, canonical_address,
          encrypted_runtime_token, encrypted_resume_token, expires_at, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(key, organization.id, claim.session.id,
@@ -128,6 +146,16 @@ export class SessionBindings {
       claim.leaseExpiresAt, new Date().toISOString()).run();
 
     if (inserted.meta.changes !== 1) {
+      if (this.work) {
+        const winner = await this.row(key);
+
+        if (winner?.sessionID === claim.session.id && winner.organizationID === organization.id &&
+            await this.tokenCipher.decrypt(winner.encryptedRuntimeToken, key, winner.sessionID) === claim.runtimeToken &&
+            await this.tokenCipher.decrypt(winner.encryptedResumeToken, 'resume:' + key, winner.sessionID) === claim.resumeToken) {
+          return winner;
+        }
+      }
+
       throw new APIError(409, 'session_provisioning_race',
         'A Session was bound by another request. Retry without changing identity.');
     }
@@ -161,8 +189,8 @@ export class SessionBindings {
     }
 
     const deleted = await this.env.BINDINGS_DB.prepare(
-      `DELETE FROM remote_session_bindings
-        WHERE grant_fingerprint = ? AND encrypted_runtime_token = ?`,
+      `DELETE FROM ${this.table}
+        WHERE ${this.keyColumn} = ? AND encrypted_runtime_token = ?`,
     ).bind(key, row.encryptedRuntimeToken).run();
 
     return deleted.meta.changes === 1;
@@ -201,10 +229,10 @@ export class SessionBindings {
     }
 
     const result = await this.env.BINDINGS_DB.prepare(
-      `UPDATE remote_session_bindings SET expires_at = MAX(expires_at, ?),
+      `UPDATE ${this.table} SET expires_at = MAX(expires_at, ?),
           canonical_address = CASE WHEN ? >= expires_at THEN COALESCE(NULLIF(?, ''), canonical_address)
                               ELSE canonical_address END
-        WHERE grant_fingerprint = ? AND session_id = ?
+        WHERE ${this.keyColumn} = ? AND session_id = ?
           AND encrypted_runtime_token = ?`,
     ).bind(expiresAt, expiresAt, canonicalAddress ?? '', key, row.sessionID,
       row.encryptedRuntimeToken).run();
@@ -238,9 +266,9 @@ export class SessionBindings {
         resumed.runtimeToken, key, row.sessionID,
       );
       const updated = await this.env.BINDINGS_DB.prepare(
-        `UPDATE remote_session_bindings
+        `UPDATE ${this.table}
             SET encrypted_runtime_token = ?, expires_at = ?, canonical_address = ?
-          WHERE grant_fingerprint = ? AND session_id = ?
+          WHERE ${this.keyColumn} = ? AND session_id = ?
             AND encrypted_runtime_token = ?`,
       ).bind(encrypted, resumed.leaseExpiresAt, resumed.session.canonical, key, row.sessionID,
         row.encryptedRuntimeToken).run();
@@ -321,7 +349,7 @@ export class SessionBindings {
     return this.recoverExpired(client, key, row, organizationSlug);
   }
 
-  async status(): Promise<Record<string, unknown>> {
+  async status(accountStatus?: AccountStatus): Promise<Record<string, unknown>> {
     const client = this.address;
     const key = await this.principal(client);
     const row = await this.row(key);
@@ -330,7 +358,7 @@ export class SessionBindings {
       return { bound: false };
     }
 
-    const status = await client.status() as AccountStatus;
+    const status = accountStatus ?? await client.status() as AccountStatus;
 
     if (status.organization?.id !== row.organizationID) {
       throw new APIError(403, 'binding_organization_changed', 'The bound Organization is no longer authorized.');
@@ -346,6 +374,13 @@ export class SessionBindings {
       ...SessionBindings.publicResult({ ...row, canonicalAddress: current.canonical }, false),
       leaseExpired: row.expiresAt <= new Date().toISOString(),
     };
+  }
+
+  async getStatus(): Promise<Record<string, unknown>> {
+    const account = await this.address.status() as AccountStatus;
+    const session = await this.status(account);
+
+    return { ...account, session: session.bound ? session : null };
   }
 
   private async updateOwnDisplayName(
@@ -372,6 +407,7 @@ export class SessionBindings {
 
   private async ensureBound(
     agentDisplayName?: string, renewRuntime = true,
+    start?: WorkStart & { prepareMailbox: (session: BoundSession) => Promise<unknown> },
   ): Promise<{ key: string; row: BindingRow; created: boolean }> {
     const client = this.address;
     const key = await this.principal(client);
@@ -402,19 +438,36 @@ export class SessionBindings {
       return { key, row: renewed, created: false };
     }
 
+    if (this.work && (!start?.sessionName || !start.sessionDisplayName)) {
+      throw new APIError(409, 'work_initialization_required',
+        'Call agentAddressStartWork with a meaningful Session name and display name for this new native work Session.');
+    }
+
     if (!status.organization) {
       // Each independently authorized OAuth grant claims its own Agent.
       // Organization auto-registration is a first-use detail, not a user prompt.
-      await client.registerOrganization({
-        slug: 'personal-' + crypto.randomUUID().replaceAll('-', '').slice(0, 12),
-        displayName: 'Personal Workspace',
-      });
+      try {
+        await client.registerOrganization({
+          slug: 'personal-' + crypto.randomUUID().replaceAll('-', '').slice(0, 12),
+          displayName: 'Personal Workspace',
+        });
+      } catch (error) {
+        if (!this.work || !(error instanceof APIError) || error.code !== 'account_has_organization') {
+          throw error;
+        }
+      }
       status = await client.status() as AccountStatus;
     }
 
     if (!status.organization?.id || !status.organization.slug) {
       throw new APIError(403, 'organization_required',
         'Agent Address did not authorize an Organization.');
+    }
+
+    if (this.work && start) {
+      const row = await this.claimWork(key, status.organization, start, this.work);
+
+      return { key, row, created: true };
     }
 
     const created = await client.claimAgent(
@@ -436,6 +489,47 @@ export class SessionBindings {
 
       throw error;
     }
+  }
+
+  private async claimWork(
+    key: string, organization: { id: string; slug: string },
+    start: WorkStart & { prepareMailbox: (session: BoundSession) => Promise<unknown> },
+    work: WorkContext,
+  ): Promise<BindingRow> {
+    const grant = await this.grant(this.address);
+    const registry = new WorkSessionRegistry(this.env, this.address, this.tokenCipher);
+    const agent = await registry.ensureAgent(grant, organization, start.agentDisplayName ?? work.agentDisplayName);
+    const claim = await this.tokenCipher.initialClaim(key, organization.id);
+    const created = await this.address.claimSession(agent.agentID, {
+      sessionName: start.sessionName, sessionDisplayName: start.sessionDisplayName,
+      runtimeLabel: SessionBindings.RUNTIME_LABEL, claim,
+    }) as ClaimResponse;
+
+    SessionBindings.checkLease(created, claim.sessionID, organization.slug);
+
+    if (created.session.agentId !== agent.agentID || created.resumeToken !== claim.resumeToken) {
+      throw new APIError(502, 'invalid_claim_result', 'Agent Address returned an inconsistent work Session.');
+    }
+
+    if (!agent.mailboxReady) {
+      await start.prepareMailbox({
+        sessionID: created.session.id, runtimeToken: created.runtimeToken,
+        onRenewed: async () => {},
+      });
+      await registry.markMailboxReady(grant, agent);
+    }
+
+    // Retry retains the same claim; releasing it on an uncertain write could
+    // revoke the winning concurrent request's Runtime.
+    return this.persist(key, organization, created);
+  }
+
+  async startWork(
+    input: WorkStart, prepareMailbox: (session: BoundSession) => Promise<unknown>,
+  ): Promise<Record<string, unknown>> {
+    const bound = await this.ensureBound(undefined, true, { ...input, prepareMailbox });
+
+    return SessionBindings.publicResult(bound.row, bound.created);
   }
 
   async ensure(
@@ -546,11 +640,11 @@ export class SessionBindings {
       const runtime = await this.tokenCipher.encrypt(resumed.runtimeToken, key, sessionID);
       const resume = await this.tokenCipher.encrypt(resumeToken, 'resume:' + key, sessionID);
       const written = await this.env.BINDINGS_DB.prepare(
-        `INSERT INTO remote_session_bindings
-          (grant_fingerprint, organization_id, session_id, canonical_address,
+        `INSERT INTO ${this.table}
+          (${this.keyColumn}, organization_id, session_id, canonical_address,
            encrypted_runtime_token, encrypted_resume_token, expires_at, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(grant_fingerprint) DO UPDATE SET
+         ON CONFLICT(${this.keyColumn}) DO UPDATE SET
            organization_id = excluded.organization_id,
            session_id = excluded.session_id,
            canonical_address = excluded.canonical_address,
@@ -558,7 +652,7 @@ export class SessionBindings {
            encrypted_resume_token = excluded.encrypted_resume_token,
            expires_at = excluded.expires_at,
            created_at = excluded.created_at
-         WHERE remote_session_bindings.expires_at <= excluded.created_at`,
+         WHERE ${this.table}.expires_at <= excluded.created_at`,
       ).bind(key, status.organization.id, sessionID, resumed.session.canonical,
         runtime, resume, resumed.leaseExpiresAt, new Date().toISOString()).run();
 

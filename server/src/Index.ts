@@ -4,11 +4,12 @@ import type { BackgroundTasks, Env } from './Env';
 import { NuwaMCPServer } from './MCPServer';
 import { AGENT_SKILL_MD } from './SkillDocument';
 import { OAuthResourceServer, type AuthenticatedRequest } from './OAuthResourceServer';
-import { AddressAPIClient } from './APIClients';
+import { AddressAPIClient, APIError } from './APIClients';
 import { Logger } from './Logger';
 import { SessionBindings } from './SessionBindings';
 import { SessionBindingController } from './SessionBindingController';
 import { OnboardingPage } from './OnboardingPage';
+import { WorkContext } from './WorkContext';
 
 export class HTTPMCPApplication {
   private static readonly logger = Logger.forModule('mcp');
@@ -80,6 +81,18 @@ export class HTTPMCPApplication {
       }
     }
 
+    let work: WorkContext | undefined;
+
+    try {
+      work = WorkContext.fromHeaders(request.headers);
+    } catch (error) {
+      if (error instanceof APIError) {
+        return Response.json({ error: error.code }, { status: error.status });
+      }
+
+      throw error;
+    }
+
     // One isolated stateless MCP transport per request: no credentials or
     // session state may be reused between distinct OAuth principals.
     let stage = 'create_transport';
@@ -92,7 +105,7 @@ export class HTTPMCPApplication {
 
       stage = 'register_tools';
       const server = new NuwaMCPServer(
-        this.env, result.authorization, address, this.tasks,
+        this.env, result.authorization, address, this.tasks, work,
       ).createServer();
 
       stage = 'connect_transport';

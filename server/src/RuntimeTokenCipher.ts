@@ -9,7 +9,7 @@ export class RuntimeTokenCipher {
     return this.key ??= this.importKey();
   }
 
-  private async importKey(): Promise<CryptoKey> {
+  private rawKey(): Uint8Array<ArrayBuffer> {
     const encoded = this.encodedKey;
 
     if (!encoded || !/^[A-Za-z0-9+/]{43}=$/.test(encoded)) {
@@ -22,7 +22,35 @@ export class RuntimeTokenCipher {
       throw new APIError(503, 'binding_key_invalid', 'Session encryption key must be 256 bits.');
     }
 
-    return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
+    return raw;
+  }
+
+  private async importKey(): Promise<CryptoKey> {
+    return crypto.subtle.importKey('raw', this.rawKey(), 'AES-GCM', false, ['encrypt', 'decrypt']);
+  }
+
+  // Domain-separated private credentials allow safe retry of an uncertain claim.
+  async initialClaim(identityKey: string, organizationID: string) {
+    const key = await crypto.subtle.importKey('raw', this.rawKey(), 'HKDF', false, ['deriveBits']);
+    const encoder = new TextEncoder();
+    const bits = await crypto.subtle.deriveBits({
+      name: 'HKDF', hash: 'SHA-256',
+      salt: encoder.encode('nuwa-private-session-claim-v1'),
+      info: encoder.encode(JSON.stringify([organizationID, identityKey])),
+    }, key, 640);
+    const bytes = new Uint8Array(bits);
+    bytes[6] = (bytes[6] & 15) | 64;
+    bytes[8] = (bytes[8] & 63) | 128;
+
+    const hex = (value: Uint8Array) =>
+      Array.from(value, (byte) => byte.toString(16).padStart(2, '0')).join('');
+    const id = hex(bytes.slice(0, 16));
+
+    return {
+      sessionID: [id.slice(0, 8), id.slice(8, 12), id.slice(12, 16), id.slice(16, 20), id.slice(20)].join('-'),
+      resumeToken: 'resume_' + hex(bytes.slice(16, 48)),
+      runtimeToken: 'runtime_' + hex(bytes.slice(48)),
+    };
   }
 
   private static binaryEncode(value: Uint8Array): string {

@@ -3,13 +3,14 @@ import * as z from 'zod/v4';
 
 import { APIError } from './APIClients';
 import { Logger } from './Logger';
+import type { WorkContext } from './WorkContext';
 
 type ToolArguments = Record<string, unknown>;
 type ToolSchema = Record<string, z.ZodType>;
 
 export abstract class MCPToolSet {
   private static readonly logger = Logger.forModule('mcp.tools');
-  protected constructor(protected readonly server: McpServer) {}
+  protected constructor(protected readonly server: McpServer, private readonly workContext?: WorkContext) {}
 
   protected register(
     name: string,
@@ -17,8 +18,9 @@ export abstract class MCPToolSet {
     inputSchema: ToolSchema,
     action: (argumentsValue: ToolArguments) => Promise<unknown>,
   ): void {
-    this.server.registerTool(name, { description, inputSchema }, async (parameters) => {
+    this.server.registerTool(name, { description, inputSchema }, async (parameters, context) => {
       try {
+        this.workContext?.bind(context.mcpReq._meta);
         const value = await action(parameters);
 
         return {

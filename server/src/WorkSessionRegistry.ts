@@ -10,7 +10,7 @@ export type WorkStart = {
 };
 
 type Organization = { id: string; slug: string };
-type WorkAgent = { organizationID: string; agentID: string; mailboxReady: number };
+export type WorkAgent = { organizationID: string; agentID: string; mailboxReady: number };
 
 // Only work initialization touches the Agent anchor. Every normal Relay tool
 // reads the selected Session binding directly.
@@ -36,10 +36,14 @@ export class WorkSessionRegistry {
     return agent;
   }
 
-  async ensureAgent(grant: string, organization: Organization, displayName: string): Promise<WorkAgent> {
+  async ensureAgent(
+    grant: string, organization: Organization, displayName: string, selectedAgentID?: string,
+  ): Promise<WorkAgent> {
     const existing = await this.find(grant);
 
     if (existing) {
+      WorkSessionRegistry.requireSelected(existing.agentID, selectedAgentID);
+
       return WorkSessionRegistry.validate(existing, organization);
     }
 
@@ -62,6 +66,9 @@ export class WorkSessionRegistry {
       }
 
       agentID = session.agentId;
+      WorkSessionRegistry.requireSelected(agentID, selectedAgentID);
+    } else if (selectedAgentID) {
+      agentID = selectedAgentID;
     } else {
       const claim = await this.cipher.initialClaim('work-agent:' + grant, organization.id);
       const root = await this.address.claimAgent({
@@ -88,6 +95,13 @@ export class WorkSessionRegistry {
     }
 
     return WorkSessionRegistry.validate(saved, organization);
+  }
+
+  private static requireSelected(agentID: string, selectedAgentID?: string): void {
+    if (selectedAgentID && selectedAgentID !== agentID) {
+      throw new APIError(409, 'work_agent_conflict',
+        'The requested Session belongs to a different Agent from this work connector.');
+    }
   }
 
   async markMailboxReady(grant: string, agent: WorkAgent): Promise<void> {

@@ -3,7 +3,7 @@ import type { Env } from './Env';
 import { Logger } from './Logger';
 import { RuntimeTokenCipher } from './RuntimeTokenCipher';
 import type { WorkContext } from './WorkContext';
-import { WorkSessionRegistry, type WorkStart } from './WorkSessionRegistry';
+import { WorkSessionRegistry, type WorkAgent, type WorkStart } from './WorkSessionRegistry';
 
 type BindingRow = {
   sessionID: string;
@@ -13,6 +13,8 @@ type BindingRow = {
   encryptedResumeToken: string;
   expiresAt: string;
 };
+
+type PrepareMailbox = (session: BoundSession) => Promise<unknown>;
 
 type AccountStatus = {
   organization: { id: string; slug: string } | null;
@@ -121,6 +123,7 @@ export class SessionBindings {
 
   private async persist(
     key: string, organization: { id: string; slug: string }, claim: ClaimResponse,
+    transferWork = false,
   ): Promise<BindingRow> {
     if (!claim.session?.id || !SessionBindings.SESSION_ID.test(claim.session.id) ||
         !claim.resumeToken?.startsWith('resume_')) {
@@ -136,11 +139,19 @@ export class SessionBindings {
     const encryptedResume = await this.tokenCipher.encrypt(
       claim.resumeToken, 'resume:' + key, claim.session.id,
     );
+    const transfer = transferWork
+      ? ` ON CONFLICT(session_id) DO UPDATE SET
+          binding_key = excluded.binding_key, organization_id = excluded.organization_id,
+          canonical_address = excluded.canonical_address,
+          encrypted_runtime_token = excluded.encrypted_runtime_token,
+          encrypted_resume_token = excluded.encrypted_resume_token,
+          expires_at = excluded.expires_at, created_at = excluded.created_at`
+      : '';
     const inserted = await this.env.BINDINGS_DB.prepare(
-      `INSERT OR IGNORE INTO ${this.table}
+      `INSERT ${transferWork ? '' : 'OR IGNORE '}INTO ${this.table}
         (${this.keyColumn}, organization_id, session_id, canonical_address,
          encrypted_runtime_token, encrypted_resume_token, expires_at, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)${transfer}`,
     ).bind(key, organization.id, claim.session.id,
       claim.session.canonical, encryptedRuntime, encryptedResume,
       claim.leaseExpiresAt, new Date().toISOString()).run();
@@ -407,7 +418,7 @@ export class SessionBindings {
 
   private async ensureBound(
     agentDisplayName?: string, renewRuntime = true,
-    start?: WorkStart & { prepareMailbox: (session: BoundSession) => Promise<unknown> },
+    start?: WorkStart & { prepareMailbox: PrepareMailbox },
   ): Promise<{ key: string; row: BindingRow; created: boolean }> {
     const client = this.address;
     const key = await this.principal(client);
@@ -493,7 +504,7 @@ export class SessionBindings {
 
   private async claimWork(
     key: string, organization: { id: string; slug: string },
-    start: WorkStart & { prepareMailbox: (session: BoundSession) => Promise<unknown> },
+    start: WorkStart & { prepareMailbox: PrepareMailbox },
     work: WorkContext,
   ): Promise<BindingRow> {
     const grant = await this.grant(this.address);
@@ -511,21 +522,32 @@ export class SessionBindings {
       throw new APIError(502, 'invalid_claim_result', 'Agent Address returned an inconsistent work Session.');
     }
 
-    if (!agent.mailboxReady) {
-      await start.prepareMailbox({
-        sessionID: created.session.id, runtimeToken: created.runtimeToken,
-        onRenewed: async () => {},
-      });
-      await registry.markMailboxReady(grant, agent);
-    }
+    await this.prepareWorkMailbox(registry, grant, agent, created, start.prepareMailbox);
 
     // Retry retains the same claim; releasing it on an uncertain write could
     // revoke the winning concurrent request's Runtime.
     return this.persist(key, organization, created);
   }
 
+  private async prepareWorkMailbox(
+    registry: WorkSessionRegistry, grant: string, agent: WorkAgent,
+    claim: ClaimResponse, prepareMailbox: PrepareMailbox,
+  ): Promise<void> {
+    if (agent.mailboxReady) {
+      return;
+    }
+
+    await prepareMailbox({
+      sessionID: claim.session.id, runtimeToken: claim.runtimeToken,
+      onRenewed: async () => {
+        // The claim is persisted after provisioning completes.
+      },
+    });
+    await registry.markMailboxReady(grant, agent);
+  }
+
   async startWork(
-    input: WorkStart, prepareMailbox: (session: BoundSession) => Promise<unknown>,
+    input: WorkStart, prepareMailbox: PrepareMailbox,
   ): Promise<Record<string, unknown>> {
     const bound = await this.ensureBound(undefined, true, { ...input, prepareMailbox });
 
@@ -541,8 +563,16 @@ export class SessionBindings {
   }
 
   async selectSession(
-    address: string,
+    address: string, prepareMailbox?: PrepareMailbox,
   ): Promise<Record<string, unknown>> {
+    if (this.work) {
+      if (!prepareMailbox) {
+        throw new APIError(409, 'work_initialization_required', 'Work Session mailbox preparation is unavailable.');
+      }
+
+      return this.selectWork(address, prepareMailbox, this.work);
+    }
+
     const client = this.address;
     const key = await this.principal(client);
     const status = await client.status() as AccountStatus;
@@ -599,6 +629,118 @@ export class SessionBindings {
 
       throw error;
     }
+  }
+
+  private async selectWork(
+    address: string, prepareMailbox: PrepareMailbox, work: WorkContext,
+  ): Promise<Record<string, unknown>> {
+    const client = this.address;
+    const grant = await this.grant(client);
+    const key = await work.key(grant);
+    const status = await client.status() as AccountStatus;
+    const organization = status.organization;
+
+    if (!organization) {
+      throw new APIError(403, 'organization_required', 'An authorized Organization is required.');
+    }
+
+    // Resolve the explicit owner-selected full address; a short Agent name
+    // must never choose a different default Session for a resumed work.
+    if (address.split('/').length !== 3) {
+      throw new APIError(400, 'work_address_required', 'Provide the original full work Session address.');
+    }
+
+    const target = await client.resolve(address) as Session & {
+      runtime?: { expiresAt: string } | null;
+    };
+
+    if (!target.agentId || target.canonical.split('/')[0] !== organization.slug) {
+      throw new APIError(403, 'binding_identity_mismatch', 'The selected Session is not authorized.');
+    }
+
+    const existing = await this.row(key);
+
+    if (existing) {
+      if (existing.organizationID !== organization.id || existing.sessionID !== target.id) {
+        throw new APIError(409, 'work_binding_exists', 'This native work already has its own Session.');
+      }
+
+      const row = await this.renew(client, key, existing, organization.slug);
+
+      return SessionBindings.publicResult(row, false);
+    }
+
+    if (target.runtime && Date.parse(target.runtime.expiresAt) > Date.now()) {
+      throw new APIError(409, 'session_in_use', 'The requested Session is still in use.');
+    }
+
+    await this.tokenCipher.requireKey();
+    const registry = new WorkSessionRegistry(this.env, client, this.tokenCipher);
+    const agent = await registry.ensureAgent(grant, organization, work.agentDisplayName, target.agentId);
+    const recovered = await client.request('PUT',
+      '/v2/account/sessions/' + encodeURIComponent(target.id) + '/owner-runtime-lease',
+      { body: { runtimeLabel: SessionBindings.RUNTIME_LABEL } },
+    ) as ClaimResponse;
+
+    try {
+      SessionBindings.checkLease(recovered, target.id, organization.slug);
+
+      if (recovered.session.agentId !== agent.agentID) {
+        throw new APIError(409, 'binding_identity_mismatch', 'The recovered work Agent changed.');
+      }
+
+      await this.prepareWorkMailbox(registry, grant, agent, recovered, prepareMailbox);
+      const row = await this.persist(key, organization, recovered, true);
+
+      return SessionBindings.publicResult(row, false);
+    } catch (error) {
+      if (recovered.runtimeToken) {
+        try {
+          await client.release(target.id, recovered.runtimeToken);
+        } catch (releaseError) {
+          SessionBindings.logger.exception('work_selection_compensation_failed', releaseError);
+        }
+      }
+
+      throw error;
+    }
+  }
+
+  async releaseWork(): Promise<Record<string, unknown>> {
+    const client = this.address;
+    const key = await this.principal(client);
+    const row = await this.row(key);
+
+    if (!this.work || !row) {
+      throw new APIError(409, 'work_initialization_required', 'No work Session is bound.');
+    }
+
+    const status = await client.status() as AccountStatus;
+
+    if (status.organization?.id !== row.organizationID) {
+      throw new APIError(403, 'binding_organization_changed', 'The work Session is no longer authorized.');
+    }
+
+    const runtime = await this.tokenCipher.decrypt(row.encryptedRuntimeToken, key, row.sessionID);
+
+    try {
+      await client.release(row.sessionID, runtime);
+    } catch (error) {
+      if (!SessionBindings.isLostLease(error)) {
+        throw error;
+      }
+    }
+
+    const updated = await this.env.BINDINGS_DB.prepare(
+      `UPDATE ${this.table} SET expires_at = ?
+        WHERE ${this.keyColumn} = ? AND session_id = ? AND encrypted_runtime_token = ?`,
+    ).bind(new Date(0).toISOString(), key, row.sessionID, row.encryptedRuntimeToken).run();
+
+    if (updated.meta.changes !== 1) {
+      throw new APIError(409, 'session_binding_changed', 'The work Session changed during release.');
+    }
+
+    return { released: true, sessionID: row.sessionID, canonical: row.canonicalAddress };
   }
 
   async resume(

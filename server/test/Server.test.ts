@@ -46,7 +46,13 @@ test('publishes the V2 Skill without exposing internal transport infrastructure'
   assert.match(expected, /bot:<native ID>/);
   assert.match(expected, /platform-required\s+tool discovery/);
   assert.match(expected, /Omit `from`\s+on an independent connection/);
-  assert.doesNotMatch(expected, /github\.com|\bHost\b|\bWork\b|work_address_id/);
+  assert.match(expected, /agentAddressStartWork/);
+  assert.match(expected, /X-Nuwa-Work-Mode/);
+  assert.match(expected, /X-Nuwa-Work-ID/);
+  assert.match(expected, /Resumed work address/);
+
+  const legacyVocabulary = expected.replace(/X-Nuwa-Work-(?:Mode|ID)/g, '');
+  assert.doesNotMatch(legacyVocabulary, /github\.com|\bHost\b|\bWork\b|work_address_id/);
 });
 
 test('OAuth discovery and missing token remain protected without a Session binding', async () => {
@@ -987,6 +993,53 @@ test('enrolled GrokBot coworkers send and reply by native IDs with no extra offi
     });
     assert.equal(scenario.calls.length, 3,
       'Enrollment, send and reply need no extra administrative MCP call.');
+  } finally {
+    scenario.restore();
+  }
+});
+
+test('explicit office Gateway confirms the actual native Thread after first delivery', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const recipientSessionID = SESSION_B;
+    const senderSessionID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+    const nativeThreadID = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+    const coworkers = [{
+      displayName: 'Cosmo', recipientBotID: 'cosmo-native-id',
+      threadMode: 'explicit', firstContactMode: 'automatic',
+    }];
+    const enrolled = await scenario.tool('relayGatewayEnrollOfficeCoworkers', { coworkers });
+
+    assert.equal(enrolled.result.isError, undefined);
+    assert.deepEqual(scenario.calls[0].body, { coworkers });
+
+    const schemas = JSON.stringify(await scenario.toolSchemas());
+    assert.match(schemas, /relayGatewayConfirmFirstContact/,
+      'The receiving Gateway needs a tool to save the native receipt after its first dispatch.');
+
+    const confirmed = await scenario.tool('relayGatewayConfirmFirstContact', {
+      recipientSessionID, senderSessionID, messageID: MESSAGE_ID, nativeThreadID,
+    });
+
+    assert.equal(confirmed.result.isError, undefined);
+    assert.equal(scenario.calls.length, 2, 'First contact needs exactly one confirmation request.');
+    const call = scenario.calls[1];
+    assert.equal(call.method, 'PUT');
+    assert.equal(call.url.pathname,
+      '/v2/gateway-teammates/' + recipientSessionID + '/first-contacts/' + senderSessionID);
+    assert.equal(call.url.searchParams.get('session_id'), SESSION_A);
+    assert.equal(call.headers.get('authorization'), 'Bearer oauth-a');
+    assert.equal(call.headers.get('x-nuwa-runtime-token'), RUNTIME_SECRET);
+    assert.deepEqual(call.body, { messageID: MESSAGE_ID, nativeThreadID });
+
+    const invalid = await scenario.tool('relayGatewayConfirmFirstContact', {
+      recipientSessionID, senderSessionID, messageID: MESSAGE_ID, nativeThreadID: '',
+    });
+
+    assert.equal(invalid.result.isError, true);
+    assert.equal(scenario.calls.length, 2, 'Missing native receipt must not reach Relay.');
   } finally {
     scenario.restore();
   }

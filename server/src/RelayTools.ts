@@ -3,6 +3,7 @@ import * as z from 'zod/v4';
 
 import { RelayAPIClient } from './APIClients';
 import { MCPToolSet } from './ToolSet';
+import type { WorkContext } from './WorkContext';
 
 export class RelayTools extends MCPToolSet {
   private static readonly IDENTITY = 'registered native Bot UUID (or bot:<native ID>), ' +
@@ -30,8 +31,8 @@ export class RelayTools extends MCPToolSet {
     artifactLinks: z.array(z.url()).max(20).optional(),
   };
 
-  constructor(server: McpServer, private readonly client: RelayAPIClient) {
-    super(server);
+  constructor(server: McpServer, private readonly client: RelayAPIClient, work?: WorkContext) {
+    super(server, work);
   }
 
   install(): void {

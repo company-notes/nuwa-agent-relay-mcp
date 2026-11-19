@@ -137,7 +137,7 @@ export class RemoteMCPScenario {
   private readonly originalFetch = globalThis.fetch;
   readonly database = new MemoryBindingDatabase();
   readonly background = new TestBackgroundTasks();
-  readonly calls: Array<{ url: URL; headers: Headers; body: unknown }> = [];
+  readonly calls: Array<{ url: URL; method: string | undefined; headers: Headers; body: unknown }> = [];
   readonly activeLeases = new Map<string, string>();
   organizationSlug = 'nuwa';
   private readonly agentHandles = new Map<string, string>();
@@ -147,7 +147,15 @@ export class RemoteMCPScenario {
     this.agentHandles.set(sessionID, handle);
   }
 
+  readonly workSessions = new Map<string, { id: string; canonical: string; agentId: string; resumeToken: string }>();
+
   private canonical(sessionID: string): string {
+    const work = this.workSessions.get(sessionID);
+
+    if (work) {
+      return work.canonical;
+    }
+
     const handle = this.agentHandles.get(sessionID) ?? 'reviewer-' + (sessionID === SESSION_B ? 'b' : 'a');
 
     return this.organizationSlug + '/' + handle + '/main';
@@ -190,7 +198,7 @@ export class RemoteMCPScenario {
     // A refreshed token of the same OAuth grant maps to the same provider
     // principal. Another grant on the same Account is deliberately isolated.
     const id = token === 'oauth-a-refresh' ? 'a' :
-      token === 'oauth-b' ? 'b' : 'a';
+      token === 'oauth-b' ? 'b' : token === 'oauth-c' ? 'c' : 'a';
 
     return id.repeat(64);
   }
@@ -247,6 +255,16 @@ export class RemoteMCPScenario {
         if (url.pathname === '/v2/account/addresses' && init?.method === 'GET') {
           const address = url.searchParams.get('address');
 
+          const work = Array.from(this.workSessions.values()).find((session) => session.canonical === address);
+
+          if (work) {
+            return Response.json({ ok: true, data: {
+              id: work.id, agentId: work.agentId, canonical: work.canonical,
+              runtime: this.activeLeases.has(work.id)
+                ? { expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() } : null,
+            } });
+          }
+
           if (address !== 'nuwa/reviewer-a/main') {
             return Response.json({ ok: false, error: { code: 'session_not_found' } }, {
               status: 404,
@@ -259,6 +277,25 @@ export class RemoteMCPScenario {
             runtime: this.activeLeases.has(SESSION_A)
               ? { expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() }
               : null,
+          } });
+        }
+
+        const ownerLease = url.pathname.match(/^\/v2\/account\/sessions\/([0-9a-f-]+)\/owner-runtime-lease$/);
+        const selectedWork = ownerLease ? this.workSessions.get(ownerLease[1]) : undefined;
+
+        if (selectedWork && init?.method === 'PUT') {
+          if (this.activeLeases.has(selectedWork.id)) {
+            return Response.json({ ok: false, error: { code: 'session_in_use' } }, { status: 409 });
+          }
+
+          const runtimeToken = 'runtime_' + crypto.randomUUID();
+          selectedWork.resumeToken = 'resume_' + crypto.randomUUID();
+          this.activeLeases.set(selectedWork.id, runtimeToken);
+
+          return Response.json({ ok: true, data: {
+            session: { id: selectedWork.id, canonical: selectedWork.canonical, agentId: selectedWork.agentId },
+            runtimeToken, resumeToken: selectedWork.resumeToken,
+            leaseExpiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
           } });
         }
 
@@ -279,6 +316,40 @@ export class RemoteMCPScenario {
             resumeToken: RESUME_SECRET + '_owner',
             leaseExpiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
           } });
+        }
+
+        const workClaim = url.pathname.match(/^\/v2\/account\/agents\/([^/]+)\/session-runtime-leases$/);
+
+        if (body?.claim && init?.method === 'POST' &&
+            (url.pathname === '/v2/account/agent-runtime-leases' || workClaim)) {
+          const claim = body.claim;
+          let session = this.workSessions.get(claim.sessionID);
+
+          if (!session) {
+            this.claimCount += 1;
+            const agentId = workClaim?.[1] ?? 'work-agent-' + principal[0];
+            const root = Array.from(this.workSessions.values()).find((item) =>
+              item.agentId === agentId && item.canonical.endsWith('/main'));
+            const prefix = root ? root.canonical.slice(0, -5) : 'nuwa/' + agentId;
+            const requested = prefix + '/' + body.sessionName;
+            const occupied = Array.from(this.workSessions.values()).some((item) => item.canonical === requested);
+            session = {
+              id: claim.sessionID, agentId, resumeToken: claim.resumeToken,
+              canonical: occupied ? requested + '-' + claim.sessionID.slice(0, 8) : requested,
+            };
+            this.workSessions.set(session.id, session);
+            this.activeLeases.set(session.id, claim.runtimeToken);
+          }
+
+          if (session.resumeToken !== claim.resumeToken) {
+            return Response.json({ ok: false, error: { code: 'claim_identity_mismatch' } }, { status: 409 });
+          }
+
+          return Response.json({ ok: true, data: {
+            session: { id: session.id, agentId: session.agentId, canonical: session.canonical },
+            runtimeToken: this.activeLeases.get(session.id), resumeToken: session.resumeToken,
+            leaseExpiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+          } }, { status: 201 });
         }
 
         if (url.pathname === '/v2/account/agent-runtime-leases' && init?.method === 'POST') {
@@ -313,7 +384,9 @@ export class RemoteMCPScenario {
 
         if (leaseMatch) {
           const [, sessionID] = leaseMatch;
-          const runtime = sessionID === SESSION_B ? RUNTIME_SECRET + '_b' : RUNTIME_SECRET;
+          const work = this.workSessions.get(sessionID);
+          const runtime = work ? 'runtime_' + crypto.randomUUID() :
+            sessionID === SESSION_B ? RUNTIME_SECRET + '_b' : RUNTIME_SECRET;
 
           if (init?.method === 'PUT') {
             if (body?.runtimeToken) {
@@ -332,7 +405,7 @@ export class RemoteMCPScenario {
 
             this.resumeCount += 1;
 
-            if (body?.resumeToken !== RESUME_SECRET || this.activeLeases.has(sessionID)) {
+            if (body?.resumeToken !== (work?.resumeToken ?? RESUME_SECRET) || this.activeLeases.has(sessionID)) {
               return Response.json({ ok: false, error: { code: 'session_in_use' } }, {
                 status: 409,
               });
@@ -411,6 +484,14 @@ export class RemoteMCPScenario {
           return Response.json({ ok: true, data: [{ id: 'agent-a', handle: 'reviewer' }] });
         }
 
+        const work = this.workSessions.get(url.pathname.split('/').at(-1) ?? '');
+
+        if (work && init?.method === 'GET') {
+          return Response.json({ ok: true, data: {
+            id: work.id, agentId: work.agentId, canonical: work.canonical,
+          } });
+        }
+
         if (url.pathname === '/v2/account/sessions/' + SESSION_A ||
             url.pathname === '/v2/account/sessions/' + SESSION_B) {
           const other = url.pathname.endsWith(SESSION_B);
@@ -438,7 +519,7 @@ export class RemoteMCPScenario {
         });
       }
 
-      this.calls.push({ url, headers, body });
+      this.calls.push({ url, method: init?.method, headers, body });
 
       return Response.json({ ok: true, data: {
         id: MESSAGE_ID, threadId: THREAD_ID,
@@ -480,19 +561,25 @@ export class RemoteMCPScenario {
   async tool(
     name: string, argumentsValue: Record<string, unknown>, token = 'oauth-a',
     waitForBackground = true,
+    work?: { mode: 'codex' | 'grok-build'; id?: string },
   ): Promise<{ result: { content: Array<{ text: string }>; isError?: boolean } }> {
     const response = await this.application.handle(new Request(
       'https://mcp.agent-relay.company-notes.com/mcp', {
         method: 'POST',
         headers: {
           authorization: 'Bearer ' + token,
+          ...(work ? { 'x-nuwa-work-mode': work.mode } : {}),
+          ...(work?.mode === 'grok-build' && work.id ? { 'x-nuwa-work-id': work.id } : {}),
           accept: 'application/json, text/event-stream',
           'content-type': 'application/json',
           'mcp-protocol-version': '2025-06-18',
         },
         body: JSON.stringify({
           jsonrpc: '2.0', id: 7, method: 'tools/call',
-          params: { name, arguments: argumentsValue },
+          params: {
+            name, arguments: argumentsValue,
+            ...(work?.mode === 'codex' && work.id ? { _meta: { threadId: work.id } } : {}),
+          },
         }),
       },
     ));

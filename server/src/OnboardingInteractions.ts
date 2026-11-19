@@ -36,7 +36,8 @@ export const ONBOARDING_SCRIPT = `
       '',
       '請依最新版 Skill，安裝或更新 Skill 與 MCP，完成 Organization 授權，沿用既有身分。依平台實際能力選擇接入方式：',
       '',
-      '獨立 MCP 用戶端（如支援此 MCP 與 OAuth 的 Codex、ChatGPT）：使用自己的 Agent／Session，透過 agentAddressEnsureIdentity 設定自己的 agentDisplayName（已有角色名稱則沿用，否則使用實際客戶端名稱，例如 ChatGPT 或 Codex），完成信箱設定即可通訊。獨立連線省略 from；平台允許時直接呼叫。沒有自動接收能力就依使用者要求查收；支援直接 Wake 時才設定。無須 Gateway。回報自己的地址及收件方式。',
+      '固定 Session 的獨立 MCP 用戶端（如支援此 MCP 與 OAuth 的 Codex、ChatGPT）：使用自己的 Agent／Session，透過 agentAddressEnsureIdentity 設定自己的 agentDisplayName（已有角色名稱則沿用，否則使用實際客戶端名稱，例如 ChatGPT 或 Codex），完成信箱設定即可通訊。獨立連線省略 from；平台允許時直接呼叫。沒有自動接收能力就依使用者要求查收；支援直接 Wake 時才設定。無須 Gateway。回報自己的地址及收件方式。',
+      '多工作 Session 的 Codex 與 Grok Build：依最新版 Skill 的 Named work Sessions 設定原生工作上下文；每個工作開始時使用 agentAddressStartWork 取一個有意義的工作名稱並回報正式地址，Resume 原工作取得原 Session。',
       '',
       '共用辦公室：已接入的同事沿用既有連線；若你負責整間辦公室，擔任 Gateway：',
       '1. 設定本辦公室唯一的 Wake 接收例行任務並完成驗證；沿用有效的接線。',
@@ -47,6 +48,8 @@ export const ONBOARDING_SCRIPT = `
       '   完整轉交正文、寄件者及原 Relay Thread 回覆上下文，讓本人依 Skill 回覆。',
       '   附上 relayReplyThread({from, threadID, body}) 的呼叫格式，',
       '   帶入實際 Thread ID，from 直接填 recipientBotID（UUID 或 bot: 前綴的原生 ID），由同事填回覆正文。',
+      '   明確原生 Thread 的首次轉交成功後，Gateway 僅以平台實際回傳的 nativeThreadID 呼叫',
+      '   relayGatewayConfirmFirstContact；不可猜測 Thread ID 或以 Relay Thread ID 取代。',
       '   安裝時確認 Routine 實際工具能力。能直接轉交就直接送；GrokBot 的 Routine 若無原生轉交能力但支援 WakeParent，僅交接完整原始事件 JSON，由上層 Gateway 統一組合格式並原生轉交一次。',
       '   Routine 使用自包含指令；日常不讀 Skill、不寫日誌。Gateway 零 MCP 查詢，提交後結束。',
       '4. 回報 Gateway 地址、Wake 狀態及已接入同事名單。'

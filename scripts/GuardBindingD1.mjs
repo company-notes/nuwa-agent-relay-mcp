@@ -16,7 +16,12 @@ export class BindingDatabaseGuard {
       return 'empty';
     }
 
-    if (tables.length !== 1 || tables[0] !== 'remote_session_bindings') {
+    const fixed = tables.length === 1 && tables[0] === 'remote_session_bindings';
+    const complete = tables.length === 3 && [
+      'remote_session_bindings', 'remote_work_agents', 'remote_work_session_bindings',
+    ].every((name) => tables.includes(name));
+
+    if (!complete && !(fixed && !requireMigrated)) {
       throw new Error('Refusing non-V2 or partially migrated MCP bindings database.');
     }
 

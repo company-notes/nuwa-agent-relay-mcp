@@ -20,6 +20,12 @@ export class GatewayTools extends MCPToolSet {
     displayName: z.string().trim().min(1).max(120),
     ...GatewayTools.route,
   })).min(1).max(25);
+  private static readonly firstContact = {
+    recipientSessionID: z.string().uuid(),
+    senderSessionID: z.string().uuid(),
+    messageID: z.string().uuid(),
+    nativeThreadID: z.string().trim().min(1).max(512),
+  };
 
   constructor(server: McpServer, private readonly client: RelayAPIClient) {
     super(server);
@@ -50,6 +56,20 @@ export class GatewayTools extends MCPToolSet {
       'and receiving-route state (gateway, direct, inbox or inactive) for this Gateway\'s office.',
       {},
       () => this.client.call('GET', '/v2/gateway-office-coworkers'));
+
+    this.register('relayGatewayConfirmFirstContact',
+      'After exactly one successful explicit-mode native first delivery, save the actual native Thread ' +
+      'receipt for the supplied sender and recipient Sessions. Use only the provider-returned Thread ID; ' +
+      'never substitute a Relay Thread ID or fabricate a receipt. The authorized Gateway remains subject ' +
+      'to Relay\'s one-time message, roster and Session checks.',
+      GatewayTools.firstContact,
+      ({ recipientSessionID, senderSessionID, messageID, nativeThreadID }) =>
+        this.client.call('PUT',
+          '/v2/gateway-teammates/' + encodeURIComponent(recipientSessionID as string) +
+          '/first-contacts/' + encodeURIComponent(senderSessionID as string), {
+            messageID: messageID as string,
+            nativeThreadID: nativeThreadID as string,
+          }));
 
     this.register('relayGatewayTeammates',
       'List this Gateway Session\'s proposed and approved coworkers, including pending approvals. ' +

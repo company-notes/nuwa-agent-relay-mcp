@@ -58,13 +58,13 @@ export class NuwaMCPServer {
           'Call directly when the schema is available, following required platform tool discovery. ' +
           'Forward the original Thread ID and recipientBotID as the coworker\'s own from ' +
           'in a ready-to-use relayReplyThread call format (omit from for independent connections). ' +
-          'For ordinary office Wake, dispatch once to recipientBotID using the native tool, ' +
-          'with zero MCP lookups or extra routing decisions, then stop. For a restricted Routine, ' +
-          'choose a trusted WakeParent raw-event handoff at setup; the parent dispatches once. ' +
-          'For a reserved explicit first contact (recipientPlatformThreadID is null), create once using the native tool, ' +
-          'then immediately call relayGatewayConfirmFirstContact with the actual native receipt before ending. ' +
-          'For an established explicit route, reuse the supplied native Thread ID with zero MCP calls. ' +
-          'GrokBot platform-managed routing retains the existing native dispatch. ' +
+          'For office Wake, use recipientBotID and the installed platform procedure. ' +
+          'GrokBot platform-managed routing (recipientPlatformThreadID absent) uses its native tool once, ' +
+          'with zero MCP lookups, then stops. For a restricted Routine, choose a trusted WakeParent raw-event ' +
+          'handoff at setup; the parent dispatches once. For an established explicit route (nonempty native Thread ID), ' +
+          'dispatch once to that exact ID with zero MCP calls, then stop. For a reserved explicit first contact ' +
+          '(recipientPlatformThreadID is null), create once using the native tool, then immediately call ' +
+          'relayGatewayConfirmFirstContact with the actual native receipt and finish after successful confirmation. ' +
           'Give the Wake pairing link to the human to open and complete in their own browser. ' +
           'Keep routine instructions self-contained without per-event Skill reads. ' +
           'Sending a message, confirmed mailbox arrival, successful Wake delivery and actual ' +

@@ -129,6 +129,17 @@ h2 { font-size: clamp(29px,3vw,39px); line-height: 1.35; letter-spacing: -.045em
 .step-body { background: white; border: 1px solid var(--line); box-shadow: 0 6px 35px rgba(30,69,52,.025); border-radius: 17px; padding: 30px; min-width: 0; }
 .step-body > p { color: var(--muted); font-size: 14px; margin: 14px 0 23px; }
 .step-body strong { color: var(--ink); }
+.platform-picker { max-width: 490px; margin: 22px 0 16px; }
+.platform-picker label { display: block; font-size: 14px; font-weight: 750; margin-bottom: 8px; }
+.platform-picker select { width: 100%; padding: 12px 15px; border: 1px solid #bacfc1; border-radius: 9px; background: white; color: var(--ink); }
+.platform-intro { margin-bottom: 0!important; }
+.studio-card { border: 1px solid #d5e5db; border-radius: 12px; padding: 18px; background: #fafcf9; }
+.studio-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.studio-card > p { font-size: 14px; color: var(--muted); }
+.availability { font-size: 12px; font-weight: 650; color: var(--muted); }
+.direct-heading { margin: 23px 0 5px; }
+.address-grid label .contact-label { font-size: 14px; font-weight: 750; color: var(--ink); }
+[hidden] { display: none!important; }
 .step-body code, .faq code, .proof-grid code { background: #e8f2eb; color: #28624c; padding: 1px 5px; border-radius: 4px; font: .92em ui-monospace, "Cascadia Code", Menlo, monospace; overflow-wrap: anywhere; }
 .step-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .kicker { color: var(--green); text-transform: uppercase; font-size: 11px; letter-spacing: .11em; font-weight: 900; }

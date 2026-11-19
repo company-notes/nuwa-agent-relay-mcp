@@ -8,115 +8,208 @@ export const ONBOARDING_SCRIPT = `
   var promptIDs = ['gatewayPrompt', 'sendPrompt', 'replyPrompt', 'returnPrompt', 'verifyPrompt'];
   var toastTimeout;
 
+  var platforms = {
+    grokbot: {
+      name: 'GrokBot', office: true, examples: ['小晴', '大熊'],
+      setup: 'GrokBot 使用 platform 模式。安裝時確認 Routine 的實際工具能力；能直接轉交就直接送。GrokBot 的 Routine 若無原生轉交能力但支援 WakeParent，僅交接完整原始事件 JSON，由上層 Gateway 組合格式並原生轉交一次。'
+    },
+    openmausbot: {
+      name: 'OpenMausBot', office: true, examples: ['Cosmo', '同事 B'],
+      setup: '確認 OpenMausBot 可建立原生對話並取得可信回執後，為同事設定 explicit／automatic。只有收到明確的 recipientPlatformThreadID: null 才建立原生對話；轉交成功後以實際回傳的 nativeThreadID 呼叫 relayGatewayConfirmFirstContact 一次。後續沿用已保存的原生 Thread ID 轉交一次。'
+    },
+    rakazo: {
+      name: 'Rakazo', office: true, examples: ['同事 A', '同事 B'],
+      setup: '先確認 Rakazo 的原生助理名錄、通知入口、轉交工具及原生對話識別能力。依官方 Skill 確認適用的接線模式；將尚無法驗證的能力如實回報，完成具備能力的接入與實際通訊驗證。'
+    },
+    codex: {
+      name: 'Codex', agent: 'codex',
+      setup: '依 Skill 的 Named work Sessions 章節設定 Codex 原生工作識別：在遠端 MCP 設定加入 X-Nuwa-Work-Mode: codex。確認原生 threadId 隨工具請求傳遞。'
+    },
+    claude: {
+      name: 'Claude CLI', agent: 'claude', fixed: true,
+      setup: '依 Skill 的 Independent client 說明，設定 Claude CLI 的 Remote MCP 及 OAuth，使用 agentAddressEnsureIdentity 取得自己的固定地址。多工作 Session 接入尚待支援，請以另一個已接入的助理或工作測試。'
+    },
+    'grok-build': {
+      name: 'Grok Build', agent: 'grok-build',
+      setup: '依 Skill 的 Named work Sessions 章節設定 Grok Build 原生工作識別：在遠端 MCP headers 加入 X-Nuwa-Work-Mode: grok-build 與 X-Nuwa-Work-ID: {{session_id}}。確認原生工作 ID 隨請求傳遞。'
+    }
+  };
+
   function fieldValue(id) {
-    var element = document.getElementById(id);
-    return element ? element.value.trim() : '';
+    return document.getElementById(id).value.trim();
   }
 
-  function validName(name) {
-    return name.length > 0 && name.length <= 120 &&
-      !/[\\u0000-\\u001f\\u007f]/.test(name);
+  function selectedPlatform() {
+    return platforms[fieldValue('platform')] || platforms.grokbot;
   }
 
-  function colleagueName(id) {
-    var name = fieldValue(id);
-    return validName(name) ? name : '另一位';
+  function isAddress(value) {
+    return /^[a-z0-9][a-z0-9_-]*\\/[a-z0-9][a-z0-9_-]*\\/[a-z0-9][a-z0-9_-]*$/i.test(value);
   }
 
-  function namesReady() {
-    return validName(fieldValue('colleagueA')) && validName(fieldValue('colleagueB'));
+  function validContact(name, platform) {
+    return name.length > 0 && name.length <= 255 &&
+      !/[\\u0000-\\u001f\\u007f]/.test(name) &&
+      (platform.office ? name.length <= 120 || isAddress(name) : isAddress(name));
   }
 
-  function gatewaySetup() {
+  function contactsReady(platform) {
+    var first = fieldValue('colleagueA');
+    var second = fieldValue('colleagueB');
+    return validContact(first, platform) && validContact(second, platform) &&
+      (!isAddress(first) || first.toLowerCase() !== second.toLowerCase());
+  }
+
+  function gatewaySetup(platform) {
     return [
-      '請將目前這個 AI 平台接入 Nuwa，讓同一 Organization 的 AI 同事可以互相聯絡。',
+      '請擔任 ' + platform.name + ' 的 Nuwa 接線助理（Gateway），讓同一 Organization 的 AI 同事可以互相聯絡。',
       '',
       '官方 Skill：' + skillURL,
       'Nuwa MCP：' + mcpURL,
       '',
-      '請依最新版 Skill，安裝或更新 Skill 與 MCP，完成 Organization 授權，沿用既有身分。依平台實際能力選擇接入方式：',
+      '請依最新版 Skill，安裝或更新 Skill 與 MCP，完成 Organization 授權，沿用既有身分。',
+      '1. 設定本辦公室唯一的 Wake 接收例行任務並完成驗證；沿用有效的接線。接收入口或金鑰變更時，以同一 Gateway 身分重新配對。',
+      '2. 從平台可信 Bot 名錄取得真實同事的名稱與 Bot ID（排除自己及群組／頻道），批次接入同事，沿用既有地址與名錄。同步新增與改名，保留獨立成員的接入模式；移除需明確授權。',
+      '3. ' + platform.setup,
+      '4. 收到正常 Wake 時，依 recipientBotID 使用平台原生工具轉交一次，完整轉交正文、寄件者及原 Relay Thread 回覆上下文，讓本人依 Skill 回覆。附上 relayReplyThread({from, threadID, body}) 的呼叫格式，帶入實際 Thread ID，from 直接填 recipientBotID（UUID 或 bot: 前綴的原生 ID），由同事填回覆正文。',
+      '   Routine 使用自包含指令；日常零 MCP 查詢，提交後結束。明確原生首聯確認依平台契約執行。',
+      '5. 回報 Gateway 地址、Wake 狀態及已接入同事名單、各自地址和收件方式；引導我使用兩位已接入的同事進行雙向通訊。'
+    ].join('\\n');
+  }
+
+  function directSetup(platform) {
+    var lines = [
+      '請將你自己（' + platform.name + '）接入 Nuwa。',
       '',
-      '固定 Session 的獨立 MCP 用戶端（如支援此 MCP 與 OAuth 的 Codex、ChatGPT）：使用自己的 Agent／Session，透過 agentAddressEnsureIdentity 設定自己的 agentDisplayName（已有角色名稱則沿用，否則使用實際客戶端名稱，例如 ChatGPT 或 Codex），完成信箱設定即可通訊。獨立連線省略 from；平台允許時直接呼叫。沒有自動接收能力就依使用者要求查收；支援直接 Wake 時才設定。無須 Gateway。回報自己的地址及收件方式。',
-      '多工作 Session 的 Codex 與 Grok Build：依最新版 Skill 的 Named work Sessions 設定原生工作上下文；每個工作開始時使用 agentAddressStartWork 取一個有意義的工作名稱並回報正式地址，Resume 原工作取得原 Session。',
+      '官方 Skill：' + skillURL,
+      'Nuwa MCP：' + mcpURL,
       '',
-      '共用辦公室：已接入的同事沿用既有連線；若你負責整間辦公室，擔任 Gateway：',
-      '1. 設定本辦公室唯一的 Wake 接收例行任務並完成驗證；沿用有效的接線。',
-      '   接收入口或金鑰變更時，以同一 Gateway 身分重新配對。',
-      '2. 從平台可信 Bot 名錄取得真實同事的名稱與 Bot ID（排除自己），',
-      '   排除群組／頻道，批次完成全部同事的接入，沿用既有地址與名錄。同步新增與改名，保留獨立成員的接入模式；移除需明確授權。',
-      '3. 收到正常 Wake 時，依 recipientBotID 使用平台原生工具轉交一次，',
-      '   完整轉交正文、寄件者及原 Relay Thread 回覆上下文，讓本人依 Skill 回覆。',
-      '   附上 relayReplyThread({from, threadID, body}) 的呼叫格式，',
-      '   帶入實際 Thread ID，from 直接填 recipientBotID（UUID 或 bot: 前綴的原生 ID），由同事填回覆正文。',
-      '   明確原生 Thread 的首次轉交成功後，Gateway 僅以平台實際回傳的 nativeThreadID 呼叫',
-      '   relayGatewayConfirmFirstContact；不可猜測 Thread ID 或以 Relay Thread ID 取代。',
-      '   安裝時確認 Routine 實際工具能力。能直接轉交就直接送；GrokBot 的 Routine 若無原生轉交能力但支援 WakeParent，僅交接完整原始事件 JSON，由上層 Gateway 統一組合格式並原生轉交一次。',
-      '   Routine 使用自包含指令；日常不讀 Skill、不寫日誌。Gateway 零 MCP 查詢，提交後結束。',
-      '4. 回報 Gateway 地址、Wake 狀態及已接入同事名單。'
+      '請依最新版 Skill，安裝或更新 Skill 與 MCP，完成 Organization 授權，沿用既有身分。此次僅設定目前的 ' + platform.name + ' 客戶端，無須 Gateway。',
+      platform.setup
+    ];
+
+    if (!platform.fixed) {
+      lines.push('新工作開始時依任務取有意義的工作名稱，呼叫 agentAddressStartWork 並主動回報正式地址；Resume 時恢復原 Session 的地址，詢問地址時使用 agentAddressGetStatus。使用原生工作識別，確認不同工作能取得各自的地址。');
+    }
+
+    lines.push('完成後回報設定狀態、目前正式地址及收件方式，必要時引導我重新載入客戶端。日常直接發訊或回覆，獨立連線省略 from；沒有自動接收能力就依使用者要求查收。');
+    lines.push(platform.fixed
+      ? '引導我選擇另一個已接入同一 Organization 的助理進行雙向通訊。'
+      : '引導我開啟第二個獨立工作，取得另一個正式地址，測試兩個工作雙向傳訊及原對話回覆。');
+
+    return lines.join('\\n');
+  }
+
+  function contact(id) {
+    var value = fieldValue(id);
+    return value || '另一位已接入的助理';
+  }
+
+  function sendPrompt(id, word, reverse, platform) {
+    var target = contact(id);
+
+    return [
+      '請透過 Nuwa 主動聯絡「' + target + '」。',
+      '告訴他：「' + (reverse ? '換我聯絡你了！' : '你好，我們來測試通話。') +
+        '測試字詞是' + word + '，請回覆這個字詞。」',
+      platform.office
+        ? '請直接發送一次，優先使用已知的 Bot ID，或填同事名稱、唯一簡稱、完整地址；共用連線時填自己的 from，獨立連線省略 from。'
+        : '請使用上面的完整地址直接發送一次，獨立連線省略 from；共用連線時填自己的 from。'
     ].join('\\n');
   }
 
-  function sendPrompt() {
+  function replyPrompt(id, word, platform) {
     return [
-      '請透過 Nuwa 找「' + colleagueName('colleagueB') +
-        '」助理聊一下。',
-      '告訴他：「你好，我們來測試通話，測試字詞是星河。收到後請回覆這個字詞。」',
-      '請直接發送一次，優先使用已知的 Bot ID，否則填同事名稱或唯一簡稱，由 Relay 解析；共用連線時填自己的 from。'
+      '請查收「' + contact(id) + '」剛才傳來的測試訊息。',
+      '請用 Nuwa 接續原本的對話回覆：「收到' + word + '！」按自己的接入方式回覆；獨立連線省略 from，共用連線填自己的 from。',
+      platform.office
+        ? '實際收到完整訊息後直接回覆一次，不需要額外查詢；若已回覆，回報結果即可。'
+        : '已收到訊息就直接回覆一次；尚未收到時請查收自己的收件匣。若已回覆，回報結果即可。'
     ].join('\\n');
   }
 
-  function replyPrompt() {
-    return [
-      '請查收剛才「' + colleagueName('colleagueA') +
-        '」助理傳來的測試訊息，',
-      '請用 Nuwa 接續原本的 Relay Thread 回覆：「收到星河！」，共用連線時填自己的 from。',
-      '實際收到完整訊息後直接回覆一次，不需要額外查詢；若已回覆，回報結果即可。'
-    ].join('\\n');
-  }
+  function updatePlatform(resetContacts) {
+    var platform = selectedPlatform();
+    var office = platform.office;
+    var first = document.getElementById('colleagueA');
+    var second = document.getElementById('colleagueB');
+    var name = platform.name;
 
-  function returnPrompt() {
-    return [
-      '請透過 Nuwa 主動找「' + colleagueName('colleagueA') +
-        '」助理聊一下。',
-      '告訴他：「換我打給你了！這次測試字詞是月光，請回覆這個字詞。」',
-      '請直接發送一次，優先使用已知的 Bot ID，否則填同事名稱或唯一簡稱；共用連線時填自己的 from。同名或找不到人才問我。'
-    ].join('\\n');
-  }
+    document.getElementById('platformIntro').textContent = office
+      ? '在 ' + name + ' 內指定或建立一位接線助理（Gateway），由它為整個辦公室接收、轉交訊息，並接入真正工作的同事。'
+      : name + ' 可直接使用自己的通訊連線和聯絡地址。' +
+        (platform.fixed ? '目前使用固定地址；獨立工作地址功能尚待支援。' : '每個獨立工作（Session）有自己的工作地址，恢復工作時沿用原地址。');
 
-  function verifyPrompt() {
-    return [
-      '請查收「' + colleagueName('colleagueB') +
-        '」助理剛才主動打來的電話，',
-      '請用 Nuwa 在那通 Relay Thread 回覆：「收到月光！」，共用連線時填自己的 from。',
-      '實際收到完整訊息後直接回覆一次，不需要額外查詢；若已回覆，回報結果即可。'
-    ].join('\\n');
+    document.getElementById('studioOptions').hidden = Boolean(office);
+    document.getElementById('installTitle').textContent = office ? '請接線助理帶你設定' : '安裝 Nuwa 至 ' + name;
+    document.getElementById('installIntro').textContent = office
+      ? '將下面的指令貼給 ' + name + ' 的接線助理。它會依官方指南完成安裝，並在需要登入或授權時請你操作。'
+      : '你可以透過 Studio 一次設定多種工具，也可以直接請 ' + name + ' 完成自己的通訊設定。';
+
+    document.getElementById('setupPromptTitle').textContent = name + (office ? ' 接線助理安裝指令' : ' 直接安裝指令');
+    document.getElementById('setupResult').textContent = office
+      ? '接線助理回報已接入的同事、各自的地址和收件方式後，就能開始下方測試。'
+      : '請確認助理回報設定完成及目前的正式地址，再選擇第二個已接入的通訊對象。';
+
+    document.getElementById('testTitle').textContent = office ? '找兩位助理，直接測試通話' : platform.fixed
+      ? '與另一個已接入的助理測試通訊' : '開啟兩個獨立工作，測試通訊';
+
+    document.getElementById('testIntro').textContent = office
+      ? '選擇兩位已接入 ' + name + ' 的同事，填入他們在平台上顯示的名稱或正式地址。'
+      : platform.fixed
+        ? '詢問 ' + name + ' 目前的正式地址，再選擇另一個已接入的助理或工作，填入兩個完整地址。'
+        : '在 ' + name + ' 開啟兩個獨立工作，請它們分別開始測試工作並回報自己的正式地址，再填入兩個完整地址。';
+
+    document.getElementById('labelA').textContent = office ? '助理 A 的名稱' : platform.fixed ? 'Claude CLI 的完整地址' : '工作 A 的完整地址';
+    document.getElementById('labelB').textContent = office ? '助理 B 的名稱' : platform.fixed ? '另一位助理的完整地址' : '工作 B 的完整地址';
+    first.placeholder = office ? '例如：' + platform.examples[0] : '例如：company/' + platform.agent + '/' + (platform.fixed ? 'main' : 'send-check');
+    second.placeholder = office ? '例如：' + platform.examples[1] : '例如：company/' + (platform.fixed ? 'codex/reply-check' : platform.agent + '/reply-check');
+    document.getElementById('testNote').textContent = office
+      ? '兩位助理可以使用相同或不同平台；同名時請改填完整 Nuwa 地址。'
+      : '也可以把另一個平台已接入的助理或工作當作 B。範例地址僅供參考，請填入實際回報的完整地址。';
+
+    if (resetContacts) {
+      first.value = '';
+      second.value = '';
+    }
+
+    updatePrompts();
   }
 
   function updatePrompts() {
+    var platform = selectedPlatform();
+    var ready = contactsReady(platform);
     var prompts = {
-      gatewayPrompt: gatewaySetup(),
-      sendPrompt: sendPrompt(),
-      replyPrompt: replyPrompt(),
-      returnPrompt: returnPrompt(),
-      verifyPrompt: verifyPrompt()
+      gatewayPrompt: platform.office ? gatewaySetup(platform) : directSetup(platform),
+      sendPrompt: sendPrompt('colleagueB', '星河', false, platform),
+      replyPrompt: replyPrompt('colleagueA', '星河', platform),
+      returnPrompt: sendPrompt('colleagueA', '月光', true, platform),
+      verifyPrompt: replyPrompt('colleagueB', '月光', platform)
     };
 
     promptIDs.forEach(function (id) {
-      document.getElementById(id).textContent = prompts[id];
+      document.getElementById(id).textContent = id === 'gatewayPrompt' || ready
+        ? prompts[id] : '填入上面的聯絡對象，就能直接複製。';
     });
 
     var first = fieldValue('colleagueA');
     var second = fieldValue('colleagueB');
     var message = document.getElementById('nameHint');
 
-    if ((first && !validName(first)) || (second && !validName(second))) {
-      message.textContent = '請填寫平台上實際看到的助理名稱，每個名稱限 120 字且不得換行。';
-    } else if (namesReady()) {
+    if ((first && !validContact(first, platform)) || (second && !validContact(second, platform))) {
+      message.textContent = platform.office
+        ? '請填寫實際助理名稱或完整地址，不得換行。'
+        : '請填寫實際回報的三層完整地址：組織／助理／工作。';
+    } else if (first && second && isAddress(first) && first.toLowerCase() === second.toLowerCase()) {
+      message.textContent = '請填入兩個不同的完整地址，才能驗證雙向通訊。';
+    } else if (ready) {
       message.textContent = first === second
-        ? '兩位助理同名；發訊時 Nuwa 可能需要你進一步確認是哪一位。'
-        : '四段測試指令已填入兩位助理名稱，直接複製即可。';
+        ? '兩位助理同名；建議填入各自的完整 Nuwa 地址。'
+        : '四段測試指令已填入聯絡對象，直接複製即可。';
     } else {
-      message.textContent = '只要填入助理在平台上顯示的名稱，不需要 Nuwa 地址。';
+      message.textContent = platform.office
+        ? '填入平台上的助理名稱或正式地址即可。'
+        : '請先向兩位助理詢問各自的完整地址。';
     }
   }
 
@@ -164,8 +257,8 @@ export const ONBOARDING_SCRIPT = `
         return;
       }
 
-      if (button.getAttribute('data-copy') !== 'gatewayPrompt' && !namesReady()) {
-        notify('請先填入兩位助理在平台上顯示的名稱。');
+      if (button.getAttribute('data-copy') !== 'gatewayPrompt' && !contactsReady(selectedPlatform())) {
+        notify('請先填入兩個有效的聯絡對象。');
         return;
       }
 
@@ -185,7 +278,11 @@ export const ONBOARDING_SCRIPT = `
     element.addEventListener('change', updatePrompts);
   });
 
+  document.getElementById('platform').addEventListener('change', function () {
+    updatePlatform(true);
+  });
+
   showSlide(0);
-  updatePrompts();
+  updatePlatform(false);
 }());
 `;

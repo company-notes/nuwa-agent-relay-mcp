@@ -58,8 +58,9 @@ export class GatewayTools extends MCPToolSet {
       () => this.client.call('GET', '/v2/gateway-office-coworkers'));
 
     this.register('relayGatewayConfirmFirstContact',
-      'After exactly one successful explicit-mode native first delivery, save the actual native Thread ' +
-      'receipt for the supplied sender and recipient Sessions. Use only the provider-returned Thread ID; ' +
+      'Complete a reserved explicit first contact (recipientPlatformThreadID is null) immediately after ' +
+      'one successful native dispatch, before ending the Routine. Use the original event sender, ' +
+      'recipient and message IDs and the provider-returned native Thread ID; ' +
       'never substitute a Relay Thread ID or fabricate a receipt. The authorized Gateway remains subject ' +
       'to Relay\'s one-time message, roster and Session checks.',
       GatewayTools.firstContact,

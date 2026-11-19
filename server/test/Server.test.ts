@@ -997,3 +997,50 @@ test('enrolled GrokBot coworkers send and reply by native IDs with no extra offi
     scenario.restore();
   }
 });
+
+test('explicit office Gateway confirms the actual native Thread after first delivery', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const recipientSessionID = SESSION_B;
+    const senderSessionID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+    const nativeThreadID = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+    const coworkers = [{
+      displayName: 'Cosmo', recipientBotID: 'cosmo-native-id',
+      threadMode: 'explicit', firstContactMode: 'automatic',
+    }];
+    const enrolled = await scenario.tool('relayGatewayEnrollOfficeCoworkers', { coworkers });
+
+    assert.equal(enrolled.result.isError, undefined);
+    assert.deepEqual(scenario.calls[0].body, { coworkers });
+
+    const schemas = JSON.stringify(await scenario.toolSchemas());
+    assert.match(schemas, /relayGatewayConfirmFirstContact/,
+      'The receiving Gateway needs a tool to save the native receipt after its first dispatch.');
+
+    const confirmed = await scenario.tool('relayGatewayConfirmFirstContact', {
+      recipientSessionID, senderSessionID, messageID: MESSAGE_ID, nativeThreadID,
+    });
+
+    assert.equal(confirmed.result.isError, undefined);
+    assert.equal(scenario.calls.length, 2, 'First contact needs exactly one confirmation request.');
+    const call = scenario.calls[1];
+    assert.equal(call.method, 'PUT');
+    assert.equal(call.url.pathname,
+      '/v2/gateway-teammates/' + recipientSessionID + '/first-contacts/' + senderSessionID);
+    assert.equal(call.url.searchParams.get('session_id'), SESSION_A);
+    assert.equal(call.headers.get('authorization'), 'Bearer oauth-a');
+    assert.equal(call.headers.get('x-nuwa-runtime-token'), RUNTIME_SECRET);
+    assert.deepEqual(call.body, { messageID: MESSAGE_ID, nativeThreadID });
+
+    const invalid = await scenario.tool('relayGatewayConfirmFirstContact', {
+      recipientSessionID, senderSessionID, messageID: MESSAGE_ID, nativeThreadID: '',
+    });
+
+    assert.equal(invalid.result.isError, true);
+    assert.equal(scenario.calls.length, 2, 'Missing native receipt must not reach Relay.');
+  } finally {
+    scenario.restore();
+  }
+});

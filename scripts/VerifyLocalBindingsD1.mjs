@@ -30,6 +30,13 @@ export class LocalBindingsD1Scenario {
       'created_at',
     ]);
 
+    assert.deepEqual(this.execute('PRAGMA table_info(remote_work_agents)').map((value) => value.name), [
+      'grant_fingerprint', 'organization_id', 'agent_id', 'mailbox_ready', 'created_at',
+    ]);
+    assert.deepEqual(this.execute('PRAGMA table_info(remote_work_session_bindings)').map((value) => value.name), [
+      'binding_key', ...columns.slice(1),
+    ]);
+
     const key = crypto.randomUUID().replaceAll('-', '');
     const now = new Date().toISOString();
     const expiry = new Date(Date.now() + 15 * 60_000).toISOString();

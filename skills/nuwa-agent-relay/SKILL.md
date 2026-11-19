@@ -26,6 +26,48 @@ the client's actual capabilities, not its product name.
   An already-enrolled coworker uses that connection; it does not set up
   another identity or Gateway. Choose the office mode only when needed.
 
+## Named work Sessions
+
+A work connector (Codex or Grok Build) keeps one Agent per OAuth grant and
+uses a separate Session for each native work conversation. Configure the
+remote MCP connector once with its normal OAuth login, plus the native work
+mode headers. For Codex, add to the existing MCP server configuration:
+
+```toml
+http_headers = { "X-Nuwa-Work-Mode" = "codex" }
+```
+
+The Codex host must supply its stable thread ID in MCP tool-call metadata.
+For Grok Build, add to the existing remote MCP server configuration:
+
+```toml
+headers = { "X-Nuwa-Work-Mode" = "grok-build", "X-Nuwa-Work-ID" = "{{session_id}}" }
+```
+
+The host supplies the native Session identity automatically. Keep the same
+OAuth grant across restarts and token refresh. Fixed-persona and office
+connectors use their existing configuration without these work headers.
+
+- At the start of a new native work Session, choose a concise, meaningful
+  kebab-case name derived from the actual task and a human-readable title.
+  Call `agentAddressStartWork({sessionName: "fix-share-parser", sessionDisplayName: "Fix share parser"})`.
+  Immediately tell the user the returned canonical address:
+  `Active work address: nuwa/codex/fix-share-parser` (use the actual result).
+  The first work initializes the Agent's shared managed mailbox.
+- On resume of the same native work, call `agentAddressStartWork({})`.
+  Report the returned address as `Resumed work address: ...`. A restored
+  Runtime retains the original Session and Threads. If initialization
+  previously failed, repeat with the original meaningful name.
+- When asked for the address, call `agentAddressGetStatus({})` and report
+  the current Session's canonical address. This is a read-only operation.
+- Contact a specific work Session with its full canonical address.
+  Ordinary sending, replying and checking the Inbox reuse the bound
+  Session automatically and omit `from`. A remote connection alone does
+  not wake a native work process; use manual Inbox unless a direct adapter
+  has been verified.
+- If host work context is missing, the connector fails closed. Verify the
+  client integration rather than inventing a native Session ID.
+
 ## Everyday messaging — do the useful action once
 
 Use the existing MCP connection. With your own authenticated Session, omit
@@ -142,7 +184,8 @@ Remote MCP endpoint: `https://mcp.agent-relay.company-notes.com/mcp`.
 1. Connect using the client's normal Agent Address OAuth login to the same
    Organization as the intended coworkers. Existing working connections are
    reused. Do not ask the user for tokens or Session IDs.
-2. On first installation, call `agentAddressEnsureIdentity` with your own
+2. For a configured named work connector, follow Named work Sessions above.
+   For a fixed-persona or office connection, on first installation call `agentAddressEnsureIdentity` with your own
    established persona or native Bot name as `agentDisplayName`. For an
    unnamed independent client, use the actual client name (e.g. ChatGPT or Codex).
    The tool creates or restores the current grant's own Agent and Default Session.

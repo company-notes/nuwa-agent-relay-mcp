@@ -6,11 +6,18 @@ test('production D1 guard accepts provider metadata and complete Session binding
   assert.equal(BindingDatabaseGuard.classify(['d1_migrations', '_cf_KV', '_cf_METADATA']), 'empty');
   assert.equal(BindingDatabaseGuard.classify([
     'd1_migrations', '_cf_KV', 'remote_session_bindings',
+  ]), 'v2');
+  assert.equal(BindingDatabaseGuard.classify([
+    'd1_migrations', '_cf_KV', 'remote_session_bindings', 'remote_work_agents',
+    'remote_work_session_bindings',
   ], true), 'v2');
 });
 
 test('production D1 guard rejects Relay, unknown, partially migrated or empty deployed D1', () => {
   for (const names of [
+    ['remote_session_bindings'],
+    ['remote_session_bindings', 'remote_work_agents'],
+    ['remote_session_bindings', 'remote_work_session_bindings'],
     ['remote_session_bindings', 'messages'],
     ['threads', 'messages'],
     ['agent_mailboxes'],

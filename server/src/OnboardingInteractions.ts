@@ -14,8 +14,8 @@ export const ONBOARDING_SCRIPT = `
       setup: 'GrokBot 使用 platform 模式。安裝時確認 Routine 的實際工具能力；能直接轉交就直接送。GrokBot 的 Routine 若無原生轉交能力但支援 WakeParent，僅交接完整原始事件 JSON，由上層 Gateway 組合格式並原生轉交一次。'
     },
     openmausbot: {
-      name: 'OpenMausBot', office: true, examples: ['Cosmo', '同事 B'],
-      setup: '確認 OpenMausBot 可建立原生對話並取得可信回執後，為同事設定 explicit／automatic。只有收到明確的 recipientPlatformThreadID: null 才建立原生對話；轉交成功後以實際回傳的 nativeThreadID 呼叫 relayGatewayConfirmFirstContact 一次。後續沿用已保存的原生 Thread ID 轉交一次。'
+      name: 'OpenMausBot', office: true, separateConnectors: true, examples: ['Cosmo', '同事 B'],
+      setup: '確認接收 Routine 能呼叫 coordinate_bots、relayGatewayConfirmFirstContact 且可讀取可信原生回執，為同事設定 explicit／automatic。將 Skill 的 OpenMausBot 完整流程放入 Routine：recipientPlatformThreadID 為 null 時用 thread: "new" 轉交一次，立即用 Wake 的三個識別碼及原生回執呼叫 relayGatewayConfirmFirstContact，確認成功才結束；為字串時直接使用該 ID 轉交一次後結束。'
     },
     rakazo: {
       name: 'Rakazo', office: true, examples: ['同事 A', '同事 B'],
@@ -68,12 +68,17 @@ export const ONBOARDING_SCRIPT = `
       'Nuwa MCP：' + mcpURL,
       '',
       '請依最新版 Skill，安裝或更新 Skill 與 MCP，完成 Organization 授權，沿用既有身分。',
-      '1. 設定本辦公室唯一的 Wake 接收例行任務並完成驗證；沿用有效的接線。接收入口或金鑰變更時，以同一 Gateway 身分重新配對。',
-      '2. 從平台可信 Bot 名錄取得真實同事的名稱與 Bot ID（排除自己及群組／頻道），批次接入同事，沿用既有地址與名錄。同步新增與改名，保留獨立成員的接入模式；移除需明確授權。',
+      '1. 設定本辦公室唯一的 Wake 接收例行任務並完成驗證；沿用有效的接線。接收入口或金鑰變更時，以同一 Gateway 身分重新配對。將配對連結直接交給使用者，由使用者自己開啟瀏覽器、登入並把 Webhook HTTPS URL 和 Bearer key 貼入安全表單。Gateway 負責接收驗證事件。',
+      '2. 從平台可信 Bot 名錄取得真實同事的名稱與 Bot ID（排除自己及群組／頻道），批次接入同事，沿用既有地址與名錄。同步新增與改名，保留獨立成員的接入模式；移除需明確授權。' +
+        (platform.separateConnectors
+          ? ' 逐一確認 Gateway 與每位同事的 nuwa-agent-relay 連接器。未開啟時列出助理名稱，請管理者開啟後再標記可通訊。'
+          : ''),
       '3. ' + platform.setup,
       '4. 收到正常 Wake 時，依 recipientBotID 使用平台原生工具轉交一次，完整轉交正文、寄件者及原 Relay Thread 回覆上下文，讓本人依 Skill 回覆。附上 relayReplyThread({from, threadID, body}) 的呼叫格式，帶入實際 Thread ID，from 直接填 recipientBotID（UUID 或 bot: 前綴的原生 ID），由同事填回覆正文。',
-      '   Routine 使用自包含指令；日常零 MCP 查詢，提交後結束。明確原生首聯確認依平台契約執行。',
-      '5. 回報 Gateway 地址、Wake 狀態及已接入同事名單、各自地址和收件方式；引導我使用兩位已接入的同事進行雙向通訊。'
+      platform.separateConnectors
+        ? '   Routine 使用自包含指令；依 OpenMausBot 首次／後續流程完成轉交。首次必須確認，後續零 MCP 查詢，提交後結束。'
+        : '   Routine 使用自包含指令；日常零 MCP 查詢，提交後結束。明確原生首聯確認依平台契約執行。',
+      '5. 回報 Gateway 地址、Wake 狀態及已接入同事名單、各自地址和收件方式；引導我使用兩位已接入的同事進行雙向通訊。發送方提交一次後結束，等待接收方自然收到及回覆。'
     ].join('\\n');
   }
 
@@ -113,7 +118,8 @@ export const ONBOARDING_SCRIPT = `
       '告訴他：「' + (reverse ? '換我聯絡你了！' : '你好，我們來測試通話。') +
         '測試字詞是' + word + '，請回覆這個字詞。」',
       platform.office
-        ? '請直接發送一次，優先使用已知的 Bot ID，或填同事名稱、唯一簡稱、完整地址；共用連線時填自己的 from，獨立連線省略 from。'
+        ? '請直接發送一次，優先使用已知的 Bot ID，或填同事名稱、唯一簡稱、完整地址；共用連線時填自己的 from，獨立連線省略 from。' +
+          (platform.separateConnectors ? ' 送出後結束，等待對方自然回覆。' : '')
         : '請使用上面的完整地址直接發送一次，獨立連線省略 from；共用連線時填自己的 from。'
     ].join('\\n');
   }
@@ -123,7 +129,8 @@ export const ONBOARDING_SCRIPT = `
       '請查收「' + contact(id) + '」剛才傳來的測試訊息。',
       '請用 Nuwa 接續原本的對話回覆：「收到' + word + '！」按自己的接入方式回覆；獨立連線省略 from，共用連線填自己的 from。',
       platform.office
-        ? '實際收到完整訊息後直接回覆一次，不需要額外查詢；若已回覆，回報結果即可。'
+        ? '實際收到完整訊息後直接回覆一次，不需要額外查詢；若已回覆，回報結果即可。' +
+          (platform.separateConnectors ? ' 此指令供訊息自然到達後使用；等待自然回覆即可。' : '')
         : '已收到訊息就直接回覆一次；尚未收到時請查收自己的收件匣。若已回覆，回報結果即可。'
     ].join('\\n');
   }

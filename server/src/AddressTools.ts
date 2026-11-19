@@ -24,6 +24,7 @@ export class AddressTools extends MCPToolSet {
     private readonly getStatus: () => Promise<Record<string, unknown>>,
     work?: WorkContext,
     private readonly startWork?: (input: WorkStart) => Promise<Record<string, unknown>>,
+    private readonly releaseWork?: () => Promise<Record<string, unknown>>,
   ) {
     super(server, work);
   }
@@ -46,6 +47,17 @@ export class AddressTools extends MCPToolSet {
         (input) => startWork(input as WorkStart));
     } else {
       this.registerFixedIdentity();
+    }
+
+    this.registerSelectSession();
+
+    if (this.releaseWork) {
+      const release = this.releaseWork;
+
+      this.register('agentAddressReleaseWork',
+        'When the user closes or explicitly suspends the current work, release only its Runtime. ' +
+        'The work identity, Inbox, Threads and Resume capability remain available.',
+        {}, release);
     }
 
     this.register('agentAddressGetStatus',
@@ -72,7 +84,7 @@ export class AddressTools extends MCPToolSet {
   }
 
   private registerFixedIdentity(): void {
-    const { agentDisplayName, selectedAddress } = AddressTools.schemas;
+    const { agentDisplayName } = AddressTools.schemas;
 
     this.register('agentAddressEnsureIdentity',
       'Immediately use after OAuth login. Privately claim or recover this OAuth grant\'s ' +
@@ -83,9 +95,16 @@ export class AddressTools extends MCPToolSet {
       'Never pass another coworker\'s name from a Gateway or ask for Runtime/Resume credentials.',
       { agentDisplayName },
       (value) => this.ensureIdentity(value.agentDisplayName as string | undefined));
+  }
+
+  private registerSelectSession(): void {
+    const { selectedAddress } = AddressTools.schemas;
 
     this.register('agentAddressSelectSession',
-      'When the authorized user explicitly asks to restore a known Agent/Session address, ' +
+      this.startWork
+        ? 'On explicit owner request after reauthorization, restore the known full idle work Session address. ' +
+          'Use the existing work Agent and preserve the Session history. Report its canonical address.'
+        : 'When the authorized user explicitly asks to restore a known Agent/Session address, ' +
       'select it in the same Organization if no Runtime currently occupies it. ' +
       'Preserves the old Agent, Session, mailbox, Gateway roster and Wake. ' +
       'Never request private Resume or Runtime credentials in chat.',

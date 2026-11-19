@@ -60,6 +60,11 @@ connectors use their existing configuration without these work headers.
   previously failed, repeat with the original meaningful name.
 - When asked for the address, call `agentAddressGetStatus({})` and report
   the current Session's canonical address. This is a read-only operation.
+- Explicitly suspend a work with `agentAddressReleaseWork({})`. Closing the
+  host also lets its Runtime lease expire. Its durable binding and history
+  remain available. After a new OAuth grant, an authorized owner can restore
+  a known idle work with `agentAddressSelectSession({address: "nuwa/codex/fix-share-parser"})`
+  in the intended native work. Do this before initializing a new work Agent.
 - Contact a specific work Session with its full canonical address.
   Ordinary sending, replying and checking the Inbox reuse the bound
   Session automatically and omit `from`. A remote connection alone does

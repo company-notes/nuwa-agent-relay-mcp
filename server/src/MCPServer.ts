@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/server';
 
 import type { BackgroundTasks, Env } from './Env';
-import { AddressAPIClient, RelayAPIClient } from './APIClients';
+import { AddressAPIClient, RelayAPIClient, type BoundSession } from './APIClients';
 import { AddressTools } from './AddressTools';
 import { GatewayTools } from './GatewayTools';
 import { RelayTools } from './RelayTools';
@@ -24,10 +24,11 @@ export class NuwaMCPServer {
     }, {
       instructions: this.work
         ? 'Nuwa gives each native work Session its own canonical address under the established Agent. ' +
-          'At the beginning of a new work Session call agentAddressStartWork with a meaningful kebab-case ' +
+          'Before beginning any new user work, even without messaging, call agentAddressStartWork with a meaningful kebab-case ' +
           'sessionName and sessionDisplayName, based on the user task. On native resume call it without names. ' +
           'Report the returned address immediately as Active or Resumed work address. On an address question ' +
-          'use agentAddressGetStatus. Use the full canonical address to reach a particular work Session. ' +
+          'use agentAddressGetStatus. On explicit reauthorization recovery use agentAddressSelectSession ' +
+          'with the original full address. Use the full canonical address to reach a particular work Session. ' +
           'After initialization, sendToAgent and relayReplyThread directly without from. Use relayInbox ' +
           'for this work Session. A managed Agent mailbox is shared; native Wake requires a supported adapter. ' +
           'Runtime and Resume credentials remain private. '
@@ -68,13 +69,16 @@ export class NuwaMCPServer {
     const bindings = new SessionBindings(this.env, this.address, this.work);
     const relay = new RelayAPIClient(this.env, this.authorization,
       () => bindings.authorize(), this.tasks);
+    const prepareMailbox = (session: BoundSession) =>
+      new RelayAPIClient(this.env, this.authorization, async () => session, this.tasks)
+        .call('PUT', '/v2/agent-mailboxes');
+
     new AddressTools(server, this.address,
       (persona) => bindings.ensure(persona),
-      (address) => bindings.selectSession(address),
+      (address) => bindings.selectSession(address, this.work ? prepareMailbox : undefined),
       () => bindings.getStatus(), this.work,
-      this.work ? (input) => bindings.startWork(input, (session) =>
-        new RelayAPIClient(this.env, this.authorization, async () => session, this.tasks)
-          .call('PUT', '/v2/agent-mailboxes')) : undefined).install();
+      this.work ? (input) => bindings.startWork(input, prepareMailbox) : undefined,
+      this.work ? () => bindings.releaseWork() : undefined).install();
 
     new RelayTools(server, relay, this.work).install();
 

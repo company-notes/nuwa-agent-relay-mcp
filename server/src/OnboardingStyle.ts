@@ -137,7 +137,6 @@ h2 { font-size: clamp(29px,3vw,39px); line-height: 1.35; letter-spacing: -.045em
 .studio-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
 .studio-card > p { font-size: 14px; color: var(--muted); }
 .availability { font-size: 12px; font-weight: 650; color: var(--muted); }
-.direct-heading { margin: 23px 0 5px; }
 .address-grid label .contact-label { font-size: 14px; font-weight: 750; color: var(--ink); }
 [hidden] { display: none!important; }
 .step-body code, .faq code, .proof-grid code { background: #e8f2eb; color: #28624c; padding: 1px 5px; border-radius: 4px; font: .92em ui-monospace, "Cascadia Code", Menlo, monospace; overflow-wrap: anywhere; }

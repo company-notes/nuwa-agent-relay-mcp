@@ -128,6 +128,22 @@ export const ONBOARDING_SCRIPT = `
     ].join('\\n');
   }
 
+  function updateInstallMethod() {
+    var platform = selectedPlatform();
+    var office = Boolean(platform.office);
+    var studio = !office && fieldValue('installMethod') === 'studio';
+
+    document.getElementById('installMethodPicker').hidden = office;
+    document.getElementById('studioOptions').hidden = !studio;
+    document.getElementById('directOptions').hidden = studio;
+    document.getElementById('directScope').hidden = office;
+    document.getElementById('setupResult').textContent = office
+      ? '接線助理回報已接入的同事、各自的地址和收件方式後，就能開始下方測試。'
+      : studio
+        ? 'Studio 新版發布後即可使用此方式。目前可切換至直接安裝，立即完成接入。'
+        : '請確認助理回報設定完成及目前的正式地址，再選擇第二個已接入的通訊對象。';
+  }
+
   function updatePlatform(resetContacts) {
     var platform = selectedPlatform();
     var office = platform.office;
@@ -140,16 +156,13 @@ export const ONBOARDING_SCRIPT = `
       : name + ' 可直接使用自己的通訊連線和聯絡地址。' +
         (platform.fixed ? '目前使用固定地址；獨立工作地址功能尚待支援。' : '每個獨立工作（Session）有自己的工作地址，恢復工作時沿用原地址。');
 
-    document.getElementById('studioOptions').hidden = Boolean(office);
     document.getElementById('installTitle').textContent = office ? '請接線助理帶你設定' : '安裝 Nuwa 至 ' + name;
     document.getElementById('installIntro').textContent = office
       ? '將下面的指令貼給 ' + name + ' 的接線助理。它會依官方指南完成安裝，並在需要登入或授權時請你操作。'
-      : '你可以透過 Studio 一次設定多種工具，也可以直接請 ' + name + ' 完成自己的通訊設定。';
+      : '依你的需求選擇一種方式：一次設定多種工具，或只設定目前的 ' + name + '。';
 
     document.getElementById('setupPromptTitle').textContent = name + (office ? ' 接線助理安裝指令' : ' 直接安裝指令');
-    document.getElementById('setupResult').textContent = office
-      ? '接線助理回報已接入的同事、各自的地址和收件方式後，就能開始下方測試。'
-      : '請確認助理回報設定完成及目前的正式地址，再選擇第二個已接入的通訊對象。';
+    updateInstallMethod();
 
     document.getElementById('testTitle').textContent = office ? '找兩位助理，直接測試通話' : platform.fixed
       ? '與另一個已接入的助理測試通訊' : '開啟兩個獨立工作，測試通訊';
@@ -281,6 +294,8 @@ export const ONBOARDING_SCRIPT = `
   document.getElementById('platform').addEventListener('change', function () {
     updatePlatform(true);
   });
+
+  document.getElementById('installMethod').addEventListener('change', updateInstallMethod);
 
   showSlide(0);
   updatePlatform(false);

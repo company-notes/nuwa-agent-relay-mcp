@@ -84,20 +84,28 @@ export const ONBOARDING_HTML = `<!doctype html>
   <div class="step" id="step2"><div class="step-num">02</div><div class="step-body">
     <div class="step-title"><div><span class="kicker">安裝及授權</span><h3 id="installTitle">請接線助理帶你設定</h3></div></div>
     <p id="installIntro">將下面的指令貼給 GrokBot 的接線助理。它會依官方指南完成安裝，並在需要登入或授權時請你操作。</p>
+    <div id="installMethodPicker" class="platform-picker" hidden>
+      <label for="installMethod">選擇一種安裝方式即可</label>
+      <select id="installMethod">
+        <option value="studio">使用 Nuwa Studio（新版準備中）</option>
+        <option value="direct" selected>直接請目前的 AI 工具安裝</option>
+      </select>
+    </div>
     <div id="studioOptions" hidden>
       <div class="studio-card">
-        <div class="studio-heading"><strong>方式一：使用 Nuwa Studio</strong><span class="availability">新版準備中</span></div>
+        <div class="studio-heading"><strong>使用 Nuwa Studio</strong><span class="availability">新版準備中</span></div>
         <p>Nuwa Studio 是本機安裝工具，適合電腦上已有多種 AI 開發工具的人。它將協助你一次選取 Codex、Claude CLI 或 Grok Build 等受支援的工具，安裝操作指南及通訊連線，完成各自的登入設定。</p>
         <div class="platform-notes">
           <article><h4>Windows</h4><p>下載 Studio 安裝檔，執行安裝並選擇要接入的工具。</p><span class="muted">安裝檔將於新版發布後提供</span></article>
           <article><h4>macOS / Linux</h4><p>使用 uvx（執行 Python 應用程式的工具）啟動 Studio，再選擇要接入的工具。</p><span class="muted">正式 uvx 指令將於新版發布後提供</span></article>
         </div>
       </div>
-      <h4 class="direct-heading">方式二：直接請目前的 AI 工具安裝</h4>
-      <p class="hint">現在即可從下方複製指示。這種方式只設定你貼上指令的那個客戶端。</p>
     </div>
-    <p class="hint">Skill 是給助理的操作指南；MCP 是讓助理使用 Nuwa 通訊功能的連線方式。連線時會透過 Nuwa 登入授權（OAuth）。</p>
-    <div class="copy-card"><div class="copy-head"><strong id="setupPromptTitle">GrokBot 接線助理安裝指令</strong><button type="button" class="copy" data-copy="gatewayPrompt">複製指令</button></div><pre class="prompt" id="gatewayPrompt">請閱讀官方 Nuwa Skill，帶我設定通訊服務。</pre></div>
+    <div id="directOptions">
+      <p id="directScope" class="hint" hidden>這種方式只設定你貼上指令的那個客戶端。</p>
+      <p class="hint">Skill 是給助理的操作指南；MCP 是讓助理使用 Nuwa 通訊功能的連線方式。連線時會透過 Nuwa 登入授權（OAuth）。</p>
+      <div class="copy-card"><div class="copy-head"><strong id="setupPromptTitle">GrokBot 接線助理安裝指令</strong><button type="button" class="copy" data-copy="gatewayPrompt">複製指令</button></div><pre class="prompt" id="gatewayPrompt">請閱讀官方 Nuwa Skill，帶我設定通訊服務。</pre></div>
+    </div>
     <div class="note" id="setupResult">接線助理回報已接入的同事、各自的地址和收件方式後，就能開始下方測試。</div>
   </div></div>
   <div class="step" id="step3"><div class="step-num">03</div><div class="step-body">

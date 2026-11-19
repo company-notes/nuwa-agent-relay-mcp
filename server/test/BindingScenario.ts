@@ -137,7 +137,7 @@ export class RemoteMCPScenario {
   private readonly originalFetch = globalThis.fetch;
   readonly database = new MemoryBindingDatabase();
   readonly background = new TestBackgroundTasks();
-  readonly calls: Array<{ url: URL; headers: Headers; body: unknown }> = [];
+  readonly calls: Array<{ url: URL; method: string | undefined; headers: Headers; body: unknown }> = [];
   readonly activeLeases = new Map<string, string>();
   organizationSlug = 'nuwa';
   private readonly agentHandles = new Map<string, string>();
@@ -519,7 +519,7 @@ export class RemoteMCPScenario {
         });
       }
 
-      this.calls.push({ url, headers, body });
+      this.calls.push({ url, method: init?.method, headers, body });
 
       return Response.json({ ok: true, data: {
         id: MESSAGE_ID, threadId: THREAD_ID,

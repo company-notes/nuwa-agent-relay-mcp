@@ -1,0 +1,47 @@
+{
+  "skill_name": "nuwa-agent-relay",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "請把這個 OpenMausBot 辦公室接入 Nuwa。有 Cosmo 和小美，Gateway 的 MCP 已連線，小美的 nuwa-agent-relay connector 尚未啟用，使用者已有 HTTPS tunnel 與 Webhook Bearer。請完成可做的安裝，安排使用者完成 Wake 配對。",
+      "expected_output": "Human receives the protected pairingUrl only and enters webhook URL and key in their own browser. Gateway handles verification. Identify 小美's disabled connector and ask administrator to enable it; report readiness separately from registration. Verify Routine has native dispatch and confirmation tools; enroll explicit/automatic.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "OpenMausBot Gateway 收到已認證的 V2 Wake。recipientPlatformThreadID 是 null，recipientBotID、recipientSessionID、senderSessionID、messageID、relayThreadID 及完整 body 都在事件中。native tool 回傳小美的實際 Thread ID T1。請執行轉交。",
+      "expected_output": "Exactly one coordinate_bots with thread=new and reply=none; then exactly one relayGatewayConfirmFirstContact using the three original event IDs and T1; finish only after confirmation. Full body and original Relay reply context delivered. No lookup or reply on coworker's behalf.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "同一寄件者又傳一封新的 Nuwa 訊息給小美，這次 relayThreadID 與上一封不同，但已認證 Wake 附上 recipientPlatformThreadID=T1。請轉交。之後另一位寄件者來訊，Wake 的欄位為 null。",
+      "expected_output": "First event: one coordinate_bots using exactly T1, no MCP calls. Second event: new native Thread T2 and confirm once from actual receipt. Native binding is by ordered sender/recipient Sessions, not individual Relay Threads.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "首次原生轉交已成功，但 relayGatewayConfirmFirstContact 回報逾時；後續 Wake 顯示 gateway_first_contact_pending。現在該如何處理？",
+      "expected_output": "Report pending/uncertain confirmation, preserve original event IDs and actual native receipt. Recover by confirming that same original message and receipt as the authorized Gateway; do not dispatch again or guess IDs.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "小晴和小美都已接入，請進行雙向傳訊測試。發訊成功後對方仍未回覆。",
+      "expected_output": "Ask only the sending coworker to submit once and finish. Observe asynchronous actual receipt and reply; no immediate receiver probe or blind resend. After first observed round trip, let the reverse sender start a new conversation. Pending is not failure.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "GrokBot Gateway 收到已認證的 V2 Wake，沒有 recipientPlatformThreadID。背景 Routine 無 Send to Agent，但有 WakeParent。請轉交給 recipientBotID。",
+      "expected_output": "One WakeParent with complete raw event; parent uses existing native Send to Agent once with full message and prepared original Relay reply context. Zero MCP lookups or confirmations; existing coworker reply identity remains unchanged.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "我在 Codex 開始一個新工作，並希望取得獨立地址、發訊給另一位同事；我不是辦公室 Gateway。",
+      "expected_output": "Existing named work connector initializes with meaningful work name via agentAddressStartWork and reports the returned address. Send directly with no from or office enrollment; use own inbox for manual receiving.",
+      "files": []
+    }
+  ]
+}

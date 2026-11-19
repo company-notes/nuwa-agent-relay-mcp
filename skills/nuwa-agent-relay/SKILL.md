@@ -240,6 +240,11 @@ the administrator to enable it. Verify both `coordinate_bots` and
 access to the actual native receipt. Enroll with
 `threadMode: "explicit", firstContactMode: "automatic"`.
 
+An installed OpenMausBot Gateway updates its existing Routine instructions
+in place when adopting this procedure. Keep its verified Wake, identity,
+roster and native bindings. Replace the entire forwarding instruction, so
+the first-contact completion rule applies to every new execution.
+
 **Routine procedure.** For an authenticated message event, read
 `recipientPlatformThreadID` from that event:
 

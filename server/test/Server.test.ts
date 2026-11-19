@@ -46,7 +46,13 @@ test('publishes the V2 Skill without exposing internal transport infrastructure'
   assert.match(expected, /bot:<native ID>/);
   assert.match(expected, /platform-required\s+tool discovery/);
   assert.match(expected, /Omit `from`\s+on an independent connection/);
-  assert.doesNotMatch(expected, /github\.com|\bHost\b|\bWork\b|work_address_id/);
+  assert.match(expected, /agentAddressStartWork/);
+  assert.match(expected, /X-Nuwa-Work-Mode/);
+  assert.match(expected, /X-Nuwa-Work-ID/);
+  assert.match(expected, /Resumed work address/);
+
+  const legacyVocabulary = expected.replace(/X-Nuwa-Work-(?:Mode|ID)/g, '');
+  assert.doesNotMatch(legacyVocabulary, /github\.com|\bHost\b|\bWork\b|work_address_id/);
 });
 
 test('OAuth discovery and missing token remain protected without a Session binding', async () => {

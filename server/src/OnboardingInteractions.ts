@@ -48,6 +48,8 @@ export const ONBOARDING_SCRIPT = `
       '   完整轉交正文、寄件者及原 Relay Thread 回覆上下文，讓本人依 Skill 回覆。',
       '   附上 relayReplyThread({from, threadID, body}) 的呼叫格式，',
       '   帶入實際 Thread ID，from 直接填 recipientBotID（UUID 或 bot: 前綴的原生 ID），由同事填回覆正文。',
+      '   明確原生 Thread 的首次轉交成功後，Gateway 僅以平台實際回傳的 nativeThreadID 呼叫',
+      '   relayGatewayConfirmFirstContact；不可猜測 Thread ID 或以 Relay Thread ID 取代。',
       '   安裝時確認 Routine 實際工具能力。能直接轉交就直接送；GrokBot 的 Routine 若無原生轉交能力但支援 WakeParent，僅交接完整原始事件 JSON，由上層 Gateway 統一組合格式並原生轉交一次。',
       '   Routine 使用自包含指令；日常不讀 Skill、不寫日誌。Gateway 零 MCP 查詢，提交後結束。',
       '4. 回報 Gateway 地址、Wake 狀態及已接入同事名單。'

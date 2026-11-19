@@ -173,9 +173,13 @@ available, following any required host tool discovery. No separate
 
 For explicit native Threads, the receiving adapter must capture the actual
 provider-returned native Thread ID and complete the authorized first-contact
-confirmation. Keep sender/recipient pairs separate. Do not fabricate a native
-Thread ID or use the Relay Thread ID in its place. If confirmation is unavailable,
-report that limitation; do not open multiple native conversations.
+confirmation with
+`relayGatewayConfirmFirstContact({recipientSessionID, senderSessionID, messageID, nativeThreadID})`.
+Use it only after the one successful native first dispatch, with the actual
+provider-returned `nativeThreadID`. Keep sender/recipient pairs separate. Do
+not fabricate a native Thread ID or use the Relay Thread ID in its place. If
+confirmation is unavailable, report that limitation; do not open multiple
+native conversations.
 
 For a direct receiving Agent (not a shared office Gateway), Wake may contain
 only `messageID` and `recipientSessionID`. Confirm it targets the Agent's own

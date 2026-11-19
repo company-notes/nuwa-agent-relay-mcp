@@ -61,6 +61,8 @@ export class NuwaMCPServer {
           'For ordinary office Wake, dispatch once to recipientBotID using the native tool, ' +
           'with zero MCP lookups or extra routing decisions, then stop. For a restricted Routine, ' +
           'choose a trusted WakeParent raw-event handoff at setup; the parent dispatches once. ' +
+          'After an explicit-mode first dispatch only, the authorized Gateway records the actual provider-returned ' +
+          'native Thread ID with relayGatewayConfirmFirstContact; never use a Relay Thread ID as that receipt. ' +
           'Keep routine instructions self-contained without per-event Skill reads. ' +
           'Sending a message, confirmed mailbox arrival, successful Wake delivery and actual ' +
           'Agent startup are separate steps.',

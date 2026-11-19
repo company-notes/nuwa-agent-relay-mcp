@@ -61,8 +61,11 @@ export class NuwaMCPServer {
           'For ordinary office Wake, dispatch once to recipientBotID using the native tool, ' +
           'with zero MCP lookups or extra routing decisions, then stop. For a restricted Routine, ' +
           'choose a trusted WakeParent raw-event handoff at setup; the parent dispatches once. ' +
-          'After an explicit-mode first dispatch only, the authorized Gateway records the actual provider-returned ' +
-          'native Thread ID with relayGatewayConfirmFirstContact; never use a Relay Thread ID as that receipt. ' +
+          'For a reserved explicit first contact (recipientPlatformThreadID is null), create once using the native tool, ' +
+          'then immediately call relayGatewayConfirmFirstContact with the actual native receipt before ending. ' +
+          'For an established explicit route, reuse the supplied native Thread ID with zero MCP calls. ' +
+          'GrokBot platform-managed routing retains the existing native dispatch. ' +
+          'Give the Wake pairing link to the human to open and complete in their own browser. ' +
           'Keep routine instructions self-contained without per-event Skill reads. ' +
           'Sending a message, confirmed mailbox arrival, successful Wake delivery and actual ' +
           'Agent startup are separate steps.',

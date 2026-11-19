@@ -7,7 +7,9 @@ import { MCPToolSet } from './ToolSet';
 export class AddressTools extends MCPToolSet {
   private static readonly schemas = {
     agentID: z.string().uuid(),
-    agentDisplayName: z.string().trim().min(1).max(120).optional(),
+    agentDisplayName: z.string().trim().min(1).max(120).optional().describe(
+      'Your own established persona or native Bot name; for an unnamed independent client use its actual client name (e.g. ChatGPT or Codex).',
+    ),
     selectedAddress: z.string().trim().min(1).max(255),
     address: z.string().min(1).max(255),
   };
@@ -26,8 +28,10 @@ export class AddressTools extends MCPToolSet {
 
     this.register('agentAddressEnsureIdentity',
       'Immediately use after OAuth login. Privately claim or recover this OAuth grant\'s ' +
-      'OWN Agent/Session. If agentDisplayName is provided on an existing binding, update only ' +
-      'this Grant\'s own registered display name to the real native Bot name for Relay routing. ' +
+      'OWN Agent/Session. At setup provide your own established persona or native Bot name; ' +
+      'for an unnamed independent client use its actual client name (e.g. ChatGPT or Codex). ' +
+      'Use agentDisplayName once to repair your own unnamed existing binding without replacing it. ' +
+      'Preserve an existing persona unless its owner explicitly requests a rename. ' +
       'Never pass another coworker\'s name from a Gateway or ask for Runtime/Resume credentials.',
       { agentDisplayName },
       (value) => this.ensureIdentity(value.agentDisplayName as string | undefined));

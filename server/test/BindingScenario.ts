@@ -62,12 +62,16 @@ class MemoryStatement implements BindingStatement {
 
     if (this.sql.startsWith('UPDATE remote_session_bindings SET expires_at')) {
       await this.expiryWriteGate;
-      const [expiresAt, key, sessionID, encryptedRuntimeToken] = this.parameters;
+      const [expiresAt, observedAt, canonical, key, sessionID, encryptedRuntimeToken] = this.parameters;
       const current = this.store.get(key);
 
       if (!current || current.sessionID !== sessionID ||
           current.encryptedRuntimeToken !== encryptedRuntimeToken) {
         return { meta: { changes: 0 } };
+      }
+
+      if (canonical && observedAt >= current.expiresAt) {
+        current.canonicalAddress = canonical;
       }
 
       current.expiresAt = current.expiresAt > expiresAt ? current.expiresAt : expiresAt;
@@ -76,7 +80,7 @@ class MemoryStatement implements BindingStatement {
     }
 
     if (this.sql.startsWith('UPDATE remote_session_bindings')) {
-      const [nextToken, expiresAt, key, sessionID, previousToken] = this.parameters;
+      const [nextToken, expiresAt, canonicalAddress, key, sessionID, previousToken] = this.parameters;
       const current = this.store.get(key);
 
       if (!current || current.sessionID !== sessionID ||
@@ -86,6 +90,7 @@ class MemoryStatement implements BindingStatement {
 
       current.encryptedRuntimeToken = nextToken;
       current.expiresAt = expiresAt;
+      current.canonicalAddress = canonicalAddress;
 
       return { meta: { changes: 1 } };
     }
@@ -134,6 +139,19 @@ export class RemoteMCPScenario {
   readonly background = new TestBackgroundTasks();
   readonly calls: Array<{ url: URL; headers: Headers; body: unknown }> = [];
   readonly activeLeases = new Map<string, string>();
+  organizationSlug = 'nuwa';
+  private readonly agentHandles = new Map<string, string>();
+
+  renameAddress(slug: string, sessionID: string, handle: string) {
+    this.organizationSlug = slug;
+    this.agentHandles.set(sessionID, handle);
+  }
+
+  private canonical(sessionID: string): string {
+    const handle = this.agentHandles.get(sessionID) ?? 'reviewer-' + (sessionID === SESSION_B ? 'b' : 'a');
+
+    return this.organizationSlug + '/' + handle + '/main';
+  }
   readonly env: Env;
   readonly application: HTTPMCPApplication;
   organizationID = 'org-a';
@@ -210,7 +228,7 @@ export class RemoteMCPScenario {
             data: {
               account: { email: 'user@example.com' },
               organization: this.organizationExists
-                ? { id: this.organizationID, slug: 'nuwa' } : null,
+                ? { id: this.organizationID, slug: this.organizationSlug } : null,
               ...(url.searchParams.get('include_grant') === '1'
                 ? { grantFingerprint: principal } : {}),
             },
@@ -222,7 +240,7 @@ export class RemoteMCPScenario {
           this.organizationExists = true;
 
           return Response.json({
-            ok: true, data: { id: this.organizationID, slug: 'nuwa' },
+            ok: true, data: { id: this.organizationID, slug: this.organizationSlug },
           }, { status: 201 });
         }
 
@@ -237,7 +255,7 @@ export class RemoteMCPScenario {
 
           return Response.json({ ok: true, data: {
             id: SESSION_A,
-            canonical: address,
+            canonical: this.canonical(SESSION_A),
             runtime: this.activeLeases.has(SESSION_A)
               ? { expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() }
               : null,
@@ -256,7 +274,7 @@ export class RemoteMCPScenario {
           this.activeLeases.set(SESSION_A, runtime);
 
           return Response.json({ ok: true, data: {
-            session: { id: SESSION_A, canonical: 'nuwa/reviewer-a/main' },
+            session: { id: SESSION_A, canonical: this.canonical(SESSION_A) },
             runtimeToken: runtime,
             resumeToken: RESUME_SECRET + '_owner',
             leaseExpiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
@@ -275,12 +293,13 @@ export class RemoteMCPScenario {
           const runtime = principal[0] === 'b' ? RUNTIME_SECRET + '_b' : RUNTIME_SECRET;
           this.activeLeases.set(sessionID, runtime);
 
+          this.agentHandles.set(sessionID, body?.agentDisplayName === '小晴'
+            ? 'xiaoqing' : 'reviewer-' + principal[0]);
+
           return Response.json({ ok: true, data: {
             session: {
               id: sessionID, agentId: 'agent-' + principal[0],
-              canonical: 'nuwa/' +
-                (body?.agentDisplayName === '小晴' ? 'xiaoqing' : 'reviewer-' + principal[0]) +
-                '/main',
+              canonical: this.canonical(sessionID),
             },
             runtimeToken: runtime,
             resumeToken: RESUME_SECRET,
@@ -303,8 +322,7 @@ export class RemoteMCPScenario {
 
               if (owner && owner === body.runtimeToken) {
                 return Response.json({ ok: true, data: {
-                  session: { id: sessionID, canonical: 'nuwa/reviewer-' +
-                    (sessionID === SESSION_B ? 'b' : 'a') + '/main' },
+                  session: { id: sessionID, canonical: this.canonical(sessionID) },
                   runtimeToken: owner,
                   leaseExpiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
                   renewed: true,
@@ -325,8 +343,7 @@ export class RemoteMCPScenario {
             return Response.json({
               ok: true,
               data: {
-                session: { id: sessionID, canonical: 'nuwa/reviewer-' +
-                  (sessionID === SESSION_B ? 'b' : 'a') + '/main' },
+                session: { id: sessionID, canonical: this.canonical(sessionID) },
                 runtimeToken: runtime,
                 leaseExpiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
               },
@@ -348,7 +365,13 @@ export class RemoteMCPScenario {
 
             return Response.json({
               ok: true,
-              data: { expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() },
+              data: {
+                expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+                ...(url.searchParams.get('include_identity') === '1' ? {
+                  organization: { id: this.organizationID, slug: this.organizationSlug },
+                  session: { id: sessionID, canonical: this.canonical(sessionID) },
+                } : {}),
+              },
             });
           }
 
@@ -396,7 +419,7 @@ export class RemoteMCPScenario {
             data: {
               id: other ? SESSION_B : SESSION_A,
               agentId: other ? 'agent-b' : 'agent-a',
-              canonical: other ? 'nuwa/reviewer-b/main' : 'nuwa/reviewer-a/main',
+              canonical: this.canonical(other ? SESSION_B : SESSION_A),
             },
           });
         }
@@ -422,7 +445,10 @@ export class RemoteMCPScenario {
         recentThreadMessages: [{ body: 'Previous context' }],
       } }, {
         status: init?.method === 'POST' ? 201 : 200,
-        headers: { 'x-nuwa-lease-expires-at': new Date(Date.now() + 15 * 60_000).toISOString() },
+        headers: {
+          'x-nuwa-lease-expires-at': new Date(Date.now() + 15 * 60_000).toISOString(),
+          'x-nuwa-canonical-address': this.canonical(sessionID),
+        },
       });
     };
   }

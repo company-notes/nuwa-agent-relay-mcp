@@ -23,6 +23,8 @@ test('publishes the V2 Skill without exposing internal transport infrastructure'
   assert.match(expected, /^---\nname: nuwa-agent-relay\n/);
   assert.match(expected, /sendToAgent/);
   assert.match(expected, /Independent client/);
+  assert.match(expected, /unique short names/);
+  assert.match(expected, /ChatGPT or Codex/);
   assert.match(expected, /No Gateway, Bot enrollment or shared office connection/);
   assert.match(expected, /relayInbox/);
   assert.match(expected, /WakeParent once with the/);
@@ -209,7 +211,7 @@ test('Skill-first OAuth alone privately creates one persistent Agent/Session and
   }
 });
 
-test('an existing coworker restores its own identity and updates its native display name only during setup', async () => {
+test('an existing unnamed ChatGPT client sets its own display name without replacing its Session', async () => {
   const scenario = new RemoteMCPScenario();
   scenario.install();
 
@@ -222,7 +224,7 @@ test('an existing coworker restores its own identity and updates its native disp
     assert.equal(scenario.displayNameUpdates.length, 0);
 
     const updated = await scenario.tool('agentAddressEnsureIdentity', {
-      agentDisplayName: '大熊',
+      agentDisplayName: 'ChatGPT',
     });
     const same = JSON.parse(updated.result.content[0].text) as {
       sessionID: string; canonical: string; created: boolean;
@@ -233,7 +235,7 @@ test('an existing coworker restores its own identity and updates its native disp
     assert.equal(same.created, false);
     assert.equal(scenario.claimCount, 1);
     assert.deepEqual(scenario.displayNameUpdates, [{
-      agentID: 'agent-a', name: '大熊', principal: 'a',
+      agentID: 'agent-a', name: 'ChatGPT', principal: 'a',
     }]);
 
     const secondGrant = await scenario.tool('agentAddressEnsureIdentity', {}, 'oauth-b');
@@ -248,10 +250,45 @@ test('an existing coworker restores its own identity and updates its native disp
     assert.equal(scenario.displayNameUpdates[0].agentID, 'agent-a');
 
     const sent = await scenario.tool('sendToAgent', {
-      to: '大熊', message: 'Normal call should not rename any Agent.',
+      to: '小晴', message: 'Normal call should not rename any Agent.',
     });
     assert.equal(sent.result.isError, undefined);
     assert.equal(scenario.displayNameUpdates.length, 2);
+  } finally {
+    scenario.restore();
+  }
+});
+
+test('keeps the same independent Session after an Organization and Agent rename', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const original = await scenario.tool('agentAddressEnsureIdentity', {});
+    const identity = JSON.parse(original.result.content[0].text);
+    const row = [...scenario.database.rows.values()][0];
+
+    scenario.renameAddress('nuwa-team', identity.sessionID, 'chatgpt');
+    const sent = await scenario.tool('sendToAgent', { to: '小晴', message: 'Same identity after rename.' });
+    assert.equal(sent.result.isError, undefined);
+    assert.equal(scenario.heartbeatCount, 0);
+    assert.equal(row.sessionID, identity.sessionID);
+    assert.equal(row.canonicalAddress, 'nuwa-team/chatgpt/main');
+
+    const updated = await scenario.tool('agentAddressEnsureIdentity', { agentDisplayName: 'ChatGPT' });
+    const result = JSON.parse(updated.result.content[0].text);
+    assert.equal(updated.result.isError, undefined);
+    assert.equal(result.sessionID, identity.sessionID);
+    assert.equal(result.canonical, 'nuwa-team/chatgpt/main');
+    assert.equal(scenario.claimCount, 1);
+
+    scenario.renameAddress('nuwa-ai', identity.sessionID, 'assistant');
+    row.expiresAt = new Date(Date.now() - 60_000).toISOString();
+
+    const restored = await scenario.tool('agentAddressEnsureIdentity', {});
+    assert.equal(restored.result.isError, undefined);
+    assert.equal(JSON.parse(restored.result.content[0].text).canonical, 'nuwa-ai/assistant/main');
+    assert.equal(scenario.claimCount, 1);
   } finally {
     scenario.restore();
   }
@@ -650,6 +687,7 @@ test('one MCP send call passes the familiar Bot name unchanged to Relay for rout
     const schemas = JSON.stringify(await scenario.toolSchemas());
     assert.doesNotMatch(schemas, /agentAddressFindByName/);
     assert.match(schemas, /Relay resolves names in/);
+    assert.match(schemas, /unique short name/);
     assert.deepEqual(await scenario.toolSchemas(), JSON.parse(schemas),
       'Static tool definitions remain identical across independent MCP requests.');
   } finally {

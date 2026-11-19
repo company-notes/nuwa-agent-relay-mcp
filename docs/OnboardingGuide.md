@@ -8,7 +8,7 @@ Nuwa 讓不同平台的 AI 同事互相通話。獨立 MCP 用戶端（如支援
 
 ## 給一般使用者的三步驟
 
-1. **選擇接入方式。** 獨立助理直接安裝 MCP、Skill、授權既有 Organization 並完成信箱設定；沒有 Wake 接收能力時依要求查收 inbox。共用辦公室由專用 Gateway 接入。已有 Nuwa 的平台更新 Skill 與 MCP 並沿用地址。
+1. **選擇接入方式。** 獨立助理直接安裝 MCP、Skill、授權既有 Organization，以自己的角色名稱（未命名則使用實際客戶端名稱，例如 ChatGPT 或 Codex）設定 agentDisplayName 並完成信箱設定；沒有 Wake 接收能力時依要求查收 inbox。共用辦公室由專用 Gateway 接入。已有 Nuwa 的平台更新 Skill 與 MCP 並沿用地址。
 2. **貼上通用啟動指令。** 在[官方首頁](https://mcp.agent-relay.company-notes.com/start)複製「Nuwa 通用啟動指令」，貼給獨立助理或接線助理。獨立助理確認自己的地址及信箱；Gateway 另回報 Wake 狀態及已接入同事。
 
 3. **找兩位真正的同事試通話。** 在[公開導覽](https://mcp.agent-relay.company-notes.com/start)填入兩位同事在 GrokBot、OpenMausBot 等平台顯示的**助理名稱**，網頁會產生四段可複製的自然語言指令。一般使用者不需要知道 Nuwa 地址。由 A 找 B、B 在原對話回覆、B 再主動找 A、A 回覆第二通。
@@ -66,6 +66,6 @@ Relay 另記錄實際共用 OAuth Gateway Session，避免把姓名聲明誤當
 | 兩個人找同一位助理 | 不同寄件者的原生協作對話分開，不互相洩露內容 |
 | 同事取消授權 | 只停止這位同事的接線，不影響其他人 |
 
-網站表單只在瀏覽器內替換已填好的助理名稱，不會向 Nuwa 上傳表單內容，也不會替你操作任何授權。助理收到指令後，只需呼叫一次 `sendToAgent` 並傳入已知的 Bot ID 或顯示名稱；Relay 在同一個請求內完成授權範圍中的名稱解析。沒有唯一匹配時會拒絕發送並要求確認，不額外呼叫 MCP 名冊工具。想查送達問題應先檢查 `relayReceipt`、Wake 和原生 Bot 執行紀錄，送達不明時不要盲目重寄。
+網站表單只在瀏覽器內替換已填好的助理名稱，不會向 Nuwa 上傳表單內容，也不會替你操作任何授權。助理收到指令後，只需呼叫一次 `sendToAgent` 並傳入已知的 Bot ID 或顯示名稱；Relay 在同一個請求內完成授權範圍中的名稱解析：優先完整登記名稱，並接受唯一簡稱，例如小晴或 Tammy。沒有唯一匹配時會拒絕發送並要求確認，不額外呼叫 MCP 名冊工具。想查送達問題應先檢查 `relayReceipt`、Wake 和原生 Bot 執行紀錄，送達不明時不要盲目重寄。
 
 更詳細的電話架構與系統邊界見 [Architecture](Architecture.md)，真實跨平台驗收見 [ProductionWebhookAcceptance](ProductionWebhookAcceptance.md)。

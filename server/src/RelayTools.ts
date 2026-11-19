@@ -7,6 +7,8 @@ import { MCPToolSet } from './ToolSet';
 export class RelayTools extends MCPToolSet {
   private static readonly IDENTITY = 'registered native Bot UUID (or bot:<native ID>), ' +
     'complete registered display name, canonical Nuwa address or verified Email alias';
+  private static readonly RECIPIENT = RelayTools.IDENTITY + ', or a unique short name (e.g. 小晴, Tammy)';
+
   private static readonly FROM = 'On a shared office connection, pass your own ' +
     RelayTools.IDENTITY + ' as from; prefer the known native Bot ID. Omit from on an independent Session.';
 
@@ -17,7 +19,7 @@ export class RelayTools extends MCPToolSet {
     messageID: z.string().uuid(),
     threadID: z.string().uuid(),
     body: z.string().min(1).max(100_000),
-    to: z.string().min(1).max(255).describe(RelayTools.IDENTITY),
+    to: z.string().min(1).max(255).describe(RelayTools.RECIPIENT),
     from: z.string().trim().min(1).max(255).optional().describe(RelayTools.FROM),
     subject: RelayTools.subject,
     optionalSubject: RelayTools.optionalSubject,
@@ -83,10 +85,10 @@ export class RelayTools extends MCPToolSet {
     const { to, from, body, optionalSubject, artifactLinks, threadID } = RelayTools.schemas;
 
     this.register('sendToAgent',
-      'Send to a ' + RelayTools.IDENTITY + ', creating a new Relay Thread. ' +
+      'Send to a ' + RelayTools.RECIPIENT + ', creating a new Relay Thread. ' +
       'Prefer a known native Bot ID from the trusted platform directory, not a group/channel ID. ' +
-      'Relay resolves names in this SAME request, as well as native Bot IDs and aliases; ' +
-      'no extra MCP lookup is needed. Ambiguous or unknown targets are rejected before delivery. ' +
+      'Relay resolves names in this SAME request, preferring exact registered names before unique short names. ' +
+      'Native Bot IDs and aliases also work. No extra MCP lookup is needed. Ask only if the target is ambiguous or unavailable. ' +
       'Use relayReplyThread to continue an existing Thread; submission is not delivery. ' +
       RelayTools.FROM + ' ' +
       'Relay maps it to the coworker Session and records the shared Gateway actor.',

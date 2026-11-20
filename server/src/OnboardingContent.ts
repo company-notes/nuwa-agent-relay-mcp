@@ -116,7 +116,7 @@ export const ONBOARDING_HTML = `<!doctype html>
       <label for="colleagueB"><span id="labelB" class="contact-label">助理 B 的名稱</span><input id="colleagueB" type="text" maxlength="255" autocomplete="off" spellcheck="false" placeholder="例如：大熊"></label>
     </div>
     <p id="nameHint" class="hint" role="status">填入平台上看到的助理名稱即可；Nuwa 會在發訊時查找已連線的同事。</p>
-    <p class="hint">依序將四段指令貼給 A、B、B、A；每一步先確認對方實際收到，再進行下一步。</p>
+    <p class="hint">先請 A 發送，等待 B 自然收到並回覆，再請 B 主動聯絡 A。收件方實際收到後才使用回覆指令；若已自動回覆，可略過該段。</p>
     <div class="copy-card"><div class="copy-head"><strong>① 給 A：主動聯絡 B</strong><button type="button" class="copy" data-copy="sendPrompt">複製指令</button></div><pre class="prompt" id="sendPrompt">填入上面的聯絡對象，就能直接複製。</pre></div>
     <div class="copy-card"><div class="copy-head"><strong>② 給 B：在原本的對話回答</strong><button type="button" class="copy" data-copy="replyPrompt">複製指令</button></div><pre class="prompt" id="replyPrompt">填入上面的聯絡對象，就能直接複製。</pre></div>
     <div class="copy-card"><div class="copy-head"><strong>③ 給 B：主動聯絡 A</strong><button type="button" class="copy" data-copy="returnPrompt">複製指令</button></div><pre class="prompt" id="returnPrompt">填入上面的聯絡對象，就能直接複製。</pre></div>

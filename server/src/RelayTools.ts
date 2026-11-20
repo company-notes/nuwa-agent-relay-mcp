@@ -162,7 +162,8 @@ export class RelayTools extends MCPToolSet {
     const { verificationId, challenge } = RelayTools.schemas;
 
     this.register('relayBeginWakePairing',
-      'Create an OAuth-protected private browser link for Session Wake pairing.',
+      'Create an OAuth-protected private browser link for the human user to open and complete ' +
+      'with their webhook HTTPS URL and key in the secure form. Return the link to the user.',
       {},
       () => this.client.call('POST', '/v2/wake-pairings'));
 

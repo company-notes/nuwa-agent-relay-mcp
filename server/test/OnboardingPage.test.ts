@@ -73,17 +73,16 @@ test('office-wide setup does not ask the user to register each coworker by hand'
   assert.match(ONBOARDING_HTML, /id="gatewayPrompt"/);
   assert.doesNotMatch(ONBOARDING_HTML, /id="gatewayPromptA"/);
   assert.doesNotMatch(ONBOARDING_HTML, /id="colleaguePromptA"/);
-  assert.match(ONBOARDING_HTML, /如果這個平台已經安裝過/);
-  assert.match(ONBOARDING_HTML, /預設連接辦公室同事/);
-  assert.match(ONBOARDING_HTML, /獨立 MCP 用戶端直接接入，不需要總機/);
-  assert.match(ONBOARDING_HTML, /Nuwa 通用啟動指令/);
-  assert.match(ONBOARDING_HTML, /同事名稱與 Bot ID/);
-  assert.match(ONBOARDING_HTML, /辦公室只需要一個 Gateway Wake/);
-  assert.match(ONBOARDING_HTML, /接線助理從平台名錄取得同事名稱與 Bot ID/);
+  assert.match(ONBOARDING_HTML, /已接入過的助理沿用原有地址和有效設定/);
+  assert.match(ONBOARDING_HTML, /辦公室同事可由接線助理一次接入/);
+  assert.match(ONBOARDING_HTML, /Codex 等開發工具可直接接入/);
+  assert.match(ONBOARDING_HTML, /id="platform"/);
+  assert.match(ONBOARDING_HTML, /接線助理會從平台名錄取得每位同事的名稱和原生識別碼（Bot ID）/);
+  assert.match(ONBOARDING_HTML, /共用一個自動來訊通知入口（Wake）/);
   assert.match(ONBOARDING_HTML, /id="verifyPrompt"/);
   assert.match(ONBOARDING_HTML, /助理 A 的名稱/);
   assert.match(ONBOARDING_HTML, /助理 B 的名稱/);
-  assert.match(ONBOARDING_HTML, /不需要知道 Nuwa 的內部地址/);
+  assert.match(ONBOARDING_HTML, /填入平台上看到的助理名稱即可/);
   assert.doesNotMatch(ONBOARDING_HTML, /id="addressA"|id="addressB"|company\/alice\/main/);
   assert.doesNotMatch(ONBOARDING_HTML, /告訴接線助理，你要讓哪些同事加入/);
   assert.doesNotMatch(ONBOARDING_HTML, /尚未提供在現行 Skill/);
@@ -110,8 +109,6 @@ test('real HTTP routes keep Skill and OAuth protected', async () => {
   assert.match(ONBOARDING_SCRIPT, /依最新版 Skill/);
   assert.match(ONBOARDING_SCRIPT, /安裝或更新 Skill 與 MCP/);
   assert.match(ONBOARDING_SCRIPT, /完成 Organization 授權/);
-  assert.match(ONBOARDING_SCRIPT, /測試字詞是星河/);
-  assert.match(ONBOARDING_SCRIPT, /測試字詞是月光/);
   assert.doesNotMatch(ONBOARDING_SCRIPT,
     /relayProvisionAgentMailbox|relayWakeSubscription/);
   assert.doesNotMatch(ONBOARDING_SCRIPT, /relayRegisterWake|relayVerifyWake|remote-bind/);
@@ -128,9 +125,11 @@ test('real HTTP routes keep Skill and OAuth protected', async () => {
 });
 
 test('GrokBot and OpenMausBot display names drive everyday bidirectional calls', () => {
-  const ids = ['gatewayPrompt', 'sendPrompt', 'replyPrompt', 'returnPrompt',
-    'verifyPrompt', 'colleagueA', 'colleagueB', 'nameHint', 'toast'];
+  const ids = Array.from(ONBOARDING_HTML.matchAll(/\bid="([^"]+)"/g), (match) => match[1]);
   const elements = new Map(ids.map((id) => [id, fakeElement()]));
+
+  elements.get('platform')!.value = 'grokbot';
+  elements.get('installMethod')!.value = 'direct';
   elements.get('colleagueA')!.value = '小晴';
   elements.get('colleagueB')!.value = '大熊';
 
@@ -186,19 +185,16 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   assert.match(gateway, /Nuwa MCP：https:\/\/mcp\.agent-relay\.company-notes\.com\/mcp/);
   assert.match(gateway, /安裝或更新 Skill 與 MCP，完成 Organization 授權/);
   assert.match(gateway, /沿用既有身分/);
-  assert.match(gateway, /獨立 MCP 用戶端/);
-  assert.match(gateway, /agentAddressEnsureIdentity/);
-  assert.match(gateway, /例如 ChatGPT 或 Codex/);
-  assert.match(gateway, /agentDisplayName/);
-  assert.match(gateway, /無須 Gateway/);
-  assert.match(gateway, /沒有自動接收能力就依使用者要求查收/);
+  assert.match(gateway, /GrokBot 使用 platform 模式/);
+  assert.match(gateway, /配對連結直接交給使用者/);
+  assert.doesNotMatch(gateway, /relayGatewayConfirmFirstContact|explicit／automatic/);
   assert.match(gateway, /GrokBot 的 Routine 若無原生轉交能力但支援 WakeParent，僅交接完整原始事件 JSON/);
   assert.match(gateway, /Routine 使用自包含指令/);
   assert.match(gateway, /唯一的 Wake 接收例行任務並完成驗證/);
   assert.match(gateway, /沿用有效的接線/);
   assert.match(gateway, /接收入口或金鑰變更時，以同一 Gateway 身分重新配對/);
-  assert.match(gateway, /從平台可信 Bot 名錄取得真實同事的名稱與 Bot ID（排除自己）/);
-  assert.match(gateway, /批次完成全部同事的接入，沿用既有地址與名錄/);
+  assert.match(gateway, /從平台可信 Bot 名錄取得真實同事的名稱與 Bot ID（排除自己及群組／頻道）/);
+  assert.match(gateway, /批次接入同事，沿用既有地址與名錄/);
   assert.match(gateway, /同步新增與改名，保留獨立成員的接入模式/);
   assert.match(gateway, /recipientBotID 使用平台原生工具轉交一次/);
   assert.match(gateway, /完整轉交正文、寄件者及原 Relay Thread 回覆上下文/);
@@ -206,7 +202,6 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   assert.match(gateway, /relayReplyThread\(\{from, threadID, body\}\)/);
   assert.match(gateway, /帶入實際 Thread ID，from 直接填 recipientBotID/);
   assert.match(gateway, /排除群組／頻道/);
-  assert.match(gateway, /獨立連線省略 from；平台允許時直接呼叫/);
   assert.match(gateway, /零 MCP 查詢，提交後結束/);
   assert.match(gateway, /回報 Gateway 地址、Wake 狀態及已接入同事名單/);
   assert.doesNotMatch(gateway, /MailTrigger|Default Session|sendToAgent|agentAddressSelectSession|歷史查詢|小晴|大熊|Cosmo|nuwa\/xiaoqing/);
@@ -216,26 +211,26 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   const returned = elements.get('returnPrompt')!.textContent;
   const verify = elements.get('verifyPrompt')!.textContent;
 
-  assert.match(send, /「大熊」助理/);
+  assert.match(send, /聯絡「大熊」/);
   assert.match(send, /測試字詞是星河/);
   assert.match(send, /直接發送一次/);
   assert.match(send, /唯一簡稱/);
   assert.match(send, /自己的 from/);
-  assert.match(reply, /「小晴」助理/);
+  assert.match(reply, /查收「小晴」/);
   assert.match(reply, /收到星河/);
-  assert.match(reply, /接續原本的 Relay Thread/);
+  assert.match(reply, /接續原本的對話/);
   assert.match(reply, /自己的 from/);
   assert.match(reply, /不需要額外查詢/);
   assert.match(reply, /實際收到完整訊息後直接回覆一次/);
   assert.match(reply, /若已回覆，回報結果即可/);
-  assert.match(returned, /「小晴」助理/);
+  assert.match(returned, /聯絡「小晴」/);
   assert.match(returned, /測試字詞是月光/);
   assert.match(returned, /直接發送一次/);
   assert.match(returned, /唯一簡稱/);
   assert.match(returned, /自己的 from/);
-  assert.match(verify, /「大熊」助理/);
+  assert.match(verify, /查收「大熊」/);
   assert.match(verify, /收到月光/);
-  assert.match(verify, /在那通 Relay Thread 回覆/);
+  assert.match(verify, /接續原本的對話/);
   assert.match(verify, /不需要額外查詢/);
 
   for (const prompt of [send, reply, returned, verify]) {
@@ -260,8 +255,8 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   elements.get('colleagueB')!.value = '宇宙小幫手';
   elements.get('colleagueB')!.callbacks.get('input')?.();
   const updated = elements.get('sendPrompt')!.textContent;
-  assert.match(updated, /「宇宙小幫手」助理/);
-  assert.doesNotMatch(updated, /「大熊」助理/);
+  assert.match(updated, /聯絡「宇宙小幫手」/);
+  assert.doesNotMatch(updated, /聯絡「大熊」/);
 
   copySend.callbacks.get('click')?.();
   assert.equal(copyCalls[2], updated);
@@ -283,4 +278,44 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   copySend.callbacks.get('click')?.();
   assert.equal(copyCalls.length, 3);
   assert.match(elements.get('nameHint')!.textContent, /不得換行/);
+
+  elements.get('platform')!.value = 'openmausbot';
+  elements.get('platform')!.callbacks.get('change')?.();
+  elements.get('colleagueA')!.value = 'Cosmo';
+  elements.get('colleagueB')!.value = '小美';
+  elements.get('colleagueB')!.callbacks.get('input')?.();
+
+  const explicitGateway = elements.get('gatewayPrompt')!.textContent;
+
+  assert.match(explicitGateway, /每位同事的 nuwa-agent-relay 連接器/);
+  assert.match(explicitGateway, /未開啟時列出助理名稱，請管理者開啟/);
+  assert.match(explicitGateway, /explicit／automatic/);
+  assert.match(explicitGateway, /thread: "new"/);
+  assert.match(explicitGateway, /relayGatewayConfirmFirstContact，確認成功才結束/);
+  assert.match(explicitGateway, /為字串時直接使用該 ID/);
+  assert.match(explicitGateway, /完整替換既有轉交指令/);
+  assert.doesNotMatch(explicitGateway, /WakeParent/);
+  assert.match(elements.get('sendPrompt')!.textContent, /聯絡「小美」/);
+  assert.match(elements.get('sendPrompt')!.textContent, /送出後結束/);
+  assert.match(elements.get('returnPrompt')!.textContent, /聯絡「Cosmo」/);
+  assert.match(elements.get('replyPrompt')!.textContent, /訊息自然到達後/);
+
+  elements.get('platform')!.value = 'codex';
+  elements.get('platform')!.callbacks.get('change')?.();
+
+  const independent = elements.get('gatewayPrompt')!.textContent;
+
+  assert.match(independent, /無須 Gateway/);
+  assert.match(independent, /agentAddressStartWork/);
+  assert.match(independent, /X-Nuwa-Work-Mode: codex/);
+  assert.doesNotMatch(independent, /relayGatewayConfirmFirstContact|WakeParent/);
+  assert.equal(elements.get('installMethodPicker')!.hidden, false);
+  assert.equal(elements.get('directOptions')!.hidden, false);
+  assert.equal(elements.get('studioOptions')!.hidden, true);
+
+  elements.get('installMethod')!.value = 'studio';
+  elements.get('installMethod')!.callbacks.get('change')?.();
+
+  assert.equal(elements.get('directOptions')!.hidden, true);
+  assert.equal(elements.get('studioOptions')!.hidden, false);
 });

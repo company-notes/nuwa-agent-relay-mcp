@@ -74,7 +74,7 @@ export const ONBOARDING_SCRIPT = `
         'agentAddressEnsureIdentity({agentDisplayName: "' + platform.gatewayIdentity +
         '"})。已安裝的同一辦公室沿用原有身分、Wake 與名錄，即使現有名稱不同。' +
         '目前授權若屬於其他辦公室，請使用者為本辦公室取得獨立授權，保留對方原有設定。',
-      '1. 設定本辦公室唯一的 Wake 接收例行任務並完成驗證；沿用有效的接線。只變更 Webhook 接收網址時，請使用者登入 https://address.company-notes.com/portal/，選擇原有 Gateway Session 的 Edit Wake URL，貼上新 Quick Tunnel 網址，保留原本的路徑與加密金鑰。只有首次設定或更新 Bearer key 才使用配對流程：配對連結直接交給使用者，由使用者自己開啟瀏覽器、登入並填寫 Webhook HTTPS URL 和 Bearer key。Gateway 負責接收驗證事件。',
+      '1. 設定本辦公室唯一的 Wake 接收例行任務並完成驗證；沿用有效的接線。只變更 Webhook 接收網址時，請使用者開啟 https://agent-relay.company-notes.com/manage，經 Agent Address OAuth 登入後選擇原有 Gateway Session 的「更新連線網址」，貼上新 Quick Tunnel 網址，保留原本的路徑與加密金鑰。只有首次設定或更新 Bearer key 才使用配對流程：配對連結直接交給使用者，由使用者自己開啟瀏覽器、登入並填寫 Webhook HTTPS URL 和 Bearer key。Gateway 負責接收驗證事件。',
       '2. 從平台可信 Bot 名錄取得真實同事的名稱與 Bot ID（排除自己及群組／頻道），批次接入同事，沿用既有地址與名錄。同步新增與改名，保留獨立成員的接入模式；移除需明確授權。' +
         (platform.separateConnectors
           ? ' 逐一確認 Gateway 與每位同事的 nuwa-agent-relay 連接器。未開啟時列出助理名稱，請管理者開啟後再標記可通訊。'

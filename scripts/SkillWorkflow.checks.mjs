@@ -41,6 +41,22 @@ function scenarios(skill, onboarding, check) {
       check(/每位同事.*連接器/.test(setup) && /未開啟.*管理者/.test(setup),
         'OpenMausBot must check every coworker connector and name missing activation to the administrator.');
     }],
+    ['Changing only the verified Wake URL uses Agent Address Portal, preserving its key', () => {
+      for (const platform of ['grokbot', 'openmausbot']) {
+        const office = new OnboardingScenario(onboarding, platform);
+        const setup = office.prompt('gateway');
+
+        check(setup.includes('Edit Wake URL') &&
+          setup.includes('address.company-notes.com/portal/'),
+          'The selected office must be directed to its existing Session Wake URL editor.');
+        check(setup.includes('只有首次設定或更新 Bearer key 才使用配對流程'),
+          'Key changes and first pairing remain separate from URL-only relocation.');
+      }
+
+      check(skill.includes('Edit Wake URL') &&
+        skill.includes('Quick Tunnel') && skill.includes('preserves'),
+        'The canonical Skill must explain URL-only relocation and retained credentials.');
+    }],
     ['OpenMausBot bidirectional test ends after sender submission', () => {
       const office = new OnboardingScenario(onboarding, 'openmausbot');
 

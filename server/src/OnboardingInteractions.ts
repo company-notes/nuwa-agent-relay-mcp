@@ -10,15 +10,16 @@ export const ONBOARDING_SCRIPT = `
 
   var platforms = {
     grokbot: {
-      name: 'GrokBot', office: true, examples: ['小晴', '大熊'],
+      name: 'GrokBot', office: true, gatewayIdentity: 'grokbot', examples: ['小晴', '大熊'],
       setup: 'GrokBot 使用 platform 模式。安裝時確認 Routine 的實際工具能力；能直接轉交就直接送。GrokBot 的 Routine 若無原生轉交能力但支援 WakeParent，僅交接完整原始事件 JSON，由上層 Gateway 組合格式並原生轉交一次。'
     },
     openmausbot: {
-      name: 'OpenMausBot', office: true, separateConnectors: true, examples: ['Cosmo', '同事 B'],
+      name: 'OpenMausBot', office: true, gatewayIdentity: 'openmausbot',
+      separateConnectors: true, examples: ['Cosmo', '同事 B'],
       setup: '確認接收 Routine 能呼叫 coordinate_bots、relayGatewayConfirmFirstContact 且可讀取可信原生回執，為同事設定 explicit／automatic。將 Skill 的 OpenMausBot 完整流程放入 Routine（已安裝時完整替換既有轉交指令，沿用有效的 Wake 與名錄）：recipientPlatformThreadID 為 null 時用 thread: "new" 轉交一次，立即用 Wake 的三個識別碼及原生回執呼叫 relayGatewayConfirmFirstContact，確認成功才結束；為字串時直接使用該 ID 轉交一次後結束。'
     },
     rakazo: {
-      name: 'Rakazo', office: true, examples: ['同事 A', '同事 B'],
+      name: 'Rakazo', office: true, gatewayIdentity: 'rakazo', examples: ['同事 A', '同事 B'],
       setup: '先確認 Rakazo 的原生助理名錄、通知入口、轉交工具及原生對話識別能力。依官方 Skill 確認適用的接線模式；將尚無法驗證的能力如實回報，完成具備能力的接入與實際通訊驗證。'
     },
     codex: {
@@ -68,6 +69,11 @@ export const ONBOARDING_SCRIPT = `
       'Nuwa MCP：' + mcpURL,
       '',
       '請依最新版 Skill，安裝或更新 Skill 與 MCP，完成 Organization 授權，沿用既有身分。',
+      '本平台新辦公室的 Gateway 身分名稱固定使用「' + platform.gatewayIdentity +
+        '」。先確認目前連線屬於這個辦公室；首次建立時使用 ' +
+        'agentAddressEnsureIdentity({agentDisplayName: "' + platform.gatewayIdentity +
+        '"})。已安裝的同一辦公室沿用原有身分、Wake 與名錄，即使現有名稱不同。' +
+        '目前授權若屬於其他辦公室，請使用者為本辦公室取得獨立授權，保留對方原有設定。',
       '1. 設定本辦公室唯一的 Wake 接收例行任務並完成驗證；沿用有效的接線。接收入口或金鑰變更時，以同一 Gateway 身分重新配對。將配對連結直接交給使用者，由使用者自己開啟瀏覽器、登入並把 Webhook HTTPS URL 和 Bearer key 貼入安全表單。Gateway 負責接收驗證事件。',
       '2. 從平台可信 Bot 名錄取得真實同事的名稱與 Bot ID（排除自己及群組／頻道），批次接入同事，沿用既有地址與名錄。同步新增與改名，保留獨立成員的接入模式；移除需明確授權。' +
         (platform.separateConnectors
@@ -159,13 +165,13 @@ export const ONBOARDING_SCRIPT = `
     var name = platform.name;
 
     document.getElementById('platformIntro').textContent = office
-      ? '在 ' + name + ' 內指定或建立一位接線助理（Gateway），由它為整個辦公室接收、轉交訊息，並接入真正工作的同事。'
+      ? '在 ' + name + ' 內指定或建立一位接線助理（Gateway），由它為整個辦公室接收、轉交訊息，並接入真正工作的同事。新安裝的接線身分名稱為「' + platform.gatewayIdentity + '」。'
       : name + ' 可直接使用自己的通訊連線和聯絡地址。' +
         (platform.fixed ? '目前使用固定地址；獨立工作地址功能尚待支援。' : '每個獨立工作（Session）有自己的工作地址，恢復工作時沿用原地址。');
 
     document.getElementById('installTitle').textContent = office ? '請接線助理帶你設定' : '安裝 Nuwa 至 ' + name;
     document.getElementById('installIntro').textContent = office
-      ? '將下面的指令貼給 ' + name + ' 的接線助理。它會依官方指南完成安裝，並在需要登入或授權時請你操作。'
+      ? '將下面的指令貼給 ' + name + ' 的接線助理。新安裝的 Gateway 名稱為「' + platform.gatewayIdentity + '」；既有辦公室沿用原身分。它會依官方指南完成安裝，並在需要登入或授權時請你操作。'
       : '依你的需求選擇一種方式：一次設定多種工具，或只設定目前的 ' + name + '。';
 
     document.getElementById('setupPromptTitle').textContent = name + (office ? ' 接線助理安裝指令' : ' 直接安裝指令');

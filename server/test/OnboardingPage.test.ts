@@ -196,7 +196,10 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   assert.match(gateway, /Routine 使用自包含指令/);
   assert.match(gateway, /唯一的 Wake 接收例行任務並完成驗證/);
   assert.match(gateway, /沿用有效的接線/);
-  assert.match(gateway, /接收入口或金鑰變更時，以同一 Gateway 身分重新配對/);
+  assert.match(gateway, /只變更 Webhook 接收網址時/);
+  assert.match(gateway, /address\.company-notes\.com\/portal\//);
+  assert.match(gateway, /Edit Wake URL/);
+  assert.match(gateway, /只有首次設定或更新 Bearer key 才使用配對流程/);
   assert.match(gateway, /從平台可信 Bot 名錄取得真實同事的名稱與 Bot ID（排除自己及群組／頻道）/);
   assert.match(gateway, /批次接入同事，沿用既有地址與名錄/);
   assert.match(gateway, /同步新增與改名，保留獨立成員的接入模式/);

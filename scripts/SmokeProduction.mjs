@@ -88,6 +88,24 @@ assert.doesNotMatch(skillText, /agentAddressFindByName/,
   'Name resolution must not add a second MCP tool call.');
 assert.doesNotMatch(skillText, /human provides the Session ID|access token and loses the binding/i);
 
+// The Relay-owned management UI must already be live before onboarding links to it.
+const relayManagementOrigin = 'https://agent-relay.company-notes.com';
+const relayManagement = await fetch(relayManagementOrigin + '/manage', {
+  redirect: 'manual',
+  signal: AbortSignal.timeout(20_000),
+});
+console.log('Relay /manage: HTTP ' + relayManagement.status);
+assert.equal(relayManagement.status, 200, 'Relay Wake management page must be reachable.');
+assert.match(await relayManagement.text(), /使用 Agent Address 登入/);
+
+const relayManagementScript = await fetch(relayManagementOrigin + '/manage.js', {
+  redirect: 'manual',
+  signal: AbortSignal.timeout(20_000),
+});
+console.log('Relay /manage.js: HTTP ' + relayManagementScript.status);
+assert.equal(relayManagementScript.status, 200, 'Relay Wake management script must load.');
+assert.match(await relayManagementScript.text(), /code_challenge_method/);
+
 const metadata = await request('/.well-known/oauth-protected-resource/mcp');
 assert.equal(metadata.status, 200, 'OAuth resource discovery must be published.');
 const oauth = await metadata.json();

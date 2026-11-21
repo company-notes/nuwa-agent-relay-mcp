@@ -49,7 +49,9 @@ assert.match(promptText, /sendPrompt\('colleagueB', '星河', false, platform\)/
 assert.match(promptText, /sendPrompt\('colleagueA', '月光', true, platform\)/);
 assert.match(promptText, /安裝或更新 Skill 與 MCP/);
 assert.match(promptText, /唯一的 Wake 接收例行任務並完成驗證/);
-assert.match(promptText, /接收入口或金鑰變更時，以同一 Gateway 身分重新配對/);
+assert.match(promptText, /只變更 Webhook 接收網址時/);
+assert.match(promptText, /agent-relay\.company-notes\.com\/manage/);
+assert.match(promptText, /只有首次設定或更新 Bearer key 才使用配對流程/);
 assert.match(promptText, /recipientBotID 使用平台原生工具轉交一次/);
 assert.match(promptText, /零 MCP 查詢，提交後結束/);
 assert.match(promptText, /relayReplyThread\(\{from, threadID, body\}\)/);
@@ -71,6 +73,8 @@ const skillText = await skill.text();
 assert.match(skillText, /agentAddressEnsureIdentity/);
 assert.match(skillText, /Independent client/);
 assert.match(skillText, /WakeParent once with the/);
+assert.match(skillText, /Existing Wake URL relocation/);
+assert.match(skillText, /agent-relay\.company-notes\.com\/manage/);
 assert.match(skillText, /relayInbox/);
 assert.match(skillText, /sendToAgent/);
 assert.match(skillText, /No preliminary directory lookup/);
@@ -83,6 +87,24 @@ assert.match(skillText, /Call the tool directly when its schema is available/);
 assert.doesNotMatch(skillText, /agentAddressFindByName/,
   'Name resolution must not add a second MCP tool call.');
 assert.doesNotMatch(skillText, /human provides the Session ID|access token and loses the binding/i);
+
+// The Relay-owned management UI must already be live before onboarding links to it.
+const relayManagementOrigin = 'https://agent-relay.company-notes.com';
+const relayManagement = await fetch(relayManagementOrigin + '/manage', {
+  redirect: 'manual',
+  signal: AbortSignal.timeout(20_000),
+});
+console.log('Relay /manage: HTTP ' + relayManagement.status);
+assert.equal(relayManagement.status, 200, 'Relay Wake management page must be reachable.');
+assert.match(await relayManagement.text(), /使用 Agent Address 登入/);
+
+const relayManagementScript = await fetch(relayManagementOrigin + '/manage.js', {
+  redirect: 'manual',
+  signal: AbortSignal.timeout(20_000),
+});
+console.log('Relay /manage.js: HTTP ' + relayManagementScript.status);
+assert.equal(relayManagementScript.status, 200, 'Relay Wake management script must load.');
+assert.match(await relayManagementScript.text(), /code_challenge_method/);
 
 const metadata = await request('/.well-known/oauth-protected-resource/mcp');
 assert.equal(metadata.status, 200, 'OAuth resource discovery must be published.');

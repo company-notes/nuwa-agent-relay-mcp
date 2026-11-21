@@ -162,9 +162,25 @@ Gateway, one Wake, and a roster of individually addressable coworkers.
    readiness and receiving modes. Guide the user through Acceptance.
    An enrolled coworker uses its shared connection and its own `from`.
 
+### Existing Wake URL relocation — account-owned Session
+
+When a computer restarts and its Quick Tunnel hostname changes, the human
+owner opens https://address.company-notes.com/portal/, selects the existing
+Gateway Agent and Session, and clicks **Edit Wake URL**. Paste the new public
+HTTPS Tunnel origin to keep the existing private Webhook path, or a complete
+Webhook URL when the platform's Automation path has changed.
+
+Saving updates the destination of the existing verified Wake. It preserves
+the encrypted Bearer key or signature, Gateway identity, Session, roster,
+native Thread mappings and waiting message records. No new Wake pairing or
+challenge is needed for this URL-only change. The owner should confirm
+that the new tunnel is online; a saved address alone does not confirm
+a message was received. A previously stalled explicit first-contact
+reservation may need separate authorized recovery.
+
 ### Wake pairing — the user operates the browser
 
-Pair a new Wake or a changed endpoint/key on the original Session.
+Pair a new Wake or change its authentication key on the original Session.
 
 1. Configure its receiving Routine. The user prepares its reachable HTTPS
    webhook URL and Bearer key in the platform; their tunnel is their own

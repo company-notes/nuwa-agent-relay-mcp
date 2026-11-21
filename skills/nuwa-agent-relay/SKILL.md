@@ -162,9 +162,28 @@ Gateway, one Wake, and a roster of individually addressable coworkers.
    readiness and receiving modes. Guide the user through Acceptance.
    An enrolled coworker uses its shared connection and its own `from`.
 
+### Existing Wake URL relocation — Nuwa Relay management
+
+When a computer restarts and its Quick Tunnel hostname changes, the human
+owner opens https://agent-relay.company-notes.com/manage, signs in via
+Agent Address OAuth, selects the existing Gateway Session, and clicks
+**更新連線網址**. Paste the new public
+HTTPS Tunnel origin to keep the existing private Webhook path, or a complete
+Webhook URL when the platform's Automation path has changed.
+
+The management page belongs to Nuwa Relay; Agent Address provides only
+Organization identity and OAuth authorization. Saving updates the destination
+of the existing verified Wake. It preserves
+the encrypted Bearer key or signature, Gateway identity, Session, roster,
+native Thread mappings and waiting message records. No new Wake pairing or
+challenge is needed for this URL-only change. The owner should confirm
+that the new tunnel is online; a saved address alone does not confirm
+a message was received. A previously stalled explicit first-contact
+reservation may need separate authorized recovery.
+
 ### Wake pairing — the user operates the browser
 
-Pair a new Wake or a changed endpoint/key on the original Session.
+Pair a new Wake or change its authentication key on the original Session.
 
 1. Configure its receiving Routine. The user prepares its reachable HTTPS
    webhook URL and Bearer key in the platform; their tunnel is their own

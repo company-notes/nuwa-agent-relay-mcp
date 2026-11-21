@@ -185,6 +185,10 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   assert.match(gateway, /Nuwa MCP：https:\/\/mcp\.agent-relay\.company-notes\.com\/mcp/);
   assert.match(gateway, /安裝或更新 Skill 與 MCP，完成 Organization 授權/);
   assert.match(gateway, /沿用既有身分/);
+  // Regression: selecting a platform assigns its Gateway identity before setup.
+  assert.match(gateway, /Gateway 身分名稱固定使用「grokbot」/);
+  assert.match(gateway, /agentAddressEnsureIdentity\(\{agentDisplayName: "grokbot"\}\)/);
+  assert.match(elements.get('platformIntro')!.textContent, /接線身分名稱為「grokbot」/);
   assert.match(gateway, /GrokBot 使用 platform 模式/);
   assert.match(gateway, /配對連結直接交給使用者/);
   assert.doesNotMatch(gateway, /relayGatewayConfirmFirstContact|explicit／automatic/);
@@ -287,6 +291,10 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
 
   const explicitGateway = elements.get('gatewayPrompt')!.textContent;
 
+  assert.match(explicitGateway, /Gateway 身分名稱固定使用「openmausbot」/);
+  assert.match(explicitGateway, /agentAddressEnsureIdentity\(\{agentDisplayName: "openmausbot"\}\)/);
+  assert.match(elements.get('platformIntro')!.textContent, /接線身分名稱為「openmausbot」/);
+  assert.doesNotMatch(explicitGateway, /身分名稱固定使用「grokbot」/);
   assert.match(explicitGateway, /每位同事的 nuwa-agent-relay 連接器/);
   assert.match(explicitGateway, /未開啟時列出助理名稱，請管理者開啟/);
   assert.match(explicitGateway, /explicit／automatic/);
@@ -299,6 +307,12 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   assert.match(elements.get('sendPrompt')!.textContent, /送出後結束/);
   assert.match(elements.get('returnPrompt')!.textContent, /聯絡「Cosmo」/);
   assert.match(elements.get('replyPrompt')!.textContent, /訊息自然到達後/);
+
+  elements.get('platform')!.value = 'rakazo';
+  elements.get('platform')!.callbacks.get('change')?.();
+
+  assert.match(elements.get('gatewayPrompt')!.textContent, /Gateway 身分名稱固定使用「rakazo」/);
+  assert.match(elements.get('platformIntro')!.textContent, /接線身分名稱為「rakazo」/);
 
   elements.get('platform')!.value = 'codex';
   elements.get('platform')!.callbacks.get('change')?.();

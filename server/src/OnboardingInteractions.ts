@@ -134,6 +134,219 @@ export const ONBOARDING_SCRIPT = `
     }
   };
 
+
+  function foreignGatewaySetup(platform) {
+    var name = platform.name;
+    var suffix = name === 'Rakazo' ? 'rakazo.md' :
+      name === 'GrokBot' ? 'grokbot.md' : 'openmausbot.md';
+    var guide = 'https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/' + suffix;
+    var t = textFor;
+    var lines = [
+      t('', '请担任 ' + name + ' 的 Nuwa 接线助理（Gateway），让办公室里的 AI 同事互相联系。',
+        'Act as the Nuwa office Gateway on ' + name + ' so AI teammates can communicate.'),
+      '',
+      t('', '共用英文 Skill：', 'English core Skill: ') + skillURL,
+      t('', '该平台的完整英文指南：', 'Full platform guide (English): ') + guide,
+      t('', 'Nuwa MCP 连接地址：', 'Nuwa MCP endpoint: ') + mcpURL,
+      '',
+      t('', '请先读取两份完整指南，按照该平台的步骤执行。每一步必须检查实际工具回执，记录结果后再进入下一步。',
+        'Read both guides in full. Follow the platform procedure, checking actual tool receipts and recording the result before moving to the next stage.'),
+      t('', 'Gateway 自己完成 OAuth 授权并拥有唯一的 Nuwa 身份。同事使用从平台名录获取的真实 Bot ID，通过 relayGatewayEnrollOfficeCoworkers 登记，发消息时使用自己的 from。',
+        'Authorize OAuth for the Gateway identity. Enroll each coworker with its real native Bot ID from the trusted directory using relayGatewayEnrollOfficeCoworkers; coworkers send using their own from.'),
+      t('', '先配置平台原生的消息接收 Routine，再使用 relayBeginWakePairing。由用户在安全网页填写完整 Webhook HTTPS 地址和密钥。只有 relayWakeSubscription 确认 enabled 才开始登记同事。',
+        'Configure the native receiving Routine first, then call relayBeginWakePairing. The user enters the complete HTTPS webhook URL and secret in the protected browser form. Enroll coworkers only after relayWakeSubscription confirms enabled.'),
+      t('', '每完成一个同事的登记，调用 relayGatewayOfficeCoworkers 核对实际地址、路由及激活状态；错误时也先重新读取名录，以免把已完成的操作当作失败。',
+        'After enrolling each coworker, read relayGatewayOfficeCoworkers to verify its actual address, active route, and status. After an error, inspect the roster for partial success.'),
+      name === 'Rakazo'
+        ? t('', 'Rakazo 安装必须按专属指南的 1–7 阶段执行。使用 Webhook-only schedule_create 和可信原生 Bot 转发工具，使用 platform/manual 模式；每步报告完成证据。',
+          'Follow all seven stages of the Rakazo guide: webhook-only schedule_create, a verified native Bot forwarding tool, platform/manual routing, and completion evidence for each stage.')
+        : name === 'OpenMausBot'
+          ? t('', 'OpenMausBot 使用 explicit/automatic 模式。首次转发后使用可信原生回执调用 relayGatewayConfirmFirstContact；之后沿用原生 Thread。',
+            'OpenMausBot uses explicit/automatic mode. After first native forwarding, confirm the actual receipt with relayGatewayConfirmFirstContact; reuse the native Thread thereafter.')
+          : t('', 'GrokBot 使用 platform 模式。受限 Routine 通过 WakeParent 交接一次完整原始事件，上层 Gateway 原生转发一次；普通接收保持零额外 MCP 查询。',
+            'GrokBot uses platform mode. A restricted Routine hands the full trusted event once to WakeParent; the parent performs one native forward. Ordinary dispatch makes zero extra MCP lookups.'),
+      t('', '完成后报告 Gateway 地址、已验证的 Wake、每位同事的地址及接收模式。让两位同事实际双向发消息并在原对话回复，才算完成。',
+        'Report the Gateway address, verified Wake, coworker addresses and receiving modes. Confirm actual delivery and original-thread replies in both directions before declaring setup complete.')
+    ];
+    return lines.join('\\n');
+  }
+
+  function foreignDirectSetup(platform) {
+    var t = textFor;
+    var name = platform.name;
+    var lines = [
+      t('', '请将当前的 ' + name + ' 连接至 Nuwa。',
+        'Connect this ' + name + ' client to Nuwa.'),
+      '',
+      t('', '英文 Nuwa Skill：', 'English Nuwa Skill: ') + skillURL,
+      t('', 'MCP 连接地址：', 'MCP endpoint: ') + mcpURL,
+      platform.fixed ? '' : t('', '独立工作英文指南：', 'Native work guide (English): ') +
+        'https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/work-clients.md',
+      '',
+      t('', '请在当前客户端安装 Remote MCP，完成目标 Organization 的 OAuth 授权，沿用已有有效身份。此安装只作用于当前客户端，无需 Gateway。',
+        'Install Remote MCP in the current client, authorize the intended Organization using OAuth, and reuse any existing valid identity. This setup is for this client only; no Gateway is needed.')
+    ];
+    if (name === 'Codex') {
+      lines.push(t('', '设置 X-Nuwa-Work-Mode: codex，确认原生 threadId 随 MCP 工具请求传递。',
+        'Set X-Nuwa-Work-Mode: codex and verify that the host sends its stable native threadId with tool requests.'));
+    } else if (name === 'Grok Build') {
+      lines.push(t('', '设置 X-Nuwa-Work-Mode: grok-build 及 X-Nuwa-Work-ID: {{session_id}}，核对原生工作 ID。',
+        'Set X-Nuwa-Work-Mode: grok-build and X-Nuwa-Work-ID: {{session_id}}; verify the native work ID.'));
+    } else {
+      lines.push(t('', '通过 agentAddressEnsureIdentity 确认本客户端固定身份。多工作地址功能尚待支持。',
+        'Confirm this client’s fixed identity with agentAddressEnsureIdentity. Native multi-work addresses are not yet supported.'));
+    }
+    if (!platform.fixed) {
+      lines.push(t('', '新工作调用 agentAddressStartWork 并报告实际地址；恢复原工作时沿用原 Session，用 agentAddressGetStatus 查看状态。',
+        'Call agentAddressStartWork for each new work and report its actual address. Resume the original Session when returning; use agentAddressGetStatus to check its status.'));
+    }
+    lines.push(t('', '完成后回报实际 Nuwa 地址与收件方式。独立连接的发送和回复省略 from；需要时检查 Inbox。',
+      'Report your actual Nuwa address and receiving method. Independent send/reply calls omit from; check the Inbox on request.'));
+    lines.push(platform.fixed
+      ? t('', '再选择同一 Organization 的另一位已接入助理验证双向通信。',
+        'Choose another connected assistant in the same Organization for the two-way test.')
+      : t('', '打开第二个独立工作，获取另一个地址，验证双向发消息与回复。',
+        'Open a second independent work, obtain its own address and verify two-way messaging and replies.'));
+    return lines.join('\\n');
+  }
+
+  function foreignSendPrompt(id, word, reverse, platform) {
+    var target = contact(id);
+    if (locale === 'en') {
+      return [
+        'Use Nuwa to contact "' + target + '".',
+        'Send: "' + (reverse ? 'Now I am contacting you!' : 'Hello, let us test communication.') +
+          ' The test word is ' + word + '. Please reply with this word."',
+        platform.office
+          ? 'Send exactly once using the recipient native Bot ID, unique teammate name or full address. For a shared office, set from to your own registered Bot ID.'
+          : 'Send exactly once to the complete address. For an independent connection, omit from.',
+        'Finish after submission. The recipient receives and replies asynchronously.'
+      ].join('\\n');
+    }
+    return [
+      '请通过 Nuwa 主动联系“' + target + '”。',
+      '发送：“' + (reverse ? '这次由我来联系你！' : '你好，我们来测试通信。') +
+        '测试词是' + word + '，请回复这个测试词。”',
+      platform.office
+        ? '只发送一次。优先使用可信 Bot ID、唯一同事名称或完整地址；共用连接的 from 填自己的 Bot ID。'
+        : '向完整地址发送一次，独立连接省略 from。',
+      '发送后结束，等待自然收件与回复。'
+    ].join('\\n');
+  }
+
+  function foreignReplyPrompt(id, word, platform) {
+    var target = contact(id);
+    if (locale === 'en') {
+      return [
+        'Read the Nuwa message just received from "' + target + '".',
+        'Reply in its original Relay Thread: "Received ' + word + '!"',
+        platform.office
+          ? 'Set from to your own registered native Bot ID on the shared connection.'
+          : 'Omit from on an independent connection.',
+        'Reply once after actual receipt. If already replied, report the result.'
+      ].join('\\n');
+    }
+    return [
+      '请查收“' + target + '”刚才发来的 Nuwa 消息。',
+      '在原来的 Relay Thread 回复：“收到' + word + '！”',
+      platform.office ? '共用连接的 from 填自己的原生 Bot ID。' : '独立连接省略 from。',
+      '实际收到后回复一次；已经回复则只报告结果。'
+    ].join('\\n');
+  }
+
+  function foreignDynamicPlatform(platform) {
+    var t = textFor;
+    var office = Boolean(platform.office);
+    var fixed = Boolean(platform.fixed);
+    var name = platform.name;
+    var studio = !office && fieldValue('installMethod') === 'studio';
+    var set = function (id, value) { document.getElementById(id).textContent = value; };
+    set('platformIntro', office
+      ? t('', '在 ' + name + ' 内选择一位接线助理（Gateway），负责整个办公室的消息转发。新 Gateway 名称为“' + platform.gatewayIdentity + '”。',
+        'Choose one ' + name + ' assistant as the office Gateway. New Gateway display name: "' + platform.gatewayIdentity + '".')
+      : t('', name + ' 可以直接使用自己的地址接入 Nuwa。' + (fixed ? '目前使用固定地址。' : '每个工作都有自己的地址，恢复工作时沿用原地址。'),
+        name + ' connects directly to Nuwa with its own address. ' + (fixed ? 'It currently uses a fixed address.' : 'Each native work gets an address preserved on resume.')));
+    set('installTitle', office ? t('', '设置接线助理', 'Set up the Gateway') : t('', '在 ' + name + ' 安装 Nuwa', 'Install Nuwa in ' + name));
+    set('installIntro', office
+      ? t('', '把指令交给 ' + name + ' 的接线助理。需要登录或授权时由你确认。',
+        'Paste the setup instructions into the ' + name + ' Gateway assistant, and confirm sign-in or authorization as prompted.')
+      : t('', '选择一种安装方式：Studio 统一安装，或让当前 ' + name + ' 直接安装。',
+        'Choose one installation method: Studio for multiple tools, or direct setup in this ' + name + ' client.'));
+    set('setupPromptTitle', name + (office ? t('', ' 接线助理安装指令', ' Gateway setup prompt') : t('', ' 直接安装指令', ' direct installation prompt')));
+    set('setupResult', office
+      ? t('', '接线助理报告同事地址及收件方式后，即可进行通信测试。',
+        'When the Gateway reports teammate addresses and receiving methods, begin the communication test.')
+      : studio
+        ? t('', 'Studio 新版准备中；当前请选择直接安装。',
+          'The new Studio installer is coming soon. Choose direct installation for now.')
+        : t('', '确认工具已安装并获得实际地址，再选择第二位已接入对象。',
+          'Confirm setup and the actual address, then choose another connected recipient.'));
+    set('testTitle', office
+      ? t('', '找两位助理测试通信', 'Test messaging with two assistants')
+      : fixed ? t('', '与另一位助理测试通信', 'Test with another assistant')
+        : t('', '用两个独立工作测试通信', 'Test two independent work sessions'));
+    set('testIntro', office
+      ? t('', '选择两位已接入 ' + name + ' 的同事，填写显示名称或 Nuwa 完整地址。',
+        'Choose two connected ' + name + ' teammates and enter their names or complete Nuwa addresses.')
+      : fixed ? t('', '取得 ' + name + ' 的真实地址，另选一个已接入对象，填写两个地址。',
+        'Ask ' + name + ' for its actual address, choose another connected assistant and enter both addresses.')
+        : t('', '在 ' + name + ' 开启两个独立工作，分别取得真实地址并填写。',
+          'Open two independent ' + name + ' work sessions and enter each actual address.'));
+    set('labelA', office ? t('', '助理 A 的名称', 'Assistant A name')
+      : fixed ? t('', 'Claude CLI 完整地址', 'Claude CLI full address') : t('', '工作 A 完整地址', 'Full address of work A'));
+    set('labelB', office ? t('', '助理 B 的名称', 'Assistant B name')
+      : fixed ? t('', '另一位助理完整地址', 'Other assistant full address') : t('', '工作 B 完整地址', 'Full address of work B'));
+    var a = document.getElementById('colleagueA');
+    var b = document.getElementById('colleagueB');
+    var exampleA = locale === 'en' ? (name === 'GrokBot' ? 'Alex' : name === 'OpenMausBot' ? 'Cosmo' : 'Teammate A') : platform.examples && platform.examples[0];
+    var exampleB = locale === 'en' ? (name === 'GrokBot' ? 'Blair' : 'Teammate B') : platform.examples && platform.examples[1];
+    var eg = t('', '例如：', 'e.g. ');
+    a.placeholder = office ? eg + exampleA : eg + 'company/' + platform.agent + '/' + (fixed ? 'main' : 'send-check');
+    b.placeholder = office ? eg + exampleB : eg + 'company/' + (fixed ? 'codex/reply-check' : platform.agent + '/reply-check');
+    set('testNote', office
+      ? t('', '两位助理可以在同一或不同平台。同名时使用完整地址，以实际收件与原对话回复为准。',
+        'Use assistants on the same or different platforms. Use full addresses for duplicate names, and verify real receipt and replies in the original thread.')
+      : t('', '也可以选择其他平台的助理。请使用实际返回的地址，示例地址仅供参考。',
+        'You may also choose a teammate on another platform. Use actual addresses; examples are placeholders.'));
+  }
+
+  function foreignUpdatePrompts() {
+    var platform = selectedPlatform();
+    var ready = contactsReady(platform);
+    var words = locale === 'en' ? ['starlight', 'moonlight'] : ['星河', '月光'];
+    var prompts = {
+      gatewayPrompt: platform.office ? foreignGatewaySetup(platform) : foreignDirectSetup(platform),
+      sendPrompt: foreignSendPrompt('colleagueB', words[0], false, platform),
+      replyPrompt: foreignReplyPrompt('colleagueA', words[0], platform),
+      returnPrompt: foreignSendPrompt('colleagueA', words[1], true, platform),
+      verifyPrompt: foreignReplyPrompt('colleagueB', words[1], platform)
+    };
+    promptIDs.forEach(function (id) {
+      document.getElementById(id).textContent = id === 'gatewayPrompt' || ready
+        ? prompts[id] : textFor('', '填写上面的联系人后即可复制。',
+          'Enter both contacts above to enable copying.');
+    });
+    var first = fieldValue('colleagueA');
+    var second = fieldValue('colleagueB');
+    var hint;
+    if ((first && !validContact(first, platform)) || (second && !validContact(second, platform))) {
+      hint = platform.office
+        ? textFor('', '请填写有效的助理名称或完整地址，不能换行。', 'Enter valid assistant names or full addresses without line breaks.')
+        : textFor('', '请填写组织／助理／工作的真实完整地址。', 'Enter actual addresses in organization/agent/session format.');
+    } else if (first && second && isAddress(first) && first.toLowerCase() === second.toLowerCase()) {
+      hint = textFor('', '请填写两个不同的完整地址。', 'Enter two different full addresses.');
+    } else if (ready) {
+      hint = first === second
+        ? textFor('', '两位助理同名，请填写完整 Nuwa 地址。', 'Both assistants have the same name. Enter their full Nuwa addresses.')
+        : textFor('', '四段测试指令已经可以复制。', 'All four test prompts are ready to copy.');
+    } else {
+      hint = platform.office
+        ? textFor('', '填写平台显示的助理名称或地址。', 'Enter names or addresses shown by your platform.')
+        : textFor('', '先获取两位助理的实际完整地址。', 'Ask both assistants for their actual full addresses.');
+    }
+    document.getElementById('nameHint').textContent = hint;
+  }
+
   function fieldValue(id) {
     return document.getElementById(id).value.trim();
   }
@@ -160,6 +373,7 @@ export const ONBOARDING_SCRIPT = `
   }
 
   function gatewaySetup(platform) {
+    if (locale !== 'zh-Hant') return foreignGatewaySetup(platform);
     if (platform.name === 'Rakazo') {
       return [
         '請擔任 Rakazo 的 Nuwa 接線助理（Gateway），幫助同一工作空間的 AI 同事互相通訊。',
@@ -208,6 +422,7 @@ export const ONBOARDING_SCRIPT = `
   }
 
   function directSetup(platform) {
+    if (locale !== 'zh-Hant') return foreignDirectSetup(platform);
     var lines = [
       '請將你自己（' + platform.name + '）接入 Nuwa。',
       '',
@@ -274,6 +489,7 @@ export const ONBOARDING_SCRIPT = `
       : studio
         ? 'Studio 新版發布後即可使用此方式。目前可切換至直接安裝，立即完成接入。'
         : '請確認助理回報設定完成及目前的正式地址，再選擇第二個已接入的通訊對象。';
+    if (locale !== 'zh-Hant') foreignDynamicPlatform(platform);
   }
 
   function updatePlatform(resetContacts) {
@@ -319,9 +535,11 @@ export const ONBOARDING_SCRIPT = `
     }
 
     updatePrompts();
+    if (locale !== 'zh-Hant') foreignDynamicPlatform(platform);
   }
 
   function updatePrompts() {
+    if (locale !== 'zh-Hant') return foreignUpdatePrompts();
     var platform = selectedPlatform();
     var ready = contactsReady(platform);
     var prompts = {
@@ -383,15 +601,15 @@ export const ONBOARDING_SCRIPT = `
 
   async function copyText(text) {
     if (!navigator.clipboard || !navigator.clipboard.writeText) {
-      notify('請選取指令，手動複製到助理對話。');
+      notify(textFor('請選取指令，手動複製到助理對話。','请手动选择并复制指令。','Select the prompt and copy it manually.'));
       return;
     }
 
     try {
       await navigator.clipboard.writeText(text);
-      notify('已複製到剪貼簿。');
+      notify(textFor('已複製到剪貼簿。','已复制到剪贴板。','Copied to clipboard.'));
     } catch (error) {
-      notify('無法複製，請選取指令後手動複製。');
+      notify(textFor('無法複製，請選取指令後手動複製。','复制失败，请手动复制。','Copy failed. Please copy the selected prompt manually.'));
     }
   }
 
@@ -403,7 +621,7 @@ export const ONBOARDING_SCRIPT = `
       }
 
       if (button.getAttribute('data-copy') !== 'gatewayPrompt' && !contactsReady(selectedPlatform())) {
-        notify('請先填入兩個有效的聯絡對象。');
+        notify(textFor('請先填入兩個有效的聯絡對象。','请先填写两个有效联系人。','Enter two valid contacts first.'));
         return;
       }
 
@@ -428,8 +646,11 @@ export const ONBOARDING_SCRIPT = `
   });
 
   document.getElementById('installMethod').addEventListener('change', updateInstallMethod);
+  document.getElementById('language').addEventListener('change', function () {
+    setLocale(fieldValue('language'), true);
+  });
 
   showSlide(0);
-  updatePlatform(false);
+  setLocale(detectLocale(), false);
 }());
 `;

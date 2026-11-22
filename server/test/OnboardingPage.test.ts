@@ -316,6 +316,20 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
 
   assert.match(elements.get('gatewayPrompt')!.textContent, /Gateway 身分名稱固定使用「rakazo」/);
   assert.match(elements.get('platformIntro')!.textContent, /接線身分名稱為「rakazo」/);
+  const rakazoGateway = elements.get('gatewayPrompt')!.textContent;
+
+  assert.match(rakazoGateway, /schedule_list/);
+  assert.match(rakazoGateway, /schedule_create/);
+  assert.match(rakazoGateway, /on: \{ webhook: true \}/);
+  assert.match(rakazoGateway, /不設定 cron、every、runAt/);
+  assert.match(rakazoGateway, /先完成 Routine 建立，才產生 Wake 配對連結/);
+  assert.match(rakazoGateway, /Rakazo Routines/);
+  assert.match(rakazoGateway, /不要把 key 貼在聊天中/);
+  assert.ok(rakazoGateway.indexOf('schedule_create') < rakazoGateway.indexOf('配對連結'));
+
+  // Do not make GrokBot and OpenMausBot use Rakazo's native scheduling tools.
+  assert.doesNotMatch(explicitGateway, /schedule_create|on: \{ webhook: true \}/);
+  assert.doesNotMatch(gateway, /schedule_create|on: \{ webhook: true \}/);
 
   elements.get('platform')!.value = 'codex';
   elements.get('platform')!.callbacks.get('change')?.();

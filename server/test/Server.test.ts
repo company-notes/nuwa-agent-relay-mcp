@@ -286,7 +286,7 @@ test('a shared OAuth coworker cannot rename an already named Gateway Session', a
       agentDisplayName: '方承宇 (Leon Fang) | 數位協作事業部主管',
     }, 'oauth-a-refresh');
     assert.equal(leon.result.isError, true);
-    assert.match(JSON.stringify(leon), /identity_name_preserved/);
+    assert.match(JSON.stringify(leon), /This OAuth connector already owns a named Agent/);
     assert.equal(scenario.agentDisplayNames.get(gateway.sessionID), 'rakazo');
     assert.equal(scenario.displayNameUpdates.length, 0);
     assert.equal(scenario.database.rows.size, 1);

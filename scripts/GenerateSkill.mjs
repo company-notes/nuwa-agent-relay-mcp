@@ -1,13 +1,24 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 
-const source = new URL('../skills/nuwa-agent-relay/SKILL.md', import.meta.url);
-const destination = new URL('../server/src/SkillDocument.ts', import.meta.url);
-const skill = readFileSync(source, 'utf8').replace(/\r\n/g, '\n');
+const root = new URL('../skills/nuwa-agent-relay/', import.meta.url);
+const skill = readFileSync(new URL('SKILL.md', root), 'utf8').replace(/\r\n/g, '\n');
+const references = ['grokbot.md', 'openmausbot.md', 'rakazo.md', 'work-clients.md'];
 
-const generated = [
+writeFileSync(new URL('../server/src/SkillDocument.ts', import.meta.url), [
   '// Generated from skills/nuwa-agent-relay/SKILL.md. Run node scripts/GenerateSkill.mjs to regenerate.',
   'export const AGENT_SKILL_MD = ' + JSON.stringify(skill) + ';',
   '',
-].join('\n');
+].join('\n'));
 
-writeFileSync(destination, generated);
+const entries = references.map((name) => {
+  const content = readFileSync(new URL('references/' + name, root), 'utf8').replace(/\r\n/g, '\n');
+  return '  ' + JSON.stringify(name) + ': ' + JSON.stringify(content) + ',';
+});
+
+writeFileSync(new URL('../server/src/SkillReferences.ts', import.meta.url), [
+  '// Generated from skills/nuwa-agent-relay/references/*.md. Run node scripts/GenerateSkill.mjs.',
+  'export const AGENT_SKILL_REFERENCES: Readonly<Record<string, string>> = {',
+  ...entries,
+  '};',
+  '',
+].join('\n'));

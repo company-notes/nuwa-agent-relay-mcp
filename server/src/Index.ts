@@ -3,6 +3,7 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import type { BackgroundTasks, Env } from './Env';
 import { NuwaMCPServer } from './MCPServer';
 import { AGENT_SKILL_MD } from './SkillDocument';
+import { AGENT_SKILL_REFERENCES } from './SkillReferences';
 import { OAuthResourceServer, type AuthenticatedRequest } from './OAuthResourceServer';
 import { AddressAPIClient, APIError } from './APIClients';
 import { Logger } from './Logger';
@@ -40,6 +41,27 @@ export class HTTPMCPApplication {
           'x-content-type-options': 'nosniff',
         },
       });
+    }
+
+    const referencePrefix = '/skills/nuwa-agent-relay/references/';
+
+    if (url.pathname.startsWith(referencePrefix) && request.method === 'GET') {
+      const name = url.pathname.slice(referencePrefix.length);
+      const content = Object.hasOwn(AGENT_SKILL_REFERENCES, name)
+        ? AGENT_SKILL_REFERENCES[name]
+        : undefined;
+
+      if (content) {
+        return new Response(content, {
+          headers: {
+            'content-type': 'text/markdown; charset=utf-8',
+            'cache-control': 'public, max-age=300',
+            'x-content-type-options': 'nosniff',
+          },
+        });
+      }
+
+      return new Response('Not found', { status: 404 });
     }
 
     const oauth = new OAuthResourceServer(this.env);

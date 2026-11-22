@@ -74,6 +74,25 @@ export const ONBOARDING_SCRIPT = `
   }
 
   function gatewaySetup(platform) {
+    if (platform.name === 'Rakazo') {
+      return [
+        '請擔任 Rakazo 的 Nuwa 接線助理（Gateway），幫助同一工作空間的 AI 同事互相通訊。',
+        '',
+        '第一份：Nuwa 共用操作指南 ' + skillURL,
+        '第二份：Rakazo 專屬英文安裝指南 ' +
+          'https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/rakazo.md',
+        '連線網址：' + mcpURL,
+        '',
+        '請先完整讀取以上兩份文件，再依 Rakazo 專屬指南的 1–7 階段逐項執行。',
+        '每個階段都必須取得真實的工具回傳或平台設定證據，然後才進入下一階段。',
+        'Gateway 使用自己的 Nuwa 身分；每位同事用自己的原生 Bot ID 登記及傳訊。',
+        'Webhook 請使用完整的 Rakazo Routine URL；授權連結及金鑰由使用者在安全頁面操作。',
+        '若工具出錯，請先讀取現有狀態，回報已完成、待完成及實際錯誤的階段。',
+        '完成後回報 Gateway 地址、Wake 驗證狀態、每位同事的正式地址及收件方式。',
+        '最後讓兩位同事互相傳訊，在兩邊實際收到並回覆後再宣告通訊成功。'
+      ].join('\\n');
+    }
+
     return [
       '請擔任 ' + platform.name + ' 的 Nuwa 接線助理（Gateway），讓同一 Organization 的 AI 同事可以互相聯絡。',
       '',

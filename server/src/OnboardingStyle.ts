@@ -38,6 +38,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .nav nav a:hover { color: var(--green); }
 .nav-skill { padding: 9px 16px; border: 1px solid #c1d3ca; border-radius: 100px; white-space: nowrap; }
 .nav-skill:hover { background: #e4f1e9; }
+.language-picker { display: inline-flex; align-items: center; gap: 7px; margin-left: auto; flex-shrink: 0; }
+.language-picker label { color: var(--muted); font-size: 12px; font-weight: 650; white-space: nowrap; }
+.language-picker select { color: var(--ink); background: white; border: 1px solid #bed3c5; border-radius: 9px; padding: 7px 9px; font-size: 13px; max-width: 135px; cursor: pointer; }
+
 .hero { background: #14392f; color: #f6fff9; overflow: hidden; position: relative; }
 .hero:after { content: ""; position: absolute; width: 520px; height: 520px; right: -150px; top: -300px; border-radius: 50%; background: #22574b; filter: blur(100px); opacity: .6; }
 .hero-inner { max-width: 1220px; margin: auto; min-height: 530px; padding: 85px 28px 93px; display: grid; grid-template-columns: 1.15fr .85fr; align-items: center; gap: 50px; position: relative; z-index: 1; }
@@ -225,7 +229,11 @@ footer { border-top: 1px solid var(--line); background: #edf4ec; padding: 28px; 
   .office-worker small { font-size: 9px; }
   .intro { padding-top: 57px; }
 
-  .nav-inner { padding: 10px 17px; } .nav-skill { padding: 8px 12px; }
+  .nav-inner { padding: 10px 17px; gap: 10px; flex-wrap: wrap; }
+  .nav-skill { padding: 7px 10px; font-size: 12px; }
+  .language-picker { margin-left: auto; }
+  .language-picker label { display: none; }
+  .language-picker select { max-width: 110px; }
   .hero-inner { padding: 55px 20px 95px; gap: 34px; }
   .hero-lead { font-size: 15px; }
   .hero-diagram { padding: 18px; }

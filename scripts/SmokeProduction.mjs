@@ -48,7 +48,7 @@ const rakazoInstructions = promptText.slice(
 );
 assert.match(rakazoInstructions, /schedule_list/);
 assert.match(rakazoInstructions, /schedule_create/);
-assert.match(rakazoInstructions, /on: \\{ webhook: true \\}/);
+assert.ok(rakazoInstructions.includes('on: { webhook: true }'));
 assert.match(rakazoInstructions, /不設定 cron、every、runAt/);
 assert.match(rakazoInstructions, /先完成 Routine 建立，才產生 Wake 配對連結/);
 assert.match(promptText, /無須 Gateway/);

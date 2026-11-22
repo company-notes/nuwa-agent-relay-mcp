@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { runInNewContext, Script } from 'node:vm';
 import test from 'node:test';
 
@@ -109,8 +110,7 @@ test('real HTTP routes keep Skill and OAuth protected', async () => {
   assert.match(ONBOARDING_SCRIPT, /依最新版 Skill/);
   assert.match(ONBOARDING_SCRIPT, /安裝或更新 Skill 與 MCP/);
   assert.match(ONBOARDING_SCRIPT, /完成 Organization 授權/);
-  assert.doesNotMatch(ONBOARDING_SCRIPT,
-    /relayProvisionAgentMailbox|relayWakeSubscription/);
+  assert.doesNotMatch(ONBOARDING_SCRIPT, /relayProvisionAgentMailbox/);
   assert.doesNotMatch(ONBOARDING_SCRIPT, /relayRegisterWake|relayVerifyWake|remote-bind/);
   assert.doesNotMatch(ONBOARDING_SCRIPT, /(?:fetch|XMLHttpRequest|sendBeacon)\s*\(/);
 
@@ -314,18 +314,26 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   elements.get('platform')!.value = 'rakazo';
   elements.get('platform')!.callbacks.get('change')?.();
 
-  assert.match(elements.get('gatewayPrompt')!.textContent, /Gateway 身分名稱固定使用「rakazo」/);
-  assert.match(elements.get('platformIntro')!.textContent, /接線身分名稱為「rakazo」/);
   const rakazoGateway = elements.get('gatewayPrompt')!.textContent;
+  const rakazoGuide = readFileSync(new URL(
+    '../../skills/nuwa-agent-relay/references/rakazo.md', import.meta.url,
+  ), 'utf8');
 
-  assert.match(rakazoGateway, /schedule_list/);
-  assert.match(rakazoGateway, /schedule_create/);
-  assert.match(rakazoGateway, /on: \{ webhook: true \}/);
-  assert.match(rakazoGateway, /不設定 cron、every、runAt/);
-  assert.match(rakazoGateway, /先完成 Routine 建立，才產生 Wake 配對連結/);
-  assert.match(rakazoGateway, /Rakazo Routines/);
-  assert.match(rakazoGateway, /不要把 key 貼在聊天中/);
-  assert.ok(rakazoGateway.indexOf('schedule_create') < rakazoGateway.indexOf('配對連結'));
+  assert.match(elements.get('platformIntro')!.textContent, /接線身分名稱為「Rakazo Gateway」/);
+  assert.match(rakazoGateway, /references\/rakazo\.md/);
+  assert.match(rakazoGateway, /1–7 階段逐項執行/);
+  assert.match(rakazoGateway, /每個階段都必須取得真實的工具回傳/);
+  assert.match(rakazoGuide, /agentAddressEnsureIdentity\(\{agentDisplayName: "Rakazo Gateway"\}\)/);
+  assert.match(rakazoGuide, /schedule_list/);
+  assert.match(rakazoGuide, /schedule_create/);
+  assert.match(rakazoGuide, /on: \{ webhook: true \}/);
+  assert.match(rakazoGuide, /relayBeginWakePairing/);
+  assert.match(rakazoGuide, /relayWakeSubscription/);
+  assert.match(rakazoGuide, /relayGatewayOfficeCoworkers/);
+  assert.match(rakazoGuide, /recipientBotID/);
+  assert.match(rakazoGuide, /firstContactMode/);
+  assert.ok(rakazoGuide.indexOf('schedule_create') < rakazoGuide.indexOf('relayBeginWakePairing'));
+  assert.doesNotMatch(rakazoGuide, /[\u3400-\u9fff]/);
 
   // Do not make GrokBot and OpenMausBot use Rakazo's native scheduling tools.
   assert.doesNotMatch(explicitGateway, /schedule_create|on: \{ webhook: true \}/);
@@ -349,4 +357,94 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
 
   assert.equal(elements.get('directOptions')!.hidden, true);
   assert.equal(elements.get('studioOptions')!.hidden, false);
+});
+
+
+test('browser language and manual selection localize prompts while preserving inputs', () => {
+  const ids = [...ONBOARDING_HTML.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
+  const languages = [
+    { tag: 'zh-TW', expected: 'zh-Hant', prompt: /請擔任 Rakazo/ },
+    { tag: 'zh-CN', expected: 'zh-Hans', prompt: /请担任 Rakazo/ },
+    { tag: 'en-US', expected: 'en', prompt: /Act as the Nuwa office Gateway/ },
+  ];
+
+  for (const { tag, expected, prompt } of languages) {
+    const elements = new Map(ids.map((id) => [id, fakeElement()]));
+    elements.get('platform')!.value = 'rakazo';
+    elements.get('installMethod')!.value = 'direct';
+    elements.get('colleagueA')!.value = 'Mira';
+    elements.get('colleagueB')!.value = 'Leon';
+
+    const textNode = { nodeValue: '開始使用' };
+    const languageStorage = new Map<string, string>();
+    const browser: { lang: string; title: string } = {
+      lang: 'zh-Hant', title: 'Nuwa Relay｜讓不同平台的 AI 助理互相聯絡',
+    };
+    const documentStub = {
+      body: {},
+      documentElement: browser,
+      get title() { return browser.title; },
+      set title(value: string) { browser.title = value; },
+      getElementById(id: string) {
+        const element = elements.get(id);
+        if (!element) {
+          throw Error('Unexpected DOM id: ' + id);
+        }
+        return element;
+      },
+      createTreeWalker() {
+        let used = false;
+        return {
+          nextNode() {
+            if (used) {
+              return null;
+            }
+            used = true;
+            return textNode;
+          },
+        };
+      },
+      querySelectorAll() { return []; },
+    };
+
+    runInNewContext(ONBOARDING_SCRIPT, {
+      document: documentStub,
+      navigator: { languages: [tag], language: tag },
+      window: { localStorage: {
+        getItem(key: string) { return languageStorage.get(key) || null; },
+        setItem(key: string, value: string) { languageStorage.set(key, value); },
+      } },
+      setTimeout() { return 1; },
+      clearTimeout() {},
+    });
+
+    assert.equal(browser.lang, expected);
+    assert.equal(elements.get('language')!.value, expected);
+    assert.match(elements.get('gatewayPrompt')!.textContent, prompt);
+    assert.match(elements.get('gatewayPrompt')!.textContent, /references\/rakazo\.md/);
+    assert.equal(textNode.nodeValue, expected === 'en' ? 'Get started' :
+      expected === 'zh-Hans' ? '开始使用' : '開始使用');
+
+    const next = expected === 'en' ? 'zh-Hans' : 'en';
+    elements.get('language')!.value = next;
+    elements.get('language')!.callbacks.get('change')?.();
+
+    assert.equal(browser.lang, next);
+    assert.equal(languageStorage.get('nuwa.relay.language'), next);
+    assert.equal(elements.get('colleagueA')!.value, 'Mira');
+    assert.equal(elements.get('colleagueB')!.value, 'Leon');
+    assert.match(elements.get('sendPrompt')!.textContent,
+      next === 'en' ? /starlight/ : /测试词是星河/);
+
+    elements.get('platform')!.value = 'codex';
+    elements.get('platform')!.callbacks.get('change')?.();
+    assert.match(elements.get('gatewayPrompt')!.textContent,
+      /X-Nuwa-Work-Mode: codex/);
+    assert.equal(elements.get('studioOptions')!.hidden, true);
+    assert.equal(elements.get('directOptions')!.hidden, false);
+  }
+
+  assert.match(ONBOARDING_HTML, /id="language"/);
+  assert.match(ONBOARDING_SCRIPT, /zh-Hans/);
+  assert.match(ONBOARDING_SCRIPT, /Native work guide/);
 });

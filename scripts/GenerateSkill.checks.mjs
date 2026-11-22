@@ -8,6 +8,8 @@ import test from 'node:test';
 const generator = new URL('./GenerateSkill.mjs', import.meta.url);
 const source = new URL('../skills/nuwa-agent-relay/SKILL.md', import.meta.url);
 const destination = new URL('../server/src/SkillDocument.ts', import.meta.url);
+const referenceDestination = new URL('../server/src/SkillReferences.ts', import.meta.url);
+const referenceNames = ['grokbot.md', 'openmausbot.md', 'rakazo.md', 'work-clients.md'];
 
 for (const [label, newline] of [['LF', '\n'], ['CRLF', '\r\n']]) {
   test(`published Skill regenerates byte-for-byte from ${label} checkout`, (context) => {
@@ -24,11 +26,18 @@ for (const [label, newline] of [['LF', '\n'], ['CRLF', '\r\n']]) {
     const entry = join(scripts, 'GenerateSkill.mjs');
     const skill = readFileSync(source, 'utf8').replace(/\r\n/g, '\n');
     const expected = readFileSync(destination);
+    const expectedReferences = readFileSync(referenceDestination);
     copyFileSync(generator, entry);
     writeFileSync(join(skills, 'SKILL.md'), skill.replace(/\n/g, newline));
+    mkdirSync(join(skills, 'references'), { recursive: true });
+    for (const name of referenceNames) {
+      const sourceText = readFileSync(new URL('../skills/nuwa-agent-relay/references/' + name, import.meta.url), 'utf8');
+      writeFileSync(join(skills, 'references', name), sourceText.replace(/\r\n/g, '\n').replace(/\n/g, newline));
+    }
 
     execFileSync(process.execPath, [entry]);
 
     assert.deepEqual(readFileSync(join(server, 'SkillDocument.ts')), expected);
+    assert.deepEqual(readFileSync(join(server, 'SkillReferences.ts')), expectedReferences);
   });
 }

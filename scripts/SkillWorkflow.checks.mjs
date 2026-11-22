@@ -53,29 +53,24 @@ function scenarios(skill, onboarding, check) {
           'Key changes and first pairing remain separate from URL-only relocation.');
       }
 
-      check(skill.includes('更新連線網址') &&
+      check(skill.includes('Update connection URL') &&
         skill.includes('Quick Tunnel') && skill.includes('preserves'),
         'The canonical Skill must explain URL-only relocation and retained credentials.');
     }],
-    ['Rakazo installer creates an event-only Wake Routine before sharing the pairing link', () => {
+    ['Rakazo installer links the complete, English-only platform workflow', () => {
       const office = new OnboardingScenario(onboarding, 'rakazo');
       const setup = office.prompt('gateway');
+      const detail = readFileSync(new URL('../skills/nuwa-agent-relay/references/rakazo.md', import.meta.url), 'utf8');
 
-      check(setup.includes('schedule_list') &&
-        setup.includes('schedule_create') &&
-        setup.includes('on: { webhook: true }'),
-        'Rakazo must inspect existing routines then use its actual webhook event tool.');
-      check(setup.includes('不設定 cron、every、runAt') &&
-        setup.includes('先完成 Routine 建立，才產生 Wake 配對連結'),
-        'A webhook-only Routine needs no timer, and must precede pairing.');
-      check(setup.indexOf('schedule_create') < setup.indexOf('配對連結'),
-        'Rakazo webhook creation must be described before the Wake pairing link.');
-      check(setup.includes('Rakazo Routines') &&
-        setup.includes('不要把 key 貼在聊天中'),
-        'Only the human retrieves the protected webhook URL and key in Rakazo Routines.');
-      check(setup.includes('工具 Schema 或實際錯誤') &&
-        !setup.includes('必須使用者手動建立 Routine'),
-        'An AI should inspect real tool errors, not guess that the platform lacks webhooks.');
+      check(setup.includes('/references/rakazo.md') && setup.includes('1–7'),
+        'The prompt must select and order the Rakazo-specific instructions.');
+      check(detail.includes('schedule_list') && detail.includes('schedule_create') &&
+        detail.includes('on: { webhook: true }'), 'Use the real event-only routine schema.');
+      check(detail.includes('relayBeginWakePairing') && detail.includes('relayWakeSubscription') &&
+        detail.includes('relayGatewayOfficeCoworkers'), 'Check each setup stage before proceeding.');
+      check(detail.includes('recipientBotID') && detail.includes('threadMode') &&
+        detail.includes('firstContactMode'), 'Bind real coworker identity and routing.');
+      check(!/[\u3400-\u9fff]/.test(detail), 'Platform references must be in English.');
     }],
     ['OpenMausBot bidirectional test ends after sender submission', () => {
       const office = new OnboardingScenario(onboarding, 'openmausbot');
@@ -89,10 +84,11 @@ function scenarios(skill, onboarding, check) {
         'The optional receiver prompt is for an already delivered message, not an immediate probe.');
     }],
     ['OpenMausBot first dispatch confirms; bound dispatch reuses the exact native Thread', () => {
-      const start = skill.indexOf('### OpenMausBot');
+      const reference = readFileSync(new URL('../skills/nuwa-agent-relay/references/openmausbot.md', import.meta.url), 'utf8');
+      const start = reference.indexOf('### OpenMausBot');
       check(start >= 0, 'Put the complete OpenMausBot dispatch algorithm in its own section.');
-      const end = skill.indexOf('\n## ', start + 1);
-      const workflow = skill.slice(start, end < 0 ? undefined : end);
+      const end = reference.indexOf('\n## ', start + 1);
+      const workflow = reference.slice(start, end < 0 ? undefined : end);
       const first = workflow.indexOf('`thread: "new"`');
       const confirm = workflow.indexOf('relayGatewayConfirmFirstContact', first);
       const finish = workflow.indexOf('finish', confirm);

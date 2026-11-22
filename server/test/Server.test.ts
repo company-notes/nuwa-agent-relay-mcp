@@ -28,6 +28,7 @@ test('publishes the V2 Skill without exposing internal transport infrastructure'
   assert.match(expected, /No Gateway, Bot enrollment or shared office connection/);
   assert.match(expected, /relayInbox/);
   assert.match(expected, /WakeParent once with the/);
+  assert.match(expected, /references\/rakazo\.md/);
   assert.match(expected, /Keep the installed Routine instructions self-contained/);
   assert.match(expected, /relayVerifyWake/);
   assert.match(expected, /relayGatewayEnrollOfficeCoworkers/);
@@ -53,6 +54,25 @@ test('publishes the V2 Skill without exposing internal transport infrastructure'
 
   const legacyVocabulary = expected.replace(/X-Nuwa-Work-(?:Mode|ID)/g, '');
   assert.doesNotMatch(legacyVocabulary, /github\.com|\bHost\b|\bWork\b|work_address_id/);
+});
+
+test('publishes the English platform references from their exact source files', async () => {
+  const scenario = new RemoteMCPScenario();
+  for (const name of ['grokbot.md', 'openmausbot.md', 'rakazo.md', 'work-clients.md']) {
+    const source = readFileSync(new URL(
+      '../../skills/nuwa-agent-relay/references/' + name, import.meta.url,
+    ), 'utf8').replace(/\r\n/g, '\n');
+    const response = await scenario.application.handle(new Request(
+      'https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/' + name,
+    ));
+    assert.equal(response.status, 200);
+    assert.equal((await response.text()).replace(/\r\n/g, '\n'), source);
+    assert.doesNotMatch(source, /[\u3400-\u9fff]/);
+  }
+  const missing = await scenario.application.handle(new Request(
+    'https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/absent.md',
+  ));
+  assert.equal(missing.status, 404);
 });
 
 test('OAuth discovery and missing token remain protected without a Session binding', async () => {

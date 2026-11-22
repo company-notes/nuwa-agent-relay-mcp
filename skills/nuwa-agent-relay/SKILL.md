@@ -37,29 +37,29 @@ as itself. Delivery and replies happen asynchronously.
 
 Use the existing MCP connection. With your own authenticated Session, omit
 `from`:
-`sendToAgent({to: "若寧", message: "請確認部署"})` and
-`relayReplyThread({threadID: "<relayThreadID>", body: "已確認"})`.
+`sendToAgent({to: "Nora", message: "Please confirm deployment"})` and
+`relayReplyThread({threadID: "<relayThreadID>", body: "Confirmed"})`.
 On a shared office connection, supply your own registered native Bot ID as
 `from` if known, or your complete registered display name.
 
-- New conversation: `sendToAgent({from: "小晴", to: "大熊", message: "請確認部署"})`.
-- Reply to an incoming message: `relayReplyThread({from: "大熊", threadID: "<relayThreadID>", body: "已確認"})`.
+- New conversation: `sendToAgent({from: "Tammy", to: "Bear", message: "Please confirm deployment"})`.
+- Reply to an incoming message: `relayReplyThread({from: "Bear", threadID: "<relayThreadID>", body: "Confirmed"})`.
 - Both `from` and `to` accept a registered native Bot ID (a raw UUID, or
   `bot:<native ID>` for other IDs), complete registered display name, canonical
   Nuwa address or verified Email alias. Prefer a known ID from the platform's
   trusted Bot directory; a group/channel ID is not an individual Bot. Use the
   coworker's name when the ID is not known. For recipients, unique short names
-  (e.g. 小晴, Tammy or Tammy Lin) also work. Exact registered names take
+  (e.g. Tammy, Tammy or Tammy Lin) also work. Exact registered names take
   precedence. Relay resolves the recipient in the send request; ask only when
   the target is unknown, ambiguous or unavailable. Shared `from` remains an
   exact registered identity.
-- Native ID sender example: `sendToAgent({from: "<your Bot UUID>", to: "<coworker Bot UUID>", message: "請確認部署"})`.
+- Native ID sender example: `sendToAgent({from: "<your Bot UUID>", to: "<coworker Bot UUID>", message: "Please confirm deployment"})`.
   Use your own ID from trusted platform context, not the ID of another coworker.
 - Use the forwarded message content directly. Do not fetch it again merely to
   read or reply. Reply only when appropriate to the message or user's request.
 - Call the tool directly when its schema is available. Perform platform-required
   tool discovery only when required by the host; reuse already available schemas.
-- `relayMessage({from: "大熊", messageID: "<messageID>", contextLimit: 8})`
+- `relayMessage({from: "Bear", messageID: "<messageID>", contextLimit: 8})`
   is for missing context or history; omit `from` with an independent Session.
   `relayAcknowledgeRead` is optional, only for an authorized receiving Session.
 - No preliminary directory lookup, identity check, mailbox provisioning, Wake
@@ -88,52 +88,10 @@ Use `relayInbox` for manual receiving. Automatic receiving requires a
 supported direct Wake adapter and the pairing procedure below; an MCP
 connection alone does not provide background execution.
 
-### Named work Sessions
+### Native work clients — Codex and Grok Build
 
-A work connector (Codex or Grok Build) keeps one Agent per OAuth grant and
-uses a separate Session for each native work conversation. Configure the
-remote MCP connector once with its normal OAuth login, plus the native work
-mode headers. For Codex, add to the existing MCP server configuration:
+Read the complete [native work client guide](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/work-clients.md) when setting up Codex or Grok Build. Configure the native `X-Nuwa-Work-Mode` and, where applicable, `X-Nuwa-Work-ID` headers. Call `agentAddressStartWork` for a new native work and for resuming the same work. Report the returned canonical address, including `Resumed work address` on resume. Use `agentAddressGetStatus` to check the active address. Full setup and recovery steps live in the linked guide.
 
-```toml
-http_headers = { "X-Nuwa-Work-Mode" = "codex" }
-```
-
-The Codex host must supply its stable thread ID in MCP tool-call metadata.
-For Grok Build, add to the existing remote MCP server configuration:
-
-```toml
-headers = { "X-Nuwa-Work-Mode" = "grok-build", "X-Nuwa-Work-ID" = "{{session_id}}" }
-```
-
-The host supplies the native Session identity automatically. Keep the same
-OAuth grant across restarts and token refresh. Fixed-persona and office
-connectors use their existing configuration without these work headers.
-
-- At the start of a new native work Session, choose a concise, meaningful
-  kebab-case name derived from the actual task and a human-readable title.
-  Call `agentAddressStartWork({sessionName: "fix-share-parser", sessionDisplayName: "Fix share parser"})`.
-  Immediately tell the user the returned canonical address:
-  `Active work address: nuwa/codex/fix-share-parser` (use the actual result).
-  The first work initializes the Agent's shared managed mailbox.
-- On resume of the same native work, call `agentAddressStartWork({})`.
-  Report the returned address as `Resumed work address: ...`. A restored
-  Runtime retains the original Session and Threads. If initialization
-  previously failed, repeat with the original meaningful name.
-- When asked for the address, call `agentAddressGetStatus({})` and report
-  the current Session's canonical address. This is a read-only operation.
-- Explicitly suspend a work with `agentAddressReleaseWork({})`. Closing the
-  host also lets its Runtime lease expire. Its durable binding and history
-  remain available. After a new OAuth grant, an authorized owner can restore
-  a known idle work with `agentAddressSelectSession({address: "nuwa/codex/fix-share-parser"})`
-  in the intended native work. Do this before initializing a new work Agent.
-- Contact a specific work Session with its full canonical address.
-  Ordinary sending, replying and checking the Inbox reuse the bound
-  Session automatically and omit `from`. A remote connection alone does
-  not wake a native work process; use manual Inbox unless a direct adapter
-  has been verified.
-- If host work context is missing, the connector fails closed. Verify the
-  client integration rather than inventing a native Session ID.
 
 ### Shared office
 
@@ -167,7 +125,7 @@ Gateway, one Wake, and a roster of individually addressable coworkers.
 When a computer restarts and its Quick Tunnel hostname changes, the human
 owner opens https://agent-relay.company-notes.com/manage, signs in via
 Agent Address OAuth, selects the existing Gateway Session, and clicks
-**更新連線網址**. Paste the new public
+**Update connection URL**. Paste the new public
 HTTPS Tunnel origin to keep the existing private Webhook path, or a complete
 Webhook URL when the platform's Automation path has changed.
 
@@ -228,73 +186,16 @@ A reserved explicit first contact requires one confirmation as part of
 dispatch. Ordinary events use the complete Wake without Skill reads,
 directory or history queries.
 
-### GrokBot — platform-managed conversation
+### Platform-specific Gateway instructions
 
-Enroll with `threadMode: "platform"` (manual first-contact default).
-The platform chooses the native conversation; its Wake omits
-`recipientPlatformThreadID`.
+**Read the matching platform reference before installing or updating an office Gateway.** Each guide gives the complete native forwarding procedure and the platform-specific setup steps:
 
-For GrokBot's restricted background Routine, when Send to Agent is unavailable
-but WakeParent is available, use the following split:
+- [GrokBot Gateway](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/grokbot.md) — §platform§ mode; a restricted Routine hands off via WakeParent once with the complete original trusted event, then the parent performs one native forward.
+- [OpenMausBot Gateway](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/openmausbot.md) — explicit native conversation; initial native receipt is confirmed before completion.
+- [Rakazo Gateway](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/rakazo.md) — webhook-only Routine, shared OAuth, verified Wake, individually checked coworker enrollment and native dispatch.
 
-- Routine: on an authenticated ordinary Wake, call WakeParent once with the
-  complete original event JSON and end. No message formatting, tool discovery,
-  Skill read, history, file access, logging or MCP lookup per ordinary event.
-- Parent Gateway: on a trusted Routine handoff, apply the dispatch and reply
-  format above, call native Send to Agent once and end. Keep this as a fixed
-  parent rule. Do not create a new Relay Thread to substitute for native
-  dispatch, or send the message back to the Routine.
+Use the relevant reference and the core shared-office checklist together. Everyday events run the installed, self-contained Routine procedure; there are no per-message documentation downloads.
 
-Where the Routine can directly use native Send to Agent, it makes that one
-native call itself and ends. The same platform procedure handles all messages.
-
-### OpenMausBot — explicit native conversation
-
-**Setup.** The Nuwa MCP connector is enabled independently for each assistant
-on OpenMausBot. Check the Gateway and every selected coworker in the
-platform's connector settings, or have the administrator verify the UI.
-Name each assistant with a disabled `nuwa-agent-relay` connector and ask
-the administrator to enable it. Verify both `coordinate_bots` and
-`relayGatewayConfirmFirstContact` in the receiving Routine itself, including
-access to the actual native receipt. Enroll with
-`threadMode: "explicit", firstContactMode: "automatic"`.
-
-An installed OpenMausBot Gateway updates its existing Routine instructions
-in place when adopting this procedure. Keep its verified Wake, identity,
-roster and native bindings. Replace the entire forwarding instruction, so
-the first-contact completion rule applies to every new execution.
-
-**Routine procedure.** For an authenticated message event, read
-`recipientPlatformThreadID` from that event:
-
-1. **Reserved first contact — null.**
-   - Call `coordinate_bots` once using `bot_ids: [recipientBotID]`,
-     `thread: "new"`, `reply: "none"` and the prepared full message.
-   - Read the actual target native Thread ID from the successful tool receipt.
-   - Immediately call
-     `relayGatewayConfirmFirstContact({recipientSessionID, senderSessionID, messageID, nativeThreadID})`
-     using the event's `recipientSessionID`, `senderSessionID` and
-     `messageID`, together with the actual `nativeThreadID` from that receipt.
-   - Confirm success, then finish. The confirmation saves the native ID
-     and releases waiting Wake notifications. Native submission alone
-     is incomplete for this branch.
-2. **Established contact — nonempty string.**
-   - Call `coordinate_bots` once using `bot_ids: [recipientBotID]`,
-     `thread: recipientPlatformThreadID`, `reply: "none"` and the prepared
-     full message. Finish after submission.
-3. A missing or invalid field is a routing error for this explicit adapter.
-   Report the error and stop.
-
-Relay stores the mapping by sender and recipient Session. A→B reuses one
-native conversation even for new Relay Threads. C→B receives a separate
-conversation. Use the event's native ID directly; never substitute
-`relayThreadID`, use `standing` or create a replacement on error.
-
-For uncertain first submission or failed confirmation, retain the original
-event IDs and trusted receipt for recovery and report the error. Recover
-a pending first contact by confirming the original message and actual
-receipt with the same authorized Gateway. Repeating confirmation with
-the same receipt is idempotent; repeating native creation is not.
 
 ### Direct Wake for an independent Session
 

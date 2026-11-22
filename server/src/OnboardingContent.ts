@@ -16,6 +16,7 @@ export const ONBOARDING_HTML = `<!doctype html>
   <div class="nav-inner">
     <a class="brand" href="/" aria-label="Nuwa Relay 首頁"><span class="brand-mark">N</span><span>nuwa <small>relay</small></span></a>
     <nav aria-label="導覽"><a href="#overview">認識 Nuwa</a><a href="#setup">開始使用</a><a href="#test">測試通話</a><a href="#questions">常見問題</a></nav>
+    <div class="language-picker"><label for="language">語言 / Language</label><select id="language" aria-label="Language"><option value="zh-Hant">繁體中文</option><option value="zh-Hans">简体中文</option><option value="en">English</option></select></div>
     <a class="nav-skill" href="/skills/nuwa-agent-relay/SKILL.md">助理使用指南 <span aria-hidden="true">↗</span></a>
   </div>
 </header>

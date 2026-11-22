@@ -90,8 +90,9 @@ export class AddressTools extends MCPToolSet {
       'Immediately use after OAuth login. Privately claim or recover this OAuth grant\'s ' +
       'OWN Agent/Session. At setup provide your own established persona or native Bot name; ' +
       'for an unnamed independent client use its actual client name (e.g. ChatGPT or Codex). ' +
-      'Use agentDisplayName once to repair your own unnamed existing binding without replacing it. ' +
-      'Preserve an existing persona unless its owner explicitly requests a rename. ' +
+      'Use agentDisplayName once to name an unnamed binding without replacing it. ' +
+      'An already named Agent cannot be renamed through EnsureIdentity, even with shared OAuth. ' +
+        'Coworkers use their registered native Bot ID as from; explicit owner renames use Agent Address management. ' +
       'Never pass another coworker\'s name from a Gateway or ask for Runtime/Resume credentials.',
       { agentDisplayName },
       (value) => this.ensureIdentity(value.agentDisplayName as string | undefined));

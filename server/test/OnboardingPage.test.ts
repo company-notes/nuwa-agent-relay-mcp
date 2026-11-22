@@ -110,8 +110,7 @@ test('real HTTP routes keep Skill and OAuth protected', async () => {
   assert.match(ONBOARDING_SCRIPT, /依最新版 Skill/);
   assert.match(ONBOARDING_SCRIPT, /安裝或更新 Skill 與 MCP/);
   assert.match(ONBOARDING_SCRIPT, /完成 Organization 授權/);
-  assert.doesNotMatch(ONBOARDING_SCRIPT,
-    /relayProvisionAgentMailbox|relayWakeSubscription/);
+  assert.doesNotMatch(ONBOARDING_SCRIPT, /relayProvisionAgentMailbox/);
   assert.doesNotMatch(ONBOARDING_SCRIPT, /relayRegisterWake|relayVerifyWake|remote-bind/);
   assert.doesNotMatch(ONBOARDING_SCRIPT, /(?:fetch|XMLHttpRequest|sendBeacon)\s*\(/);
 
@@ -358,4 +357,90 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
 
   assert.equal(elements.get('directOptions')!.hidden, true);
   assert.equal(elements.get('studioOptions')!.hidden, false);
+});
+
+
+test('browser language and manual selection localize prompts while preserving inputs', () => {
+  const ids = [...ONBOARDING_HTML.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
+  const languages = [
+    { tag: 'zh-TW', expected: 'zh-Hant', prompt: /請擔任 Rakazo/ },
+    { tag: 'zh-CN', expected: 'zh-Hans', prompt: /请担任 Rakazo/ },
+    { tag: 'en-US', expected: 'en', prompt: /Act as the Nuwa office Gateway/ },
+  ];
+
+  for (const { tag, expected, prompt } of languages) {
+    const elements = new Map(ids.map((id) => [id, fakeElement()]));
+    elements.get('platform')!.value = 'rakazo';
+    elements.get('installMethod')!.value = 'direct';
+    elements.get('colleagueA')!.value = 'Mira';
+    elements.get('colleagueB')!.value = 'Leon';
+
+    const textNode = { nodeValue: '開始使用' };
+    const languageStorage = new Map<string, string>();
+    const browser: { lang: string; title: string } = {
+      lang: 'zh-Hant', title: 'Nuwa Relay｜讓不同平台的 AI 助理互相聯絡',
+    };
+    const documentStub = {
+      body: {},
+      documentElement: browser,
+      get title() { return browser.title; },
+      set title(value: string) { browser.title = value; },
+      getElementById(id: string) {
+        const element = elements.get(id);
+        if (!element) throw Error('Unexpected DOM id: ' + id);
+        return element;
+      },
+      createTreeWalker() {
+        let used = false;
+        return {
+          nextNode() {
+            if (used) return null;
+            used = true;
+            return textNode;
+          },
+        };
+      },
+      querySelectorAll() { return []; },
+    };
+
+    runInNewContext(ONBOARDING_SCRIPT, {
+      document: documentStub,
+      navigator: { languages: [tag], language: tag },
+      window: { localStorage: {
+        getItem(key: string) { return languageStorage.get(key) || null; },
+        setItem(key: string, value: string) { languageStorage.set(key, value); },
+      } },
+      setTimeout() { return 1; },
+      clearTimeout() {},
+    });
+
+    assert.equal(browser.lang, expected);
+    assert.equal(elements.get('language')!.value, expected);
+    assert.match(elements.get('gatewayPrompt')!.textContent, prompt);
+    assert.match(elements.get('gatewayPrompt')!.textContent, /references\/rakazo\.md/);
+    assert.equal(textNode.nodeValue, expected === 'en' ? 'Get started' :
+      expected === 'zh-Hans' ? '开始使用' : '開始使用');
+
+    const next = expected === 'en' ? 'zh-Hans' : 'en';
+    elements.get('language')!.value = next;
+    elements.get('language')!.callbacks.get('change')?.();
+
+    assert.equal(browser.lang, next);
+    assert.equal(languageStorage.get('nuwa.relay.language'), next);
+    assert.equal(elements.get('colleagueA')!.value, 'Mira');
+    assert.equal(elements.get('colleagueB')!.value, 'Leon');
+    assert.match(elements.get('sendPrompt')!.textContent,
+      next === 'en' ? /starlight/ : /测试词是星河/);
+
+    elements.get('platform')!.value = 'codex';
+    elements.get('platform')!.callbacks.get('change')?.();
+    assert.match(elements.get('gatewayPrompt')!.textContent,
+      /X-Nuwa-Work-Mode: codex/);
+    assert.equal(elements.get('studioOptions')!.hidden, true);
+    assert.equal(elements.get('directOptions')!.hidden, false);
+  }
+
+  assert.match(ONBOARDING_HTML, /id="language"/);
+  assert.match(ONBOARDING_SCRIPT, /zh-Hans/);
+  assert.match(ONBOARDING_SCRIPT, /Native work guide/);
 });

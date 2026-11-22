@@ -57,6 +57,26 @@ function scenarios(skill, onboarding, check) {
         skill.includes('Quick Tunnel') && skill.includes('preserves'),
         'The canonical Skill must explain URL-only relocation and retained credentials.');
     }],
+    ['Rakazo installer creates an event-only Wake Routine before sharing the pairing link', () => {
+      const office = new OnboardingScenario(onboarding, 'rakazo');
+      const setup = office.prompt('gateway');
+
+      check(setup.includes('schedule_list') &&
+        setup.includes('schedule_create') &&
+        setup.includes('on: { webhook: true }'),
+        'Rakazo must inspect existing routines then use its actual webhook event tool.');
+      check(setup.includes('不設定 cron、every、runAt') &&
+        setup.includes('先完成 Routine 建立，才產生 Wake 配對連結'),
+        'A webhook-only Routine needs no timer, and must precede pairing.');
+      check(setup.indexOf('schedule_create') < setup.indexOf('配對連結'),
+        'Rakazo webhook creation must be described before the Wake pairing link.');
+      check(setup.includes('Rakazo Routines') &&
+        setup.includes('不要把 key 貼在聊天中'),
+        'Only the human retrieves the protected webhook URL and key in Rakazo Routines.');
+      check(setup.includes('工具 Schema 或實際錯誤') &&
+        !setup.includes('必須使用者手動建立 Routine'),
+        'An AI should inspect real tool errors, not guess that the platform lacks webhooks.');
+    }],
     ['OpenMausBot bidirectional test ends after sender submission', () => {
       const office = new OnboardingScenario(onboarding, 'openmausbot');
 

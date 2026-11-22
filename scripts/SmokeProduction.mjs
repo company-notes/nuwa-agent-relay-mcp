@@ -40,6 +40,17 @@ assert.equal(prompts.status, 200, 'Onboarding copyable prompts must load.');
 const promptText = await prompts.text();
 assert.match(promptText, /function gatewaySetup/);
 assert.match(promptText, /function directSetup/);
+
+// Rakazo can create an event-triggered Routine without any timer.
+const rakazoInstructions = promptText.slice(
+  promptText.indexOf('    rakazo: {'),
+  promptText.indexOf('    codex: {'),
+);
+assert.match(rakazoInstructions, /schedule_list/);
+assert.match(rakazoInstructions, /schedule_create/);
+assert.ok(rakazoInstructions.includes('on: { webhook: true }'));
+assert.match(rakazoInstructions, /不設定 cron、every、runAt/);
+assert.match(rakazoInstructions, /先完成 Routine 建立，才產生 Wake 配對連結/);
 assert.match(promptText, /無須 Gateway/);
 assert.match(promptText, /WakeParent，僅交接完整原始事件 JSON/);
 assert.match(promptText, /verifyPrompt: replyPrompt/);

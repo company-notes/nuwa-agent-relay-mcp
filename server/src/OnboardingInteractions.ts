@@ -20,7 +20,19 @@ export const ONBOARDING_SCRIPT = `
     },
     rakazo: {
       name: 'Rakazo', office: true, gatewayIdentity: 'rakazo', examples: ['同事 A', '同事 B'],
-      setup: '先確認 Rakazo 的原生助理名錄、通知入口、轉交工具及原生對話識別能力。依官方 Skill 確認適用的接線模式；將尚無法驗證的能力如實回報，完成具備能力的接入與實際通訊驗證。'
+      wakeSetup: 'Rakazo 支援由 Webhook 事件觸發的 Routine，不是只有定時任務。' +
+        '先使用 schedule_list 檢查本 Gateway Bot 是否已有有效的 Nuwa Wake 接收 Routine；若有就沿用，不要重建。' +
+        '若沒有，直接呼叫 schedule_create，name 使用 "Nuwa Wake Receiver"，' +
+        'on: { webhook: true }，prompt 寫入依官方 Skill 產生的完整、自包含 Wake 驗證與原生轉交指令。' +
+        '不設定 cron、every、runAt 或任何定時欄位，這是僅由 Webhook 觸發的 Routine；' +
+        '如操作需核准，直接向使用者提出核准請求，不要改成定時輪詢。' +
+        '先完成 Routine 建立，才產生 Wake 配對連結。' +
+        '建立成功後請使用者開啟 Rakazo Routines 管理介面，從該 Routine 取得 Webhook HTTPS URL 和 key，' +
+        '由使用者直接填入 Nuwa 的安全配對表單；不要把 key 貼在聊天中，也不要猜測任何 URL 或 key。' +
+        '驗證 Wake 後才宣稱接線完成。',
+      setup: '接著確認 Rakazo 可信 Bot 名錄、原生轉交工具與原生對話識別能力，依 Skill 判斷適用的接線模式。' +
+        '若 schedule_create 的工具 Schema 不支援 on，或實際呼叫失敗，請回報工具 Schema 或實際錯誤及所需權限，' +
+        '不要自行推斷只能建立定時任務、要求使用者代為建立 Routine，或假稱已完成。'
     },
     codex: {
       name: 'Codex', agent: 'codex',
@@ -74,7 +86,9 @@ export const ONBOARDING_SCRIPT = `
         'agentAddressEnsureIdentity({agentDisplayName: "' + platform.gatewayIdentity +
         '"})。已安裝的同一辦公室沿用原有身分、Wake 與名錄，即使現有名稱不同。' +
         '目前授權若屬於其他辦公室，請使用者為本辦公室取得獨立授權，保留對方原有設定。',
-      '1. 設定本辦公室唯一的 Wake 接收例行任務並完成驗證；沿用有效的接線。只變更 Webhook 接收網址時，請使用者開啟 https://agent-relay.company-notes.com/manage，經 Agent Address OAuth 登入後選擇原有 Gateway Session 的「更新連線網址」，貼上新 Quick Tunnel 網址，保留原本的路徑與加密金鑰。只有首次設定或更新 Bearer key 才使用配對流程：配對連結直接交給使用者，由使用者自己開啟瀏覽器、登入並填寫 Webhook HTTPS URL 和 Bearer key。Gateway 負責接收驗證事件。',
+      '1. ' + (platform.wakeSetup ||
+        '設定本辦公室唯一的 Wake 接收例行任務並完成驗證；沿用有效的接線。') +
+        ' 只變更 Webhook 接收網址時，請使用者開啟 https://agent-relay.company-notes.com/manage，經 Agent Address OAuth 登入後選擇原有 Gateway Session 的「更新連線網址」，貼上新 Quick Tunnel 網址，保留原本的路徑與加密金鑰。只有首次設定或更新 Bearer key 才使用配對流程：配對連結直接交給使用者，由使用者自己開啟瀏覽器、登入並填寫 Webhook HTTPS URL 和 Bearer key。Gateway 負責接收驗證事件。',
       '2. 從平台可信 Bot 名錄取得真實同事的名稱與 Bot ID（排除自己及群組／頻道），批次接入同事，沿用既有地址與名錄。同步新增與改名，保留獨立成員的接入模式；移除需明確授權。' +
         (platform.separateConnectors
           ? ' 逐一確認 Gateway 與每位同事的 nuwa-agent-relay 連接器。未開啟時列出助理名稱，請管理者開啟後再標記可通訊。'

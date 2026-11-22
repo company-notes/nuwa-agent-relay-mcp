@@ -19,7 +19,7 @@ export const ONBOARDING_SCRIPT = `
       setup: '確認接收 Routine 能呼叫 coordinate_bots、relayGatewayConfirmFirstContact 且可讀取可信原生回執，為同事設定 explicit／automatic。將 Skill 的 OpenMausBot 完整流程放入 Routine（已安裝時完整替換既有轉交指令，沿用有效的 Wake 與名錄）：recipientPlatformThreadID 為 null 時用 thread: "new" 轉交一次，立即用 Wake 的三個識別碼及原生回執呼叫 relayGatewayConfirmFirstContact，確認成功才結束；為字串時直接使用該 ID 轉交一次後結束。'
     },
     rakazo: {
-      name: 'Rakazo', office: true, gatewayIdentity: 'rakazo', examples: ['同事 A', '同事 B'],
+      name: 'Rakazo', office: true, gatewayIdentity: 'Rakazo Gateway', examples: ['同事 A', '同事 B'],
       wakeSetup: 'Rakazo 支援由 Webhook 事件觸發的 Routine，不是只有定時任務。' +
         '先使用 schedule_list 檢查本 Gateway Bot 是否已有有效的 Nuwa Wake 接收 Routine；若有就沿用，不要重建。' +
         '若沒有，直接呼叫 schedule_create，name 使用 "Nuwa Wake Receiver"，' +

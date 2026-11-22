@@ -387,14 +387,18 @@ test('browser language and manual selection localize prompts while preserving in
       set title(value: string) { browser.title = value; },
       getElementById(id: string) {
         const element = elements.get(id);
-        if (!element) throw Error('Unexpected DOM id: ' + id);
+        if (!element) {
+          throw Error('Unexpected DOM id: ' + id);
+        }
         return element;
       },
       createTreeWalker() {
         let used = false;
         return {
           nextNode() {
-            if (used) return null;
+            if (used) {
+              return null;
+            }
             used = true;
             return textNode;
           },

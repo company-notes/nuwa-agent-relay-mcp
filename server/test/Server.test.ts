@@ -265,6 +265,49 @@ test('an existing unnamed ChatGPT client sets its own display name without repla
   }
 });
 
+test('a shared OAuth coworker cannot rename an already named Gateway Session', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const first = await scenario.tool('agentAddressEnsureIdentity', {
+      agentDisplayName: 'rakazo',
+    });
+    const gateway = JSON.parse(first.result.content[0].text) as {
+      sessionID: string; canonical: string;
+    };
+
+    assert.equal(first.result.isError, undefined);
+    assert.equal(scenario.agentDisplayNames.get(gateway.sessionID), 'rakazo');
+
+    // All Rakazo coworkers use one OAuth connector. A coworker's personal
+    // setup must not rename the shared Gateway or block roster enrollment.
+    const leon = await scenario.tool('agentAddressEnsureIdentity', {
+      agentDisplayName: '方承宇 (Leon Fang) | 數位協作事業部主管',
+    }, 'oauth-a-refresh');
+    assert.equal(leon.result.isError, true);
+    assert.match(JSON.stringify(leon), /This OAuth connector already owns a named Agent/);
+    assert.equal(scenario.agentDisplayNames.get(gateway.sessionID), 'rakazo');
+    assert.equal(scenario.displayNameUpdates.length, 0);
+    assert.equal(scenario.database.rows.size, 1);
+
+    const same = await scenario.tool('agentAddressEnsureIdentity', {
+      agentDisplayName: 'rakazo',
+    });
+    assert.equal(same.result.isError, undefined);
+    assert.equal(JSON.parse(same.result.content[0].text).sessionID, gateway.sessionID);
+    assert.equal(scenario.displayNameUpdates.length, 0);
+
+    const normalSend = await scenario.tool('sendToAgent', {
+      to: 'nuwainfo/claire/main', message: 'Shared office connection remains available.',
+    });
+    assert.equal(normalSend.result.isError, undefined);
+    assert.equal(scenario.database.rows.size, 1);
+  } finally {
+    scenario.restore();
+  }
+});
+
 test('keeps the same independent Session after an Organization and Agent rename', async () => {
   const scenario = new RemoteMCPScenario();
   scenario.install();

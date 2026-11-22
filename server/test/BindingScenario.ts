@@ -141,6 +141,7 @@ export class RemoteMCPScenario {
   readonly activeLeases = new Map<string, string>();
   organizationSlug = 'nuwa';
   private readonly agentHandles = new Map<string, string>();
+  readonly agentDisplayNames = new Map<string, string>();
 
   renameAddress(slug: string, sessionID: string, handle: string) {
     this.organizationSlug = slug;
@@ -363,6 +364,9 @@ export class RemoteMCPScenario {
           const sessionID = principal[0] === 'b' ? SESSION_B : SESSION_A;
           const runtime = principal[0] === 'b' ? RUNTIME_SECRET + '_b' : RUNTIME_SECRET;
           this.activeLeases.set(sessionID, runtime);
+          if (body?.agentDisplayName) {
+            this.agentDisplayNames.set(sessionID, body.agentDisplayName);
+          }
 
           this.agentHandles.set(sessionID, body?.agentDisplayName === '小晴'
             ? 'xiaoqing' : 'reviewer-' + principal[0]);
@@ -474,6 +478,7 @@ export class RemoteMCPScenario {
           this.displayNameUpdates.push({
             agentID: ownAgentID, name, principal: principal[0],
           });
+          this.agentDisplayNames.set(principal[0] === 'b' ? SESSION_B : SESSION_A, name);
 
           return Response.json({ ok: true, data: {
             id: ownAgentID, displayName: name,
@@ -501,6 +506,7 @@ export class RemoteMCPScenario {
               id: other ? SESSION_B : SESSION_A,
               agentId: other ? 'agent-b' : 'agent-a',
               canonical: this.canonical(other ? SESSION_B : SESSION_A),
+              agentDisplayName: this.agentDisplayNames.get(other ? SESSION_B : SESSION_A) ?? null,
             },
           });
         }

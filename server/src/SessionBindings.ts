@@ -399,11 +399,24 @@ export class SessionBindings {
   ): Promise<void> {
     const own = await client.getSession(row.sessionID) as {
       id?: string; agentId?: string; canonical?: string;
+      agentDisplayName?: string | null;
     };
 
     if (!own || own.id !== row.sessionID || !own.agentId) {
       throw new APIError(409, 'binding_identity_mismatch',
         'The authorized Agent/Session no longer matches this private binding.');
+    }
+
+    // The same OAuth grant can be used by several native coworkers. Only an
+    // unnamed bound Agent may be named here; a named Gateway is not a coworker.
+    if (own.agentDisplayName?.trim()) {
+      if (own.agentDisplayName !== displayName) {
+        throw new APIError(409, 'identity_name_preserved',
+          'This OAuth connector already owns a named Agent. Do not rename it as a coworker. ' +
+          'Use the coworker native Bot ID as from; explicit owner renames belong in Agent Address management.');
+      }
+
+      return;
     }
 
     const updated = await client.setAgentDisplayName(own.agentId, displayName) as {

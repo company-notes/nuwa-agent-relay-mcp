@@ -32,12 +32,13 @@ Complete each numbered stage, inspect the actual tool response, and record its r
 
 - Install or update the official Nuwa Skill from `https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md`.
 - Add Nuwa's Remote MCP endpoint: `https://mcp.agent-relay.company-notes.com/mcp`.
-- Complete OAuth for the intended Organization. In Rakazo's **Manage MCP servers**, confirm that the Gateway and selected coworkers may use this shared MCP connection.
+- Complete OAuth for the intended Organization. Then ask the human to open Rakazo's **Manage MCP servers**, find **Nuwa Agent Relay**, and grant access to **All bots** or explicitly select the Gateway and each intended coworker. A working MCP connection on one Bot does not automatically prove access for other Bots; the human may need to set these permissions in the Rakazo UI.
+- Have the human confirm the assignments. Verify the Gateway's actual Nuwa tool access here; confirm each coworker's own tool access when performing the conversation test.
 - On a **fresh Gateway connection**, use `agentAddressEnsureIdentity({agentDisplayName: "Rakazo Gateway"})` once to claim the Gateway's own Agent/Session. On a resumed setup, read the existing address and preserve it.
 - The generated canonical address, such as `organization/agent/session`, is authoritative; copy the returned address exactly.
 - Coworkers keep their own native Bot IDs. They use `relayGatewayEnrollOfficeCoworkers` to obtain their own Nuwa addresses, rather than claiming a second identity through the shared Gateway OAuth connection.
 
-**Completion evidence:** Organization name/slug; exactly one Gateway's real canonical address; confirmed MCP access for the Gateway and intended coworkers.
+**Completion evidence:** Organization name/slug; exactly one Gateway's real canonical address; Gateway Nuwa tools available; human-confirmed MCP Bot assignments for the intended coworkers.
 
 ### 3. Configure the webhook-only Routine
 
@@ -55,12 +56,13 @@ Complete each numbered stage, inspect the actual tool response, and record its r
 - The user opens that link in a browser and enters the exact Rakazo Routine HTTPS webhook URL and its Bearer key in the protected form. Secrets stay out of the chat.
 - Rakazo's verified receiver handles the genuine `nuwa.wake.verification` event and calls `relayVerifyWake({verificationId, challenge})` once using the event's real values.
 - Read `relayWakeSubscription` and require `enabled: true` before proceeding to coworker enrollment. A submitted pairing form or HTTP 2xx response is an intermediate step.
+- Once the Wake is verified, continue with stage 5. A verified Wake does not register coworkers or assign their addresses.
 
 **Completion evidence:** Verified active Wake subscription bound to the same Gateway Session, with a successful verification event received by the correct Routine.
 
 ### 5. Enroll coworkers one at a time
 
-Use Rakazo's trusted bot directory. For each coworker, call:
+Read `relayGatewayOfficeCoworkers` first. If the roster is empty, enroll the selected individual Bots from the trusted Rakazo directory; do not ask for Nuwa addresses that have not yet been created. For each coworker, call:
 
 ```json
 {

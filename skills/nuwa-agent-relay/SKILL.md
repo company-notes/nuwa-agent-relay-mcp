@@ -190,7 +190,7 @@ directory or history queries.
 
 **Read the matching platform reference before installing or updating an office Gateway.** Each guide gives the complete native forwarding procedure and the platform-specific setup steps:
 
-- [GrokBot Gateway](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/grokbot.md) — §platform§ mode; a restricted Routine hands off via WakeParent once with the complete original trusted event, then the parent performs one native forward.
+- [GrokBot Gateway](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/grokbot.md) — `platform` mode; a restricted Routine hands off via WakeParent once with the complete original trusted event, then the parent performs one native forward.
 - [OpenMausBot Gateway](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/openmausbot.md) — explicit native conversation; initial native receipt is confirmed before completion.
 - [Rakazo Gateway](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/rakazo.md) — webhook-only Routine, shared OAuth, verified Wake, individually checked coworker enrollment and native dispatch.
 

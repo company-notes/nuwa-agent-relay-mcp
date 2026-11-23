@@ -375,50 +375,21 @@ export const ONBOARDING_SCRIPT = `
 
   function gatewaySetup(platform) {
     if (locale !== 'zh-Hant') return foreignGatewaySetup(platform);
-    if (platform.name === 'Rakazo') {
-      return [
-        '請擔任 Rakazo 的 Nuwa 接線助理（Gateway），幫助同一工作空間的 AI 同事互相通訊。',
-        '',
-        '第一份：Nuwa 共用操作指南 ' + skillURL,
-        '第二份：Rakazo 專屬英文安裝指南 ' +
-          'https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/rakazo.md',
-        '連線網址：' + mcpURL,
-        '',
-        '請先完整讀取以上兩份文件，再依 Rakazo 專屬指南的 1–7 階段逐項執行。',
-        '每個階段都必須取得真實的工具回傳或平台設定證據，然後才進入下一階段。',
-        'Gateway 使用自己的 Nuwa 身分；每位同事用自己的原生 Bot ID 登記及傳訊。',
-        'Webhook 請使用完整的 Rakazo Routine URL；授權連結及金鑰由使用者在安全頁面操作。',
-        '若工具出錯，請先讀取現有狀態，回報已完成、待完成及實際錯誤的階段。',
-        '完成後回報 Gateway 地址、Wake 驗證狀態、每位同事的正式地址及收件方式。',
-        '最後讓兩位同事互相傳訊，在兩邊實際收到並回覆後再宣告通訊成功。'
-      ].join('\\n');
-    }
-
+    var guide = 'https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/';
+    var file = platform.name === 'Rakazo' ? 'rakazo.md' :
+      platform.name === 'GrokBot' ? 'grokbot.md' : 'openmausbot.md';
     return [
-      '請擔任 ' + platform.name + ' 的 Nuwa 接線助理（Gateway），讓同一 Organization 的 AI 同事可以互相聯絡。',
+      '請擔任 ' + platform.name + ' 的 Nuwa 接線助理（Gateway），協助真正的同事跨平台通訊。',
       '',
-      '官方 Skill：' + skillURL,
+      '英文共用 Skill：' + skillURL,
+      '本平台英文安裝指南：' + guide + file,
       'Nuwa MCP：' + mcpURL,
       '',
-      '請依最新版 Skill，安裝或更新 Skill 與 MCP，完成 Organization 授權，沿用既有身分。',
-      '本平台新辦公室的 Gateway 身分名稱固定使用「' + platform.gatewayIdentity +
-        '」。先確認目前連線屬於這個辦公室；首次建立時使用 ' +
-        'agentAddressEnsureIdentity({agentDisplayName: "' + platform.gatewayIdentity +
-        '"})。已安裝的同一辦公室沿用原有身分、Wake 與名錄，即使現有名稱不同。' +
-        '目前授權若屬於其他辦公室，請使用者為本辦公室取得獨立授權，保留對方原有設定。',
-      '1. ' + (platform.wakeSetup ||
-        '設定本辦公室唯一的 Wake 接收例行任務並完成驗證；沿用有效的接線。') +
-        ' 只變更 Webhook 接收網址時，請使用者開啟 https://agent-relay.company-notes.com/manage，經 Agent Address OAuth 登入後選擇原有 Gateway Session 的「更新連線網址」，貼上新 Quick Tunnel 網址，保留原本的路徑與加密金鑰。只有首次設定或更新 Bearer key 才使用配對流程：配對連結直接交給使用者，由使用者自己開啟瀏覽器、登入並填寫 Webhook HTTPS URL 和 Bearer key。Gateway 負責接收驗證事件。',
-      '2. 從平台可信 Bot 名錄取得真實同事的名稱與 Bot ID（排除自己及群組／頻道），批次接入同事，沿用既有地址與名錄。同步新增與改名，保留獨立成員的接入模式；移除需明確授權。' +
-        (platform.separateConnectors
-          ? ' 逐一確認 Gateway 與每位同事的 nuwa-agent-relay 連接器。未開啟時列出助理名稱，請管理者開啟後再標記可通訊。'
-          : ''),
-      '3. ' + platform.setup,
-      '4. 收到正常 Wake 時，依 recipientBotID 使用平台原生工具轉交一次，完整轉交正文、寄件者及原 Relay Thread 回覆上下文，讓本人依 Skill 回覆。附上 relayReplyThread({from, threadID, body}) 的呼叫格式，帶入實際 Thread ID，from 直接填 recipientBotID（UUID 或 bot: 前綴的原生 ID），由同事填回覆正文。',
-      platform.separateConnectors
-        ? '   Routine 使用自包含指令；依 OpenMausBot 首次／後續流程完成轉交。首次必須確認，後續零 MCP 查詢，提交後結束。'
-        : '   Routine 使用自包含指令；日常零 MCP 查詢，提交後結束。明確原生首聯確認依平台契約執行。',
-      '5. 回報 Gateway 地址、Wake 狀態及已接入同事名單、各自地址和收件方式；引導我使用兩位已接入的同事進行雙向通訊。發送方提交一次後結束，等待接收方自然收到及回覆。'
+      '請先讀完共用 Skill 和本平台指南，依照指南的七個階段逐步完成安裝與授權。',
+      '每一步都檢查真實的工具回傳，確認完成證據後才繼續；失敗時先核對已完成的狀態。',
+      'Gateway 保有自己的身分；同事透過可信名錄中的原生 Bot ID 登記，並以自己的身分發訊及回覆。',
+      '完成後回報 Gateway 地址、驗證成功的 Wake、每位同事的正式地址及收件方式。',
+      '最後讓兩位同事雙向發訊並在原對話回覆，收到並實際回覆後才表示接通。'
     ].join('\\n');
   }
 

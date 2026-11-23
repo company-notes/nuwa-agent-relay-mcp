@@ -87,6 +87,7 @@ export class ManagementBindingCleanup {
 
     const slots = actual.map(() => '?').join(', ');
     const parameters = [organization.id, ...actual];
+
     const fixed = await this.env.BINDINGS_DB.prepare(
       'DELETE FROM remote_session_bindings WHERE organization_id = ? AND session_id IN (' + slots + ')',
     ).bind(...parameters).run();

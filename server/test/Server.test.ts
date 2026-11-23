@@ -1107,3 +1107,47 @@ test('explicit office Gateway confirms the actual native Thread after first deli
     scenario.restore();
   }
 });
+
+
+test('owner resets one Agent binding after preview without affecting another OAuth Session', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    assert.equal((await scenario.bind()).status, 201);
+    const another = await scenario.tool('agentAddressEnsureIdentity', {}, 'oauth-b');
+    assert.equal(another.result.isError, undefined);
+    assert.equal(scenario.database.rows.size, 2);
+
+    const path = 'https://mcp.agent-relay.company-notes.com/v2/management/agents/agent-a/bindings';
+    const operation = async (agentID: string, sessionIDs: string[], origin: string) =>
+      scenario.application.handle(new Request(path.replace('/agent-a/', '/' + agentID + '/'), {
+        method: 'DELETE',
+        headers: {
+          authorization: 'Bearer oauth-a',
+          origin,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ confirmAgentID: agentID, sessionIDs }),
+      }));
+
+    const invalidOrigin = await operation('agent-a', [SESSION_A], 'https://untrusted.example');
+    assert.equal(invalidOrigin.status, 403);
+    assert.equal(scenario.database.rows.size, 2);
+
+    const invalidSession = await operation('agent-a', [SESSION_B], 'https://agent-relay.company-notes.com');
+    assert.equal(invalidSession.status, 409);
+    assert.equal(scenario.database.rows.size, 2);
+
+    const cleaned = await operation('agent-a', [SESSION_A], 'https://agent-relay.company-notes.com');
+    assert.equal(cleaned.status, 200);
+    assert.deepEqual(await cleaned.json(), { ok: true, data: {
+      agentID: 'agent-a',
+      cleared: { fixedBindings: 1, workSessions: 0, workAgentRegistrations: 0 },
+    } });
+    assert.equal(scenario.database.rows.size, 1);
+    assert.equal([...scenario.database.rows.values()][0].sessionID, SESSION_B);
+  } finally {
+    scenario.restore();
+  }
+});

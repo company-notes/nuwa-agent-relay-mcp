@@ -95,6 +95,25 @@ class MemoryStatement implements BindingStatement {
       return { meta: { changes: 1 } };
     }
 
+    if (this.sql.startsWith('DELETE FROM remote_session_bindings WHERE organization_id')) {
+      const [organizationID, ...sessionIDs] = this.parameters;
+      let changes = 0;
+
+      for (const [key, record] of this.store) {
+        if (record.organizationID === organizationID && sessionIDs.includes(record.sessionID)) {
+          this.store.delete(key);
+          changes += 1;
+        }
+      }
+
+      return { meta: { changes } };
+    }
+
+    if (this.sql.startsWith('DELETE FROM remote_work_session_bindings') ||
+        this.sql.startsWith('DELETE FROM remote_work_agents')) {
+      return { meta: { changes: 0 } };
+    }
+
     if (this.sql.startsWith('DELETE FROM remote_session_bindings')) {
       const [key, token] = this.parameters;
       const current = this.store.get(key);
@@ -486,7 +505,26 @@ export class RemoteMCPScenario {
         }
 
         if (url.pathname === '/v2/account/agents') {
-          return Response.json({ ok: true, data: [{ id: 'agent-a', handle: 'reviewer' }] });
+          return Response.json({ ok: true, data: [
+            { id: 'agent-a', handle: 'reviewer' },
+            { id: 'agent-b', handle: 'reviewer-b' },
+          ] });
+        }
+
+        if (url.pathname === '/v2/account/agents/agent-a/sessions') {
+          return Response.json({ ok: true, data: [{
+            id: SESSION_A,
+            agentId: 'agent-a',
+            canonical: 'nuwa/reviewer-a/main',
+          }] });
+        }
+
+        if (url.pathname === '/v2/account/agents/agent-b/sessions') {
+          return Response.json({ ok: true, data: [{
+            id: SESSION_B,
+            agentId: 'agent-b',
+            canonical: 'nuwa/reviewer-b/main',
+          }] });
         }
 
         const work = this.workSessions.get(url.pathname.split('/').at(-1) ?? '');

@@ -97,8 +97,8 @@ relayReplyThread({ from: "<自己的原生 Bot ID>", threadID: "<收到的 Relay
 | **3. 建立接收 Routine** | 建立**實際存在、可被外部 HTTPS 呼叫**的 Webhook Routine，填入完整驗證及原生轉交程序，取得可配對的完整 Webhook URL 和 Bearer key。 | Routine 已啟用、外部可達、接收端驗證及轉交工具能力已核對；使用者能在受保護位置取得 URL/key。 |
 | **4. 配對與驗證 Wake** | 呼叫 `relayBeginWakePairing`，人類在受保護網頁提交第 3 階段的 URL／key；接收端處理 `nuwa.wake.verification`，以真實挑戰呼叫 `relayVerifyWake`。 | `relayWakeSubscription` 回傳原 Gateway Session 的 `enabled: true`；配對完成。 |
 | **5. 登記真實同事** | 按可信名錄使用 `relayGatewayEnrollOfficeCoworkers` 登記選定成員，逐項核對 `recipientBotID`、地址、狀態、收件模式與路由。 | 每位同事都有獨立 Agent／Session、正式地址及有效 Gateway 路由。 |
-| **6. 驗證日常轉送** | 讓 Routine 依經驗證 Wake 的 `recipientBotID` 轉交完整訊息及原 Thread 回覆資訊。OpenMausBot 的首次原生對話在此完成確認。 | 收件平台實際提交一次原生訊息、正確收件 Bot ID、正確回覆上下文；首次原生 Thread 綁定完成。 |
-| **7. 真實雙向驗收** | A 發給 B、B 在原 Relay Thread 回覆、B 主動發新訊給 A、A 在新 Thread 回覆，並確認兩邊實際收到。OpenMausBot 加驗原生 Thread 的後續重用。 | 兩個方向的真實收件與回覆、兩條正確 Relay Thread、Receipt、Wake、平台原生證據。 |
+| **6. 設定日常原生轉送** | 將完整 Wake 的 `recipientBotID`、正文及原 Thread 回覆資訊寫入接收 Routine 的固定流程；OpenMausBot 加入使用原生工具收據確認首次聯絡的程序。 | Routine 已安裝自包含轉送程序，能依實際事件選對收件人及回覆上下文；真實投遞由第 7 階段驗收。 |
+| **7. 真實雙向驗收** | A 發給 B、B 在原 Relay Thread 回覆、B 主動發新訊給 A、A 在新 Thread 回覆，並確認兩邊實際收到。OpenMausBot 在此確認首次原生 Thread 綁定完成及同方向後續重用。 | 兩個方向的真實收件與回覆、兩條正確 Relay Thread、Receipt、Wake、平台原生收據；OpenMausBot 首聯已確認及原生對話延續。 |
 
 **重要的安裝依賴：第 3 階段取得可用 Webhook URL 與 key 後，才進入第 4 階段的人工配對。** 首次建立時驗證 Routine 的工具能力可以在第 3 階段實際操作中完成；第 7 階段再用真實訊息確認完整執行路徑。配對連結只能由人類在自己的瀏覽器填寫敏感資料。
 

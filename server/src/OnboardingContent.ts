@@ -85,6 +85,7 @@ export const ONBOARDING_HTML = `<!doctype html>
   <div class="step" id="step2"><div class="step-num">02</div><div class="step-body">
     <div class="step-title"><div><span class="kicker">安裝及授權</span><h3 id="installTitle">請接線助理帶你設定</h3></div></div>
     <p id="installIntro">將下面的指令貼給 GrokBot 的接線助理。它會依官方指南完成安裝，並在需要登入或授權時請你操作。</p>
+    <p class="hint" id="setupModelAdvice">首次安裝或重新接入時，建議先選擇擅長工具操作的模型，例如 Terra、Claude Haiku、Grok 4.7；OpenCode 可選 GLM-5.3-Flash 或 Kimi K2.6。若可設定推理程度，建議設為中或以上；接通後日常轉接可改用更快的模型。</p>
     <div id="installMethodPicker" class="platform-picker" hidden>
       <label for="installMethod">選擇一種安裝方式即可</label>
       <select id="installMethod">

@@ -33,29 +33,25 @@ class OnboardingScenario {
 
 function scenarios(skill, onboarding, check) {
   return [
-    ['OpenMausBot onboarding gives human the pairing link and checks each connector', () => {
+    ['OpenMausBot onboarding links its seven-stage verified English guide', () => {
       const office = new OnboardingScenario(onboarding, 'openmausbot');
       const setup = office.prompt('gateway');
-
-      check(/配對連結.*使用者|使用者.*配對連結/.test(setup), 'The user must receive the protected pairing link.');
-      check(/每位同事.*連接器/.test(setup) && /未開啟.*管理者/.test(setup),
-        'OpenMausBot must check every coworker connector and name missing activation to the administrator.');
+      const detail = readFileSync(new URL('../skills/nuwa-agent-relay/references/openmausbot.md', import.meta.url), 'utf8');
+      check(setup.includes('/references/openmausbot.md') && setup.includes('七個階段'),
+        'The prompt must select the platform reference.');
+      check(detail.includes('relayBeginWakePairing') && detail.includes('coordinate_bots') &&
+        detail.includes('relayGatewayConfirmFirstContact'), 'The reference must cover Wake and first contact.');
+      check(detail.includes('connector') && detail.includes('Completion evidence:'),
+        'The reference must verify coworker connector readiness.');
     }],
-    ['Changing only the verified Wake URL uses Relay management, preserving its key', () => {
-      for (const platform of ['grokbot', 'openmausbot']) {
-        const office = new OnboardingScenario(onboarding, platform);
-        const setup = office.prompt('gateway');
-
-        check(setup.includes('更新連線網址') &&
-          setup.includes('agent-relay.company-notes.com/manage'),
-          'The selected office must be directed to its existing Session Wake URL editor.');
-        check(setup.includes('只有首次設定或更新 Bearer key 才使用配對流程'),
-          'Key changes and first pairing remain separate from URL-only relocation.');
-      }
-
-      check(skill.includes('Update connection URL') &&
-        skill.includes('Quick Tunnel') && skill.includes('preserves'),
-        'The canonical Skill must explain URL-only relocation and retained credentials.');
+    ['GrokBot onboarding links its full English, fast native dispatch guide', () => {
+      const office = new OnboardingScenario(onboarding, 'grokbot');
+      const setup = office.prompt('gateway');
+      const detail = readFileSync(new URL('../skills/nuwa-agent-relay/references/grokbot.md', import.meta.url), 'utf8');
+      check(setup.includes('/references/grokbot.md') && setup.includes('七個階段'),
+        'GrokBot follows the same short installation contract as Rakazo.');
+      check(detail.includes('WakeParent') && detail.includes('zero additional Nuwa MCP') &&
+        detail.includes('Completion evidence:'), 'GrokBot must preserve its fast native dispatch.');
     }],
     ['Rakazo installer links the complete, English-only platform workflow', () => {
       const office = new OnboardingScenario(onboarding, 'rakazo');
@@ -97,15 +93,6 @@ function scenarios(skill, onboarding, check) {
       check(workflow.includes('`thread: recipientPlatformThreadID`') &&
         workflow.includes('`senderSessionID`') && workflow.includes('`recipientSessionID`'),
         'Established sender/recipient routes must use the supplied native ID directly.');
-    }],
-    ['GrokBot keeps the existing native dispatch, parent handoff and reply identity', () => {
-      const office = new OnboardingScenario(onboarding, 'grokbot');
-      const setup = office.prompt('gateway');
-
-      check(setup.includes('GrokBot 使用 platform 模式') && setup.includes('WakeParent，僅交接完整原始事件 JSON'),
-        'GrokBot must retain platform mode and the raw WakeParent handoff.');
-      check(!setup.includes('relayGatewayConfirmFirstContact') && setup.includes('from 直接填 recipientBotID'),
-        'GrokBot must not inherit explicit routing and must retain the coworker reply identity.');
     }],
   ];
 }

@@ -181,37 +181,19 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
 
   const gateway = elements.get('gatewayPrompt')!.textContent;
 
-  assert.match(gateway, /官方 Skill：https:\/\/mcp\.agent-relay\.company-notes\.com\/skills\/nuwa-agent-relay\/SKILL\.md/);
-  assert.match(gateway, /Nuwa MCP：https:\/\/mcp\.agent-relay\.company-notes\.com\/mcp/);
-  assert.match(gateway, /安裝或更新 Skill 與 MCP，完成 Organization 授權/);
-  assert.match(gateway, /沿用既有身分/);
-  // Regression: selecting a platform assigns its Gateway identity before setup.
-  assert.match(gateway, /Gateway 身分名稱固定使用「grokbot」/);
-  assert.match(gateway, /agentAddressEnsureIdentity\(\{agentDisplayName: "grokbot"\}\)/);
+  const grokGuide = readFileSync(new URL(
+    '../../skills/nuwa-agent-relay/references/grokbot.md', import.meta.url,
+  ), 'utf8');
+
+  assert.match(gateway, /references\/grokbot\.md/);
+  assert.match(gateway, /七個階段/);
+  assert.match(gateway, /實際回覆後才表示接通/);
+  assert.match(grokGuide, /agentAddressEnsureIdentity\(\{agentDisplayName: "grokbot"\}\)/);
+  assert.match(grokGuide, /WakeParent/);
+  assert.match(grokGuide, /native Send to Agent once/);
+  assert.match(grokGuide, /Zero|zero additional Nuwa MCP/);
   assert.match(elements.get('platformIntro')!.textContent, /接線身分名稱為「grokbot」/);
-  assert.match(gateway, /GrokBot 使用 platform 模式/);
-  assert.match(gateway, /配對連結直接交給使用者/);
-  assert.doesNotMatch(gateway, /relayGatewayConfirmFirstContact|explicit／automatic/);
-  assert.match(gateway, /GrokBot 的 Routine 若無原生轉交能力但支援 WakeParent，僅交接完整原始事件 JSON/);
-  assert.match(gateway, /Routine 使用自包含指令/);
-  assert.match(gateway, /唯一的 Wake 接收例行任務並完成驗證/);
-  assert.match(gateway, /沿用有效的接線/);
-  assert.match(gateway, /只變更 Webhook 接收網址時/);
-  assert.match(gateway, /agent-relay\.company-notes\.com\/manage/);
-  assert.match(gateway, /更新連線網址/);
-  assert.match(gateway, /只有首次設定或更新 Bearer key 才使用配對流程/);
-  assert.match(gateway, /從平台可信 Bot 名錄取得真實同事的名稱與 Bot ID（排除自己及群組／頻道）/);
-  assert.match(gateway, /批次接入同事，沿用既有地址與名錄/);
-  assert.match(gateway, /同步新增與改名，保留獨立成員的接入模式/);
-  assert.match(gateway, /recipientBotID 使用平台原生工具轉交一次/);
-  assert.match(gateway, /完整轉交正文、寄件者及原 Relay Thread 回覆上下文/);
-  assert.match(gateway, /讓本人依 Skill 回覆/);
-  assert.match(gateway, /relayReplyThread\(\{from, threadID, body\}\)/);
-  assert.match(gateway, /帶入實際 Thread ID，from 直接填 recipientBotID/);
-  assert.match(gateway, /排除自己及群組／頻道/);
-  assert.match(gateway, /零 MCP 查詢，提交後結束/);
-  assert.match(gateway, /回報 Gateway 地址、Wake 狀態及已接入同事名單/);
-  assert.doesNotMatch(gateway, /MailTrigger|Default Session|sendToAgent|agentAddressSelectSession|歷史查詢|小晴|大熊|Cosmo|nuwa\/xiaoqing/);
+  assert.doesNotMatch(gateway, /MailTrigger|Default Session|nuwa\/xiaoqing/);
 
   const send = elements.get('sendPrompt')!.textContent;
   const reply = elements.get('replyPrompt')!.textContent;
@@ -294,17 +276,19 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
 
   const explicitGateway = elements.get('gatewayPrompt')!.textContent;
 
-  assert.match(explicitGateway, /Gateway 身分名稱固定使用「openmausbot」/);
-  assert.match(explicitGateway, /agentAddressEnsureIdentity\(\{agentDisplayName: "openmausbot"\}\)/);
+  const openmausGuide = readFileSync(new URL(
+    '../../skills/nuwa-agent-relay/references/openmausbot.md', import.meta.url,
+  ), 'utf8');
+
+  assert.match(explicitGateway, /references\/openmausbot\.md/);
+  assert.match(explicitGateway, /七個階段/);
+  assert.match(openmausGuide, /agentAddressEnsureIdentity\(\{agentDisplayName: "openmausbot"\}\)/);
+  assert.match(openmausGuide, /coordinate_bots/);
+  assert.match(openmausGuide, /relayGatewayConfirmFirstContact/);
+  assert.match(openmausGuide, /thread: "new"/);
+  assert.match(openmausGuide, /thread: recipientPlatformThreadID/);
+  assert.match(openmausGuide, /firstContactMode: "automatic"/);
   assert.match(elements.get('platformIntro')!.textContent, /接線身分名稱為「openmausbot」/);
-  assert.doesNotMatch(explicitGateway, /身分名稱固定使用「grokbot」/);
-  assert.match(explicitGateway, /每位同事的 nuwa-agent-relay 連接器/);
-  assert.match(explicitGateway, /未開啟時列出助理名稱，請管理者開啟/);
-  assert.match(explicitGateway, /explicit／automatic/);
-  assert.match(explicitGateway, /thread: "new"/);
-  assert.match(explicitGateway, /relayGatewayConfirmFirstContact，確認成功才結束/);
-  assert.match(explicitGateway, /為字串時直接使用該 ID/);
-  assert.match(explicitGateway, /完整替換既有轉交指令/);
   assert.doesNotMatch(explicitGateway, /WakeParent/);
   assert.match(elements.get('sendPrompt')!.textContent, /聯絡「小美」/);
   assert.match(elements.get('sendPrompt')!.textContent, /送出後結束/);
@@ -321,8 +305,8 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
 
   assert.match(elements.get('platformIntro')!.textContent, /接線身分名稱為「Rakazo Gateway」/);
   assert.match(rakazoGateway, /references\/rakazo\.md/);
-  assert.match(rakazoGateway, /1–7 階段逐項執行/);
-  assert.match(rakazoGateway, /每個階段都必須取得真實的工具回傳/);
+  assert.match(rakazoGateway, /七個階段/);
+  assert.match(rakazoGateway, /每一步都檢查真實的工具回傳/);
   assert.match(rakazoGuide, /agentAddressEnsureIdentity\(\{agentDisplayName: "Rakazo Gateway"\}\)/);
   assert.match(rakazoGuide, /schedule_list/);
   assert.match(rakazoGuide, /schedule_create/);

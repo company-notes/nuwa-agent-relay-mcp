@@ -6,8 +6,9 @@ import { MCPToolSet } from './ToolSet';
 import type { WorkContext } from './WorkContext';
 
 export class RelayTools extends MCPToolSet {
-  private static readonly IDENTITY = 'exact registered native Bot ID (plain UUID or opaque ID; bot:<native ID> also works), ' +
-    'complete registered display name, canonical Nuwa address or verified Email alias';
+  private static readonly IDENTITY = 'exact registered native Bot ID ' +
+    '(plain UUID or opaque ID; bot:<native ID> also works), complete registered display name, ' +
+    'canonical Nuwa address or verified Email alias';
   private static readonly RECIPIENT = RelayTools.IDENTITY + ', or a unique short name (e.g. 小晴, Tammy)';
 
   private static readonly FROM = 'On a shared office connection, pass your own ' +

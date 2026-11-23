@@ -73,7 +73,7 @@ export class HTTPMCPApplication {
     }
 
     const resetMatch = url.pathname.match(
-      /^\/v2\/management\/agents\/([0-9a-f-]{36})\/bindings$/,
+      /^\/v2\/management\/agents\/([^/]+)\/bindings$/,
     );
 
     if (url.pathname !== '/mcp' && url.pathname !== '/session-bindings' && !resetMatch) {

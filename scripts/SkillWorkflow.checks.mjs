@@ -58,7 +58,7 @@ function scenarios(skill, onboarding, check) {
       const setup = office.prompt('gateway');
       const detail = readFileSync(new URL('../skills/nuwa-agent-relay/references/rakazo.md', import.meta.url), 'utf8');
 
-      check(setup.includes('/references/rakazo.md') && setup.includes('1–7'),
+      check(setup.includes('/references/rakazo.md') && setup.includes('七個階段'),
         'The prompt must select and order the Rakazo-specific instructions.');
       check(detail.includes('schedule_list') && detail.includes('schedule_create') &&
         detail.includes('on: { webhook: true }'), 'Use the real event-only routine schema.');
@@ -81,9 +81,9 @@ function scenarios(skill, onboarding, check) {
     }],
     ['OpenMausBot first dispatch confirms; bound dispatch reuses the exact native Thread', () => {
       const reference = readFileSync(new URL('../skills/nuwa-agent-relay/references/openmausbot.md', import.meta.url), 'utf8');
-      const start = reference.indexOf('### OpenMausBot');
+      const start = reference.indexOf('### 6. Install native delivery');
       check(start >= 0, 'Put the complete OpenMausBot dispatch algorithm in its own section.');
-      const end = reference.indexOf('\n## ', start + 1);
+      const end = reference.indexOf('\n### 7.', start + 1);
       const workflow = reference.slice(start, end < 0 ? undefined : end);
       const first = workflow.indexOf('`thread: "new"`');
       const confirm = workflow.indexOf('relayGatewayConfirmFirstContact', first);

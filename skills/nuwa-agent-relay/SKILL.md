@@ -44,16 +44,17 @@ On a shared office connection, supply your own registered native Bot ID as
 
 - New conversation: `sendToAgent({from: "Tammy", to: "Bear", message: "Please confirm deployment"})`.
 - Reply to an incoming message: `relayReplyThread({from: "Bear", threadID: "<relayThreadID>", body: "Confirmed"})`.
-- Both `from` and `to` accept a registered native Bot ID (a raw UUID, or
-  `bot:<native ID>` for other IDs), complete registered display name, canonical
-  Nuwa address or verified Email alias. Prefer a known ID from the platform's
-  trusted Bot directory; a group/channel ID is not an individual Bot. Use the
-  coworker's name when the ID is not known. For recipients, unique short names
-  (e.g. Tammy, Tammy or Tammy Lin) also work. Exact registered names take
-  precedence. Relay resolves the recipient in the send request; ask only when
+- Both `from` and `to` accept an exact registered native Bot ID (plain UUID
+  or opaque platform ID, or explicitly `bot:<native ID>`), complete registered
+  display name, canonical Nuwa address or verified Email alias. Prefer a
+  known ID from the platform's trusted Bot directory; a group/channel ID is
+  not an individual Bot. Use the coworker's name when the ID is not known.
+  For recipients, unique short names (e.g. Tammy or Tammy Lin) also work.
+  Exact registered Bot IDs take precedence over names; exact names precede
+  short names. Relay resolves the recipient in the send request; ask only when
   the target is unknown, ambiguous or unavailable. Shared `from` remains an
   exact registered identity.
-- Native ID sender example: `sendToAgent({from: "<your Bot UUID>", to: "<coworker Bot UUID>", message: "Please confirm deployment"})`.
+- Native ID sender example: `sendToAgent({from: "<your registered Bot ID>", to: "<coworker registered Bot ID>", message: "Please confirm deployment"})`.
   Use your own ID from trusted platform context, not the ID of another coworker.
 - Use the forwarded message content directly. Do not fetch it again merely to
   read or reply. Reply only when appropriate to the message or user's request.
@@ -174,8 +175,8 @@ Forward a ready-to-use reply call with the trusted context:
 
 `relayReplyThread({from: "<actual recipientBotID>", threadID: "<actual relayThreadID>", body: "<reply>"})`
 
-Substitute the actual recipientBotID (raw UUID, or `bot:` for other native
-IDs) and relayThreadID; the coworker supplies the reply text.
+Substitute the actual registered recipientBotID (plain or `bot:`-prefixed)
+and relayThreadID; the coworker supplies the reply text.
 Omit `from` on an independent connection.
 
 Choose the platform procedure at setup and install its full instructions

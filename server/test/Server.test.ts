@@ -29,7 +29,8 @@ test('publishes the V2 Skill without exposing internal transport infrastructure'
   assert.match(expected, /relayInbox/);
   assert.match(expected, /WakeParent once with the/);
   assert.match(expected, /references\/rakazo\.md/);
-  assert.match(expected, /Keep the installed Routine instructions self-contained/);
+  assert.match(expected, /Keep its instructions self-contained/);
+  assert.match(expected, /Verify actual webhook-time tool execution during Wake pairing and Acceptance/);
   assert.match(expected, /relayVerifyWake/);
   assert.match(expected, /relayGatewayEnrollOfficeCoworkers/);
   assert.match(expected, /senderDisplayName/);

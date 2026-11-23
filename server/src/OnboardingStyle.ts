@@ -132,6 +132,7 @@ h2 { font-size: clamp(29px,3vw,39px); line-height: 1.35; letter-spacing: -.045em
 .step-num { background: #e2f0e5; border: 1px solid #bfd9ca; width: 50px; height: 50px; border-radius: 50%; color: var(--green); font-size: 16px; font-weight: 900; display: grid; place-items: center; position: sticky; top: 95px; }
 .step-body { background: white; border: 1px solid var(--line); box-shadow: 0 6px 35px rgba(30,69,52,.025); border-radius: 17px; padding: 30px; min-width: 0; }
 .step-body > p { color: var(--muted); font-size: 14px; margin: 14px 0 23px; }
+#setupModelAdvice { color: var(--green); font-weight: 800; border-left: 4px solid var(--green); padding-left: 12px; }
 .step-body strong { color: var(--ink); }
 .platform-picker { max-width: 490px; margin: 22px 0 16px; }
 .platform-picker label { display: block; font-size: 14px; font-weight: 750; margin-bottom: 8px; }

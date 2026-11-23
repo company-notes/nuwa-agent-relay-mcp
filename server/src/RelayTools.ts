@@ -6,7 +6,7 @@ import { MCPToolSet } from './ToolSet';
 import type { WorkContext } from './WorkContext';
 
 export class RelayTools extends MCPToolSet {
-  private static readonly IDENTITY = 'registered native Bot UUID (or bot:<native ID>), ' +
+  private static readonly IDENTITY = 'exact registered native Bot ID (plain UUID or opaque ID; bot:<native ID> also works), ' +
     'complete registered display name, canonical Nuwa address or verified Email alias';
   private static readonly RECIPIENT = RelayTools.IDENTITY + ', or a unique short name (e.g. 小晴, Tammy)';
 
@@ -105,7 +105,7 @@ export class RelayTools extends MCPToolSet {
     this.register('relayReplyThread',
       'Reply in the original Relay Thread using this Session or an enrolled office coworker. ' +
       'Use the trusted relayThreadID forwarded by the office Gateway directly; no message lookup required. ' +
-      'The Wake recipientBotID is the replying Bot\'s own ID (raw UUID or bot:<native ID>). ' +
+      'The Wake recipientBotID is the replying Bot\'s exact registered ID (plain or bot:<native ID>). ' +
       RelayTools.FROM + ' Relay records its coworker Session and the Gateway audit actor.',
       { threadID, from, body, artifactLinks },
       ({ threadID, from, body: text, artifactLinks }) =>

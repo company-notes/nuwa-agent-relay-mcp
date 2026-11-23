@@ -75,6 +75,10 @@ test('office-wide setup does not ask the user to register each coworker by hand'
   assert.doesNotMatch(ONBOARDING_HTML, /id="gatewayPromptA"/);
   assert.doesNotMatch(ONBOARDING_HTML, /id="colleaguePromptA"/);
   assert.match(ONBOARDING_HTML, /已接入過的助理沿用原有地址和有效設定/);
+  assert.match(ONBOARDING_HTML, /首次安裝或重新接入時，建議先選擇擅長工具操作的模型/);
+  assert.match(ONBOARDING_HTML, /Terra、Claude Haiku、Grok 4\.7/);
+  assert.match(ONBOARDING_HTML, /OpenCode 可選 GLM-5\.3-Flash 或 Kimi K2\.6/);
+  assert.match(ONBOARDING_HTML, /推理程度，建議設為中或以上/);
   assert.match(ONBOARDING_HTML, /辦公室同事可由接線助理一次接入/);
   assert.match(ONBOARDING_HTML, /Codex 等開發工具可直接接入/);
   assert.match(ONBOARDING_HTML, /id="platform"/);
@@ -307,6 +311,7 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   assert.match(rakazoGateway, /references\/rakazo\.md/);
   assert.match(rakazoGateway, /七個階段/);
   assert.match(rakazoGateway, /每一步都檢查真實的工具回傳/);
+  assert.match(rakazoGateway, /完成角色設定後，請接續執行安裝步驟/);
   assert.match(rakazoGuide, /agentAddressEnsureIdentity\(\{agentDisplayName: "Rakazo Gateway"\}\)/);
   assert.match(rakazoGuide, /schedule_list/);
   assert.match(rakazoGuide, /schedule_create/);
@@ -360,6 +365,7 @@ test('browser language and manual selection localize prompts while preserving in
     elements.get('colleagueB')!.value = 'Leon';
 
     const textNode = { nodeValue: '開始使用' };
+    const modelAdviceNode = { nodeValue: '首次安裝或重新接入時，建議先選擇擅長工具操作的模型，例如 Terra、Claude Haiku、Grok 4.7；OpenCode 可選 GLM-5.3-Flash 或 Kimi K2.6。若可設定推理程度，建議設為中或以上；接通後日常轉接可改用更快的模型。' };
     const languageStorage = new Map<string, string>();
     const browser: { lang: string; title: string } = {
       lang: 'zh-Hant', title: 'Nuwa Relay｜讓不同平台的 AI 助理互相聯絡',
@@ -377,14 +383,11 @@ test('browser language and manual selection localize prompts while preserving in
         return element;
       },
       createTreeWalker() {
-        let used = false;
+        const nodes = [textNode, modelAdviceNode];
+        let index = 0;
         return {
           nextNode() {
-            if (used) {
-              return null;
-            }
-            used = true;
-            return textNode;
+            return nodes[index++] ?? null;
           },
         };
       },
@@ -408,6 +411,13 @@ test('browser language and manual selection localize prompts while preserving in
     assert.match(elements.get('gatewayPrompt')!.textContent, /references\/rakazo\.md/);
     assert.equal(textNode.nodeValue, expected === 'en' ? 'Get started' :
       expected === 'zh-Hans' ? '开始使用' : '開始使用');
+    assert.match(modelAdviceNode.nodeValue,
+      expected === 'en' ? /For first-time setup or reconnection/ :
+        expected === 'zh-Hans' ? /首次安装或重新接入/ : /首次安裝或重新接入/);
+    assert.match(elements.get('gatewayPrompt')!.textContent,
+      expected === 'en' ? /After establishing your role, continue the installation steps/ :
+        expected === 'zh-Hans' ? /完成角色设置后继续执行安装步骤/ :
+          /完成角色設定後，請接續執行安裝步驟/);
 
     const next = expected === 'en' ? 'zh-Hans' : 'en';
     elements.get('language')!.value = next;

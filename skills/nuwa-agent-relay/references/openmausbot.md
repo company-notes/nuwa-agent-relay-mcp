@@ -20,9 +20,9 @@ Read the [core Skill](https://mcp.agent-relay.company-notes.com/skills/nuwa-agen
 
 Select one Gateway Bot and collect its real ID and the selected coworkers' IDs from the trusted directory. Exclude the Gateway itself, groups and channels.
 
-In OpenMausBot's connector settings, verify that the `nuwa-agent-relay` MCP connector is enabled for **both the Gateway and every selected coworker**. Report any missing activation to the owner, who enables it before the coworker is marked ready. In the actual receiving Routine, confirm both `coordinate_bots` and `relayGatewayConfirmFirstContact` can be called and that the real native tool receipt exposes the native Thread ID.
+Inspect the trusted Bot directory, the platform's connector assignment controls, the available Routine/Webhook creation tools, and the native `coordinate_bots` tool schema. Record how the receiver will obtain the real native Thread ID. The actual receiving Routine is created in stage 3; its first live native receipt is verified in stage 7.
 
-**Completion evidence:** Real Bot roster, connector access for each included Bot, and confirmed native tools/receipt in the receiving Routine.
+**Completion evidence:** Real Bot roster, connector configuration requirements, available Routine/Webhook creation capability and native forwarding schema.
 
 ### 2. Authorize the Gateway identity
 
@@ -30,19 +30,23 @@ Install the official Nuwa Skill and configure Remote MCP `https://mcp.agent-rela
 
 The shared office OAuth connection identifies the Gateway; registered coworkers speak through their own native Bot IDs as `from`.
 
-**Completion evidence:** Real Gateway canonical address and confirmed Nuwa tool access.
+Verify that the `nuwa-agent-relay` connector is enabled for the Gateway and every selected coworker in OpenMausBot's Apps settings. Guide the owner to enable any missing Bot assignment before enrollment.
+
+**Completion evidence:** Real Gateway canonical address, verified Nuwa tool access and actual connector assignment for each intended coworker.
 
 ### 3. Configure the receiving Routine
 
-Install a **self-contained** authenticated Wake receiver with verification handling and the complete native dispatch algorithm from stage 6. Verify the Routine itself can use `coordinate_bots`, `relayGatewayConfirmFirstContact` and the real native receipt.
+Create and enable the **actual Webhook Routine before requesting Wake pairing**. Install a self-contained authenticated Wake receiver with verification handling and the complete native dispatch algorithm from stage 6. Inspect the created Routine's tool context for `coordinate_bots` and `relayGatewayConfirmFirstContact`; its real native Thread receipt is confirmed with the first live message in stage 7.
 
-For an installed office, **replace the entire existing forwarding instruction** in the same Routine, preserving its verified Wake, Gateway identity, coworker roster and native Thread bindings.
+Prepare an externally reachable HTTPS webhook endpoint (including the owner's approved tunnel/reverse proxy when needed). Verify that the owner can retrieve the complete webhook URL and protected Bearer key from the Routine configuration.
 
-**Completion evidence:** A receiving Routine whose actual tool context satisfies both first-contact and established-contact operations.
+For an installed office, update the existing Routine's complete forwarding instruction while retaining the verified Wake, Gateway identity, coworker roster and native Thread bindings.
+
+**Completion evidence:** Enabled receiving Routine, verified forwarding-tool access, an externally reachable HTTPS endpoint, and a complete webhook URL and Bearer key available to the owner in protected settings.
 
 ### 4. Pair and verify one Wake
 
-On a new installation, call `relayBeginWakePairing({})`, then hand `pairingUrl` to the human user. The user opens the protected form and supplies the complete webhook HTTPS URL and Bearer key. Do not copy the secret to chat.
+After stage 3 proves the receiver exists and the owner can obtain its public HTTPS webhook URL and Bearer key, call `relayBeginWakePairing({})` and hand `pairingUrl` to the human user. The owner submits those stage-3 values in the protected browser form. Keep the secret in protected settings.
 
 On a genuine `nuwa.wake.verification` event, call `relayVerifyWake({verificationId, challenge})` once and check `relayWakeSubscription` for `enabled: true`. For a URL-only change, the owner updates the existing Session at [Wake management](https://agent-relay.company-notes.com/manage), keeping its authentication key.
 
@@ -78,7 +82,7 @@ A→B reuses one native conversation even for new Relay Threads; C→B receives 
 
 Have A send once to B. Confirm actual native delivery, B's original Relay Thread reply, and first-contact confirmation. Have A send a second message to B and verify it uses the same native Thread. Then have B initiate to A and verify A's real receipt and reply. A third sender C should produce a separate native Thread for C→B when testing multi-sender isolation.
 
-**Completion evidence:** Correct initial binding, retained conversation for repeated sends, two-way replies and distinct sender-to-recipient native Thread mapping.
+**Completion evidence:** Correct first native Thread receipt and confirmed first-contact binding; the second message from the same sender reuses the identical native Thread; both directions have genuine replies in their original Relay Threads. When a third sender is selected for isolation testing, it creates a distinct native Thread.
 
 ## Recovery and safety
 

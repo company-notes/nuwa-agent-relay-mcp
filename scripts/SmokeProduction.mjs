@@ -41,39 +41,53 @@ const promptText = await prompts.text();
 assert.match(promptText, /function gatewaySetup/);
 assert.match(promptText, /function directSetup/);
 
-// Rakazo can create an event-triggered Routine without any timer.
-const rakazoInstructions = promptText.slice(
-  promptText.indexOf('    rakazo: {'),
-  promptText.indexOf('    codex: {'),
-);
-assert.match(rakazoInstructions, /schedule_list/);
-assert.match(rakazoInstructions, /schedule_create/);
-assert.ok(rakazoInstructions.includes('on: { webhook: true }'));
-assert.match(rakazoInstructions, /不設定 cron、every、runAt/);
-assert.match(rakazoInstructions, /先完成 Routine 建立，才產生 Wake 配對連結/);
-assert.match(promptText, /無須 Gateway/);
-assert.match(promptText, /WakeParent，僅交接完整原始事件 JSON/);
+// The homepage supplies short instructions; full native details live in each reference.
+assert.match(promptText, /references\//);
+for (const filename of ['grokbot.md', 'openmausbot.md', 'rakazo.md']) {
+  assert.ok(promptText.includes(filename), 'The homepage must select the ' + filename + ' guide.');
+}
+
 assert.match(promptText, /verifyPrompt: replyPrompt/);
-assert.match(promptText, /依最新版 Skill/);
-assert.match(promptText, /從平台可信 Bot 名錄取得真實同事的名稱與 Bot ID/);
+assert.match(promptText, /gatewaySetup/);
+assert.match(promptText, /七個階段/);
 assert.match(promptText, /sendPrompt\('colleagueB', '星河', false, platform\)/);
 assert.match(promptText, /sendPrompt\('colleagueA', '月光', true, platform\)/);
-assert.match(promptText, /安裝或更新 Skill 與 MCP/);
-assert.match(promptText, /唯一的 Wake 接收例行任務並完成驗證/);
-assert.match(promptText, /只變更 Webhook 接收網址時/);
-assert.match(promptText, /agent-relay\.company-notes\.com\/manage/);
-assert.match(promptText, /只有首次設定或更新 Bearer key 才使用配對流程/);
-assert.match(promptText, /recipientBotID 使用平台原生工具轉交一次/);
-assert.match(promptText, /零 MCP 查詢，提交後結束/);
-assert.match(promptText, /relayReplyThread\(\{from, threadID, body\}\)/);
-assert.match(promptText, /from 直接填 recipientBotID/);
-assert.match(promptText, /獨立連線省略 from/);
-assert.doesNotMatch(promptText, /MailTrigger|Default Session|agentAddressSelectSession/);
 assert.match(promptText, /colleagueA/);
 assert.match(promptText, /colleagueB/);
-assert.doesNotMatch(promptText, /addressA|addressB|先填入這位助理真正的 Nuwa 地址/);
 assert.doesNotMatch(promptText, /relayProvisionAgentMailbox/,
-  'Public user prompts should not expose internal tool implementation details.');
+  'Public user prompts should not expose mailbox implementation internals.');
+
+const references = [
+  {
+    file: 'grokbot.md',
+    markers: [/WakeParent/, /Send to Agent/, /zero additional Nuwa MCP/],
+  },
+  {
+    file: 'openmausbot.md',
+    markers: [/coordinate_bots/, /relayGatewayConfirmFirstContact/, /recipientPlatformThreadID/],
+  },
+  {
+    file: 'rakazo.md',
+    markers: [/schedule_create/, /on: \{ webhook: true \}/, /relayGatewayOfficeCoworkers/],
+  },
+];
+
+for (const reference of references) {
+  const path = '/skills/nuwa-agent-relay/references/' + reference.file;
+  const response = await request(path);
+  assert.equal(response.status, 200, path + ' should be publicly available.');
+  assert.match(response.headers.get('content-type') || '', /text\/markdown/);
+
+  const content = await response.text();
+  assert.match(content, /### 1\./);
+  assert.match(content, /### 7\./);
+  assert.match(content, /Completion evidence:/);
+
+  for (const marker of reference.markers) {
+    assert.match(content, marker, path + ' must preserve its verified platform procedure.');
+  }
+  assert.doesNotMatch(content, /[\u3400-\u9fff]/, 'The platform reference must remain English-only.');
+}
 
 const styles = await request('/start.css');
 assert.equal(styles.status, 200, 'The guide stylesheet must load.');

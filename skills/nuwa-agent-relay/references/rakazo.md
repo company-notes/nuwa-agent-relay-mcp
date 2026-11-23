@@ -23,10 +23,10 @@ Complete each numbered stage, inspect the actual tool response, and record its r
 
 - Read the trusted Rakazo bot directory. Record the designated Gateway's actual native Bot ID and the intended coworkers' IDs.
 - Keep group or channel identities out of the coworker list.
-- Verify the selected Gateway can use Rakazo's Routine tools and the native Bot-to-Bot forwarding tool in its **Routine execution context**.
-- Record the real forwarding tool's name, input schema and success receipt. If the Routine cannot forward to the required native Bot ID, report this dependency and stop the installation at this stage.
+- Inspect available Rakazo Routine management tools and the native Bot-to-Bot forwarding tool (such as `message_bot`) in the current setup conversation.
+- Record the forwarding tool's name, input schema and support for targeting a native Bot ID. Check actual webhook-Routine tool access when that Routine runs in later stages.
 
-**Completion evidence:** Gateway Bot ID; available Routine tools; confirmed native forward tool/schema in the actual receiver context.
+**Completion evidence:** Gateway Bot ID; coworker Bot IDs; available Routine management tools and a candidate native forwarding tool/schema in the setup context.
 
 ### 2. Connect Nuwa as the Gateway
 
@@ -44,10 +44,10 @@ Complete each numbered stage, inspect the actual tool response, and record its r
 - Call `schedule_list` and inspect the actual Routine triggers. Reuse the designated Gateway's existing verified Nuwa receiver when applicable.
 - On a fresh setup, inspect the `schedule_create` schema and create `Nuwa Wake Receiver` with `on: { webhook: true }`, the complete receiver instructions below and any other fields required by the actual schema.
 - A webhook-only Routine uses an event trigger. Its configuration omits `cron`, `every`, `runAt` and other time-based triggers.
-- Complete any approval the platform requests. Inspect the created Routine, confirm that it is webhook-only and can call the verified native forwarding tool.
+- Complete any approval the platform requests. Inspect the created Routine and confirm its webhook-only trigger and saved receiver instructions.
 - Retrieve the **complete** HTTPS webhook URL and key from Rakazo's Routine management UI. The URL includes the actual Bot webhook path.
 
-**Completion evidence:** Routine name/ID; webhook-only trigger; actual forwarding tool available; exact HTTPS endpoint ready for the user.
+**Completion evidence:** Routine name/ID; webhook-only trigger; receiver instructions saved; exact HTTPS endpoint ready for the user.
 
 ### 4. Pair and verify Wake
 
@@ -81,7 +81,7 @@ After **each** call, invoke `relayGatewayOfficeCoworkers` and confirm that cowor
 
 ### 6. Install the complete receiver procedure
 
-Place a **self-contained** instruction in the Rakazo Routine. Use the native tool name and schema verified in stage 1. Include the trusted webhook authentication mechanism provided by Rakazo's configured endpoint.
+Place a **self-contained** instruction in the Rakazo Routine. Use the native tool name and schema inspected in stage 1. Include the trusted webhook authentication mechanism provided by Rakazo's configured endpoint.
 
 **For `nuwa.wake.verification`:** Use the genuine `verificationId` and `challenge` to call `relayVerifyWake` once; report the result.
 
@@ -97,14 +97,15 @@ Place a **self-contained** instruction in the Rakazo Routine. Use the native too
 
 For invalid or incomplete trusted event fields, report the routing error and stop. If native submission is uncertain, inspect the actual result before retrying to avoid duplicate messages.
 
-**Completion evidence:** The receiver uses the correct real Bot ID, performs exactly one native forward, and includes the original Relay Thread context.
+**Completion evidence:** The saved receiver procedure uses the event's exact Bot ID and original Relay Thread context. Confirm a real native forwarding tool call and receipt during the conversation test in stage 7.
 
 ### 7. Verify a complete conversation
 
 - Ask coworker A to send one distinct test message to coworker B, then finish.
+- Inspect the webhook Routine's actual run and native Bot-to-Bot tool receipt for the exact recipient Bot ID. If the forwarding tool or its approval is unavailable in this runtime, report the observed blocker here.
 - Observe the real native delivery to B and B's reply in the original Relay Thread.
 - Ask B to start another message to A and observe A's reply.
-- Report the two actual Nuwa addresses, the verified Wake, native forwarding result and both round trips. Successful submission alone is not delivery confirmation.
+- Report the two actual Nuwa addresses, the verified Wake, actual native forwarding result and both round trips. Successful submission alone is not delivery confirmation.
 
 ## Boundaries and recovery
 

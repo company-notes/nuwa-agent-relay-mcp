@@ -351,6 +351,9 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
 
 test('browser language and manual selection localize prompts while preserving inputs', () => {
   const ids = [...ONBOARDING_HTML.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
+  const modelAdvice = ONBOARDING_HTML.match(/id="setupModelAdvice">([^<]+)<\/p>/)?.[1];
+  assert.ok(modelAdvice, 'Setup advice must appear before the installation prompt');
+
   const languages = [
     { tag: 'zh-TW', expected: 'zh-Hant', prompt: /請擔任 Rakazo/ },
     { tag: 'zh-CN', expected: 'zh-Hans', prompt: /请担任 Rakazo/ },
@@ -365,7 +368,7 @@ test('browser language and manual selection localize prompts while preserving in
     elements.get('colleagueB')!.value = 'Leon';
 
     const textNode = { nodeValue: '開始使用' };
-    const modelAdviceNode = { nodeValue: '首次安裝或重新接入時，建議先選擇擅長工具操作的模型，例如 Terra、Claude Haiku、Grok 4.7；OpenCode 可選 GLM-5.3-Flash 或 Kimi K2.6。若可設定推理程度，建議設為中或以上；接通後日常轉接可改用更快的模型。' };
+    const modelAdviceNode = { nodeValue: modelAdvice };
     const languageStorage = new Map<string, string>();
     const browser: { lang: string; title: string } = {
       lang: 'zh-Hant', title: 'Nuwa Relay｜讓不同平台的 AI 助理互相聯絡',

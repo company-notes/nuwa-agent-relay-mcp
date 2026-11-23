@@ -102,8 +102,8 @@ Gateway, one Wake, and a roster of individually addressable coworkers.
    `agentAddressEnsureIdentity({agentDisplayName})` using its actual name.
    Reuse its existing verified Wake and roster on the same Session.
 2. Configure the receiving Routine with the complete applicable platform
-   procedure in Gateway dispatch below. Verify tools in the actual Routine
-   execution context. Keep the installed Routine instructions self-contained.
+   procedure in Gateway dispatch below. Keep its instructions self-contained.
+   Verify actual webhook-time tool execution during Wake pairing and Acceptance.
 3. Pair Wake using the human-operated procedure below.
 4. Read the trusted Bot directory and existing roster. Verify access to
    the Nuwa MCP tools. On OpenMausBot, verify every coworker's individual

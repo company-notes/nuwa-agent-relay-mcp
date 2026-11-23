@@ -318,11 +318,24 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   // its webhook Routine exists. The first actual forward is a stage 7 proof.
   const stageOne = rakazoGuide.split('### 1. Choose one Gateway bot')[1]
     .split('### 2. Connect Nuwa as the Gateway')[0];
+  const stageTwo = rakazoGuide.split('### 2. Connect Nuwa as the Gateway')[1]
+    .split('### 3. Configure the webhook-only Routine')[0];
   const stageThree = rakazoGuide.split('### 3. Configure the webhook-only Routine')[1]
     .split('### 4. Pair and verify Wake')[0];
+  const stageFour = rakazoGuide.split('### 4. Pair and verify Wake')[1]
+    .split('### 5. Enroll coworkers one at a time')[0];
+  const stageFive = rakazoGuide.split('### 5. Enroll coworkers one at a time')[1]
+    .split('### 6. Install the complete receiver procedure')[0];
   const stageSeven = rakazoGuide.split('### 7. Verify a complete conversation')[1]
     .split('## Boundaries and recovery')[0];
   assert.match(stageOne, /message_bot|native Bot-to-Bot forwarding tool/);
+  assert.match(stageTwo, /Manage MCP servers/);
+  assert.match(stageTwo, /All bots/);
+  assert.match(stageTwo, /each intended coworker/);
+  assert.match(stageTwo, /human.*confirm|human.*MCP|human.*open/);
+  assert.match(stageFour, /continue with stage 5/);
+  assert.match(stageFive, /relayGatewayOfficeCoworkers/);
+  assert.match(stageFive, /If.*empty.*enroll|empty.*enroll/);
   assert.doesNotMatch(stageOne, /success receipt|stop the installation at this stage/);
   assert.match(stageThree, /Routine name\/ID/);
   assert.match(stageSeven, /actual native forwarding result|native forwarding result/);

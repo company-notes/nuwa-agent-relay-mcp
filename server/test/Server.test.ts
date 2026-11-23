@@ -46,6 +46,8 @@ test('publishes the V2 Skill without exposing internal transport infrastructure'
   assert.match(expected, /relayReplyThread\(\{from: "<actual recipientBotID>", threadID: "<actual relayThreadID>", body: "<reply>"\}\)/);
   assert.match(expected, /group\/channel ID is not an individual Bot/);
   assert.match(expected, /bot:<native ID>/);
+  assert.match(expected, /opaque platform ID/);
+  assert.match(expected, /exact registered Bot IDs take/);
   assert.match(expected, /platform-required\s+tool discovery/);
   assert.match(expected, /Omit `from`\s+on an independent connection/);
   assert.match(expected, /agentAddressStartWork/);

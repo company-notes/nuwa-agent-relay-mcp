@@ -294,6 +294,27 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   assert.match(openmausGuide, /thread: "new"/);
   assert.match(openmausGuide, /thread: recipientPlatformThreadID/);
   assert.match(openmausGuide, /firstContactMode: "automatic"/);
+  // A fresh office must have a real enabled webhook receiver before the
+  // human is asked to submit its protected URL and key for Wake pairing.
+  const omausStageOne = openmausGuide.split('### 1. Choose a Gateway')[1]
+    .split('### 2. Authorize the Gateway identity')[0];
+  const omausStageThree = openmausGuide.split('### 3. Configure the receiving Routine')[1]
+    .split('### 4. Pair and verify one Wake')[0];
+  const omausStageFour = openmausGuide.split('### 4. Pair and verify one Wake')[1]
+    .split('### 5. Enroll coworkers')[0];
+  const omausStageSeven = openmausGuide.split('### 7. Verify first contact')[1]
+    .split('## Recovery and safety')[0];
+  assert.match(omausStageOne, /native forwarding schema/);
+  assert.doesNotMatch(omausStageOne, /real native tool receipt exposes/);
+  assert.match(omausStageThree, /Create and enable the \*\*actual Webhook Routine before requesting Wake pairing/);
+  assert.match(omausStageThree, /externally reachable HTTPS/);
+  assert.match(omausStageThree, /complete webhook URL and Bearer key/);
+  assert.match(omausStageFour, /After stage 3 proves the receiver exists/);
+  assert.match(omausStageSeven, /second message from the same sender/);
+  assert.match(omausStageSeven, /confirmed first-contact binding/);
+  assert.ok(openmausGuide.indexOf('### 3. Configure the receiving Routine') <
+    openmausGuide.indexOf('### 4. Pair and verify one Wake'));
+
   assert.match(elements.get('platformIntro')!.textContent, /接線身分名稱為「openmausbot」/);
   assert.doesNotMatch(explicitGateway, /WakeParent/);
   assert.match(elements.get('sendPrompt')!.textContent, /聯絡「小美」/);

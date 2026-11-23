@@ -11,6 +11,7 @@ import { SessionBindings } from './SessionBindings';
 import { SessionBindingController } from './SessionBindingController';
 import { OnboardingPage } from './OnboardingPage';
 import { WorkContext } from './WorkContext';
+import { ManagementBindingCleanup } from './ManagementBindingCleanup';
 
 export class HTTPMCPApplication {
   private static readonly logger = Logger.forModule('mcp');
@@ -71,7 +72,11 @@ export class HTTPMCPApplication {
       return Response.json(oauth.metadata(url.origin));
     }
 
-    if (url.pathname !== '/mcp' && url.pathname !== '/session-bindings') {
+    const resetMatch = url.pathname.match(
+      /^\/v2\/management\/agents\/([0-9a-f-]{36})\/bindings$/,
+    );
+
+    if (url.pathname !== '/mcp' && url.pathname !== '/session-bindings' && !resetMatch) {
       return new Response('Not found', { status: 404 });
     }
 
@@ -90,6 +95,16 @@ export class HTTPMCPApplication {
     }
 
     const address = new AddressAPIClient(this.env, result.authorization, undefined, result.status);
+
+    if (resetMatch) {
+      try {
+        return await new ManagementBindingCleanup(this.env, address).handle(request, resetMatch[1]);
+      } catch (error) {
+        HTTPMCPApplication.logger.exception('management_binding_cleanup_failed', error);
+
+        return SessionBindingController.error(error);
+      }
+    }
 
     if (url.pathname === '/session-bindings') {
       try {

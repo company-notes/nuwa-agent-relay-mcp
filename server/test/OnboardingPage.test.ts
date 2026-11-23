@@ -5,6 +5,7 @@ import test from 'node:test';
 
 import { ONBOARDING_HTML } from '../src/OnboardingContent';
 import { ONBOARDING_SCRIPT } from '../src/OnboardingInteractions';
+import { ONBOARDING_CSS } from '../src/OnboardingStyle';
 import { RemoteMCPScenario } from './BindingScenario';
 
 const origin = 'https://mcp.agent-relay.company-notes.com';
@@ -76,6 +77,7 @@ test('office-wide setup does not ask the user to register each coworker by hand'
   assert.doesNotMatch(ONBOARDING_HTML, /id="colleaguePromptA"/);
   assert.match(ONBOARDING_HTML, /已接入過的助理沿用原有地址和有效設定/);
   assert.match(ONBOARDING_HTML, /首次安裝或重新接入時，建議先選擇擅長工具操作的模型/);
+  assert.match(ONBOARDING_CSS, /#setupModelAdvice[^}]*font-weight:\s*(?:7\d\d|8\d\d|bold)/);
   assert.match(ONBOARDING_HTML, /Terra、Claude Haiku、Grok 4\.7/);
   assert.match(ONBOARDING_HTML, /OpenCode 可選 GLM-5\.3-Flash 或 Kimi K2\.6/);
   assert.match(ONBOARDING_HTML, /推理程度，建議設為中或以上/);
@@ -312,6 +314,18 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   assert.match(rakazoGateway, /七個階段/);
   assert.match(rakazoGateway, /每一步都檢查真實的工具回傳/);
   assert.match(rakazoGateway, /完成角色設定後，請接續執行安裝步驟/);
+  // The receiver cannot provide a successful native-forward receipt before
+  // its webhook Routine exists. The first actual forward is a stage 7 proof.
+  const stageOne = rakazoGuide.split('### 1. Choose one Gateway bot')[1]
+    .split('### 2. Connect Nuwa as the Gateway')[0];
+  const stageThree = rakazoGuide.split('### 3. Configure the webhook-only Routine')[1]
+    .split('### 4. Pair and verify Wake')[0];
+  const stageSeven = rakazoGuide.split('### 7. Verify a complete conversation')[1]
+    .split('## Boundaries and recovery')[0];
+  assert.match(stageOne, /message_bot|native Bot-to-Bot forwarding tool/);
+  assert.doesNotMatch(stageOne, /success receipt|stop the installation at this stage/);
+  assert.match(stageThree, /Routine name\/ID/);
+  assert.match(stageSeven, /actual native forwarding result|native forwarding result/);
   assert.match(rakazoGuide, /agentAddressEnsureIdentity\(\{agentDisplayName: "Rakazo Gateway"\}\)/);
   assert.match(rakazoGuide, /schedule_list/);
   assert.match(rakazoGuide, /schedule_create/);

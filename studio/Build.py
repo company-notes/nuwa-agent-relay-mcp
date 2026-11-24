@@ -42,7 +42,7 @@ class BuildApplication:
         self.runCommand([
             str(python), "-m", "PyInstaller", "--noconfirm", "--clean",
             "--onefile", "--console", "--name", self.name,
-            "--collect-all", "fastmcp", "--collect-all", "mcp",
+            "--collect-all", "fastmcp", "--collect-data", "mcp",
             "--collect-all", "mcp_install", "--recursive-copy-metadata", "fastmcp",
             "--copy-metadata", self.name,
             "--add-data", f'{self.root.parent / "install.config.json"}{os.pathsep}src',

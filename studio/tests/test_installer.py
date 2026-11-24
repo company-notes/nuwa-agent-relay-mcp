@@ -2,7 +2,7 @@
 
 import os
 import subprocess
-import sys
+import sysconfig
 import tomllib
 from pathlib import Path
 
@@ -19,8 +19,12 @@ class TestStudioInstall:
         })
         env.pop("NUWA_STUDIO_MCP_BINARY", None)
 
+        name = "nuwa-relay-mcp.exe" if os.name == "nt" else "nuwa-relay-mcp"
+        launcher = Path(sysconfig.get_path("scripts")) / name
+        assert launcher.is_file(), "The installed distribution must expose nuwa-relay-mcp"
+
         result = subprocess.run(
-            [sys.executable, "-m", "src", *arguments, "--target", "codex"],
+            [str(launcher), *arguments, "--target", "codex"],
             env=env, cwd=home, capture_output=True, text=True, encoding="utf-8",
             timeout=60, check=False,
         )

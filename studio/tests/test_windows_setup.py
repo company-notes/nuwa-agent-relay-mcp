@@ -1,7 +1,9 @@
 """Run the real Windows Setup and its installed stdio MCP on a disposable profile."""
 
 import asyncio
+import json
 import os
+import sys
 import time
 from importlib.metadata import version
 from pathlib import Path
@@ -38,6 +40,22 @@ class TestWindowsSetup:
                 assert {"sendToAgent", "replyThread"} <= {tool.name for tool in tools.tools}
 
     @classmethod
+    def verifyClaudeRegistration(cls, profile, claude, executable):
+        details = profile.run(str(claude), "mcp", "get", "nuwa-agent-relay-studio")
+        assert str(executable).lower() in details.lower()
+
+    @classmethod
+    def verifyClaudeAbsent(cls, profile, claude):
+        result = profile.runResult(
+            str(claude), "mcp", "remove", "-s", "user", "nuwa-agent-relay-studio",
+        )
+
+        assert result.returncode != 0, "Claude MCP registration must be absent"
+        assert 'No MCP server named "nuwa-agent-relay-studio" in user scope' in (
+            result.stderr + result.stdout
+        )
+
+    @classmethod
     def waitForUninstall(cls, executable, uninstaller):
         deadline = time.monotonic() + 60
 
@@ -60,6 +78,14 @@ class TestWindowsSetup:
         uninstaller = destination / "Uninstall.exe"
         expectedVersion = version("nuwa-relay-mcp")
         assert setup.is_file(), "Windows Setup must exist before running acceptance"
+        claude = Path(os.environ["NUWA_TEST_CLAUDE_CLI"]).resolve()
+        assert claude.is_file(), "Real Claude Code CLI is required for Setup acceptance"
+        profile.env["CLAUDE_CLI_PATH"] = str(claude)
+        profile.env["DISABLE_AUTOUPDATER"] = "1"
+
+        self.verifyClaudeAbsent(profile, claude)
+        profile.run(str(claude), "mcp", "add-json", "-s", "user", "nuwa-unrelated",
+                    json.dumps({"command": sys.executable, "args": ["--version"]}))
 
         identity = Path(profile.env["NUWA_MCP_HOME"]) / "auth.json"
         identity.parent.mkdir()
@@ -78,6 +104,8 @@ class TestWindowsSetup:
         assert profile.servers()["other"]["command"] == "other"
         assert (profile.skill / "SKILL.md").is_file()
         assert (profile.skill / "references" / "work-clients.md").is_file()
+        self.verifyClaudeRegistration(profile, claude, executable)
+        assert (profile.home / ".claude" / "skills" / "nuwa-agent-relay" / "SKILL.md").is_file()
         asyncio.run(asyncio.wait_for(self.verifyMCP(executable, profile), timeout=90))
 
         profile.run(str(setup), "/S", f"/D={destination}", timeout=300)
@@ -85,9 +113,14 @@ class TestWindowsSetup:
         assert Path(profile.servers()["nuwa-agent-relay-studio"]["command"]) == executable
         assert (profile.skill / "SKILL.md").is_file()
 
+        self.verifyClaudeRegistration(profile, claude, executable)
+
         profile.run(str(uninstaller), "/S", timeout=300)
         self.waitForUninstall(executable, uninstaller)
         assert "nuwa-agent-relay-studio" not in profile.servers()
         assert profile.servers()["other"]["command"] == "other"
         assert not profile.skill.exists()
         assert identity.read_text(encoding="utf-8") == "local identity sentinel"
+        assert not (profile.home / ".claude" / "skills" / "nuwa-agent-relay").exists()
+        self.verifyClaudeAbsent(profile, claude)
+        profile.run(str(claude), "mcp", "remove", "-s", "user", "nuwa-unrelated")

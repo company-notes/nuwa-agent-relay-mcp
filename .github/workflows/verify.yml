@@ -90,6 +90,18 @@ jobs:
             choco install nsis --yes --no-progress
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
+      - name: Install real Claude Code native CLI for Windows acceptance
+        shell: pwsh
+        run: |
+          $prefix = Join-Path $env:RUNNER_TEMP "claude-cli"
+          npm install --prefix $prefix --no-save --ignore-scripts @anthropic-ai/claude-code-win32-x64@2.1.331
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $binaries = @(Get-ChildItem -Path $prefix -Recurse -File -Filter claude.exe)
+          if ($binaries.Count -ne 1) { throw "Expected one native Claude Code executable" }
+          $claude = $binaries[0].FullName
+          & $claude --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "NUWA_TEST_CLAUDE_CLI=$claude" >> $env:GITHUB_ENV
       - name: Build standalone Relay MCP and Windows Setup
         run: python studio/Build.py
       - name: Verify real Setup install, upgrade, MCP stdio and uninstall

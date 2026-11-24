@@ -31,11 +31,14 @@ class InstallerProfile:
         self.originalConfig = self.config.read_bytes()
         self.skill = home / ".agents" / "skills" / "nuwa-agent-relay"
 
-    def run(self, *command: str, timeout: int = 60):
-        result = subprocess.run(
+    def runResult(self, *command: str, timeout: int = 60):
+        return subprocess.run(
             list(command), env=self.env, cwd=self.home, capture_output=True,
             text=True, encoding="utf-8", errors="replace", timeout=timeout, check=False,
         )
+
+    def run(self, *command: str, timeout: int = 60):
+        result = self.runResult(*command, timeout=timeout)
 
         assert result.returncode == 0, result.stdout + result.stderr
         return result.stdout

@@ -18,11 +18,13 @@ class TestStudioInstall:
             "NUWA_MCP_HOME": str(home / "nuwa"),
         })
         env.pop("NUWA_STUDIO_MCP_BINARY", None)
+
         result = subprocess.run(
             [sys.executable, "-m", "src", *arguments, "--target", "codex"],
             env=env, cwd=home, capture_output=True, text=True, encoding="utf-8",
             timeout=60, check=False,
         )
+
         assert result.returncode == 0, result.stdout + result.stderr
         return result.stdout
 

@@ -3,7 +3,7 @@ name = "nuwa-agent-relay-studio-mcp"
 version = "0.2.0"
 description = "Local FastMCP Studio adapter for Nuwa Agent Relay"
 requires-python = ">=3.12"
-dependencies = ["fastmcp==4.0.3", "httpx>=0.27,<1", "mcp-install==0.1.0"]
+dependencies = ["fastmcp==4.0.3", "httpx>=0.27,<1", "mcp-install==0.3.0"]
 [project.optional-dependencies]
 dev = ["pytest>=8,<10", "ruff>=0.13,<1"]
 [project.scripts]
@@ -14,6 +14,7 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
 [tool.hatch.build.targets.wheel.force-include]
-"scripts/install.config.json" = "scripts/install.config.json"
+"../install.config.json" = "src/install.config.json"
+"../skills/nuwa-agent-relay" = "src/skills/nuwa-agent-relay"
 [tool.pytest.ini_options]
 testpaths = ["tests"]

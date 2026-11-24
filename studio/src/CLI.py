@@ -5,6 +5,7 @@ import json
 import logging
 import getpass
 import os
+import sys
 
 from .Auth import OAuthCredentials
 from .Client import AddressClient, RelayClient, RemoteBindingClient
@@ -47,6 +48,9 @@ class StudioCLI:
 
         for name in ("install", "uninstall"):
             command = commands.add_parser(name)
+            command.add_argument("--target", default="all")
+            command.add_argument("--component", choices=("auto", "mcp", "skill", "all"),
+                                 default="auto")
             command.add_argument("--overwrite", action="store_true")
             command.add_argument("--print", dest="printOnly", action="store_true")
 
@@ -130,7 +134,7 @@ class StudioCLI:
 
     @classmethod
     def run(cls) -> None:
-        args = cls.createParser().parse_args()
+        args = cls.createParser().parse_args(sys.argv[1:] or ["run"])
 
         config = LocalConfig.load()
         credentials = OAuthCredentials(config)
@@ -176,7 +180,8 @@ class StudioCLI:
             return
 
         if args.command in ("install", "uninstall"):
-            StudioInstaller.run(args.command == "uninstall", args.overwrite, args.printOnly)
+            StudioInstaller.run(args.command == "uninstall", args.overwrite, args.printOnly,
+                                args.target, args.component)
             return
 
         if args.command == "run":

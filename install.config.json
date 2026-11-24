@@ -10,5 +10,10 @@
     "NUWA_MCP_HOME"
   ],
   "defaultEnvValues": {},
-  "envWarnings": {}
+  "envWarnings": {},
+  "skills": [
+    {
+      "path": "skills/nuwa-agent-relay"
+    }
+  ]
 }

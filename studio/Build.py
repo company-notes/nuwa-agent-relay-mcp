@@ -40,7 +40,8 @@ class BuildApplication:
             "--onefile", "--console", "--name", "nuwa-studio-mcp",
             "--collect-all", "fastmcp", "--collect-all", "mcp",
             "--collect-all", "mcp_install",
-            "--add-data", f'{self.root / "scripts" / "install.config.json"}{os.pathsep}scripts',
+            "--add-data", f'{self.root.parent / "install.config.json"}{os.pathsep}src',
+            "--add-data", f'{self.root.parent / "skills" / "nuwa-agent-relay"}{os.pathsep}src/skills/nuwa-agent-relay',
             str(self.root / "RunMCP.py"),
         ])
 

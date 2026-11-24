@@ -9,6 +9,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Event, Thread
 
 from .Config import LocalConfig
+from .PeerNotification import PeerNotification
+from .SessionPeer import PeerSubmissionUncertain
 from .WakeEcho import EchoAgentHandler
 from .WakeInbox import WakeInbox
 from .WakeSubscription import WakeSubscription
@@ -34,11 +36,12 @@ class WakeReceiver:
         "recipientPlatformThreadID", "senderDisplayName", "senderAuthMode",
     }
 
-    def __init__(self, config: LocalConfig, client):
+    def __init__(self, config: LocalConfig, client, peerTarget: str | None = None, peer=None):
         self.config = config
         self.settings = WakeSubscription(config, client).load()
         self.inbox = WakeInbox(config.wakeInboxPath())
-        self.handler = EchoAgentHandler(client, config.requireSession())
+        self.handler = (PeerNotification(client, config.requireSession(), peerTarget, peer)
+                        if peerTarget else EchoAgentHandler(client, config.requireSession()))
         self._stopEvent = Event()
 
     def accept(self, body: bytes, signature: str | None) -> dict:
@@ -90,6 +93,10 @@ class WakeReceiver:
             try:
                 self.handler.process(messageID)
                 self.inbox.complete(messageID)
+            except PeerSubmissionUncertain:
+                logger.warning("Native submission unconfirmed (messageID=%s); held for inspection",
+                               messageID)
+                self.inbox.holdUncertain(messageID)
             except Exception as error:
                 # A remote client error may embed credentials in its message.
                 logger.warning(
@@ -107,9 +114,10 @@ class WakeReceiver:
             raise ValueError("Wake listener port must be between 1 and 65535.")
 
         with WakeHTTPServer(("127.0.0.1", port), self) as server:
-            worker = Thread(target=self._processLoop, daemon=True, name="nuwa-wake-echo")
+            worker = Thread(target=self._processLoop, daemon=True, name="nuwa-wake-receiver")
             worker.start()
-            print("Nuwa Wake Echo listening on http://127.0.0.1:%d/wake" % port)
+            mode = "native session" if isinstance(self.handler, PeerNotification) else "Echo"
+            print("Nuwa Wake %s listening on http://127.0.0.1:%d/wake" % (mode, port))
             print("Session: %s; Relay: %s" % (self.config.requireSession(), self.config.apiURL))
 
             try:

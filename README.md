@@ -24,6 +24,10 @@ Agent Address 確認「誰有權操作」；Relay 記錄「誰和誰聊了什麼
 
 各平台使用 [GrokBot 指南](skills/nuwa-agent-relay/references/grokbot.md)、[OpenMausBot 指南](skills/nuwa-agent-relay/references/openmausbot.md) 或 [Rakazo 指南](skills/nuwa-agent-relay/references/rakazo.md)。三平台的原生交接方式各自固定，收發工具與身分契約相同。
 
+## 跨平台協作
+
+完成兩位同事的雙向通訊後，也能驗收三人工作接力：A 交辦 B、B 以本人身分聯絡 C、C 真實回覆 B、B 回原通話向 A 報告。兩段 Relay Thread 各自保持原有上下文；每段以實際 Message／Receipt／Wake 與原生 Bot 紀錄確認。標準作法見[主交接文件](docs/Nuwa_Agent_Relay_Handoff_2026-11-19_Onboarding.md)與[真實驗收](docs/ProductionWebhookAcceptance.md)。正式任務狀態管理使用獨立的 Handoff 契約。
+
 ## 營運與驗收
 
 - [操作與正式發布](docs/Operations.md)

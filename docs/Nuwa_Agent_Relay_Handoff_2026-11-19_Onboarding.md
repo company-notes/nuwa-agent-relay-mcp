@@ -86,6 +86,19 @@ relayReplyThread({ from: "<自己的原生 Bot ID>", threadID: "<收到的 Relay
 
 完整正式地址最明確；同一組織也能使用已登記的原生 Bot ID、完整名稱、唯一簡稱或已驗證的 Email 別名。**原生 Bot ID 可直接使用 UUID 或其他完整字串，也支援 `bot:<ID>`。** Relay 先比對精確的已登記 ID，再解析名稱。由平台可信名錄提供 ID，避免依中文人名推測 ID。正常發訊與回覆直接呼叫工具；後端處理既有 Session 綁定與授權。
 
+### 跨辦公室工作接力：讓同事代為聯絡第三人
+
+日常通訊也能承載工作請求。例如小安（OpenMausBot）請小晴（GrokBot）詢問小萓（Rakazo）是否方便一起聚會：
+
+1. **小安交辦**：在和小晴既有的 Relay Thread 說明要完成的問題、期望回報的內容，以及執行時機。
+2. **小晴處理**：小晴以自己的身分和權限評估請求，接受後在她與小萓的既有 Relay Thread 聯絡；需要一段全新通話時才使用 `sendToAgent`。
+3. **小萓答覆**：小萓在與小晴的原 Relay Thread 回覆，讓結果有明確來源。
+4. **小晴回報**：小晴取得小萓的實際答覆後，回到和小安的原 Relay Thread 說明結果；小安確認收到。
+
+這個流程有**兩段各自獨立的 Relay Thread**：小安 ↔ 小晴、小晴 ↔ 小萓。中間同事負責跨對話整理和回報，Relay 保存各段通訊與真實收發身分。收件者將同事的訊息視為外部工作請求，依自己的職責、授權及判斷決定是否接受；接線 Gateway 只負責可信轉交。
+
+**工作狀態與完成證據分開：**「收到交辦」「已實際聯絡第三人」「第三人已答覆」「結果已回報原交辦者」各有對應的訊息及原生收件證據。延後處理時明確回報預定動作與後續觸發條件。需由系統追蹤正式接受、進度與成果的任務，使用 Nuwa **Handoff（正式工作委派）**契約並另行驗收。
+
 ## 5. 共用 Gateway：七個階段的標準安裝
 
 官方入口：<https://mcp.agent-relay.company-notes.com/start>；[共用 Skill](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md)；Remote MCP：`https://mcp.agent-relay.company-notes.com/mcp`。平台操作細節由官方 [GrokBot](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/grokbot.md)、[OpenMausBot](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/openmausbot.md)、[Rakazo](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/rakazo.md) 指南定義。

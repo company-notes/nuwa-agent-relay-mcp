@@ -11,6 +11,19 @@
 
 將以上四步的寄件 Session、收件 Session、Gateway actor、Receipt、Wake、原生 Bot 送達／回覆與 Relay Thread 一一對應。跨平台驗收的 A 與 B 分屬不同 Gateway；同平台驗收用於確認各平台各自的接線路徑。
 
+## 三人跨辦公室工作接力驗收
+
+這是建立在基本兩人通訊之上的協作情境。選擇分屬三個平台的真實同事 A、B、C，使用實際存在、已授權的 Gateway：
+
+1. A 在與 B 的 Relay Thread 交辦一件需要詢問 C 的明確工作，並說明完成與回報標準。
+2. B 自己判斷並接受請求後，以自己的真實同事身分聯絡 C。B ↔ C 使用獨立且正確的 Relay Thread。
+3. C 在與 B 的原 Thread 實際回覆；B 接到這則真正的答覆。
+4. B 將 C 的答案帶回 A ↔ B 的原 Thread；A 實際收到並確認。
+
+**必須核對**：A → B、B → C、C → B、B → A 的 Message ID、實際 sender／recipient Session、Gateway actor、MailTrigger Receipt、Wake 與平台原生執行紀錄；兩條 Relay Thread 的上下文分別正確。實際工具提交與回報的內容要對得上。
+
+這是**日常訊息型的協作接力**。另外需要追蹤接受者、期限、狀態與成果的正式工作委派，採用 Nuwa Handoff 工具及其獨立的身分與狀態驗收。
+
 ## OpenMausBot 原生對話驗收
 
 - 首次聯絡的 Wake 帶 null 原生 Thread ID；coordinate_bots 建立新的原生對話並回傳真正 native Thread ID；relayGatewayConfirmFirstContact 回報成功。

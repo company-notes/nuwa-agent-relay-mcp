@@ -6,6 +6,8 @@ from pathlib import Path
 
 from mcp_install.Install import main as installMain
 
+from .SkillInstaller import StudioSkillInstaller
+
 
 class StudioInstaller:
     @classmethod
@@ -13,8 +15,10 @@ class StudioInstaller:
         return Path(__file__).resolve().parent.parent / "scripts" / "install.config.json"
 
     @classmethod
-    def run(cls, uninstall: bool, overwrite: bool, printOnly: bool) -> None:
-        arguments = ["--app-config", str(cls.manifestPath())]
+    def run(cls, uninstall: bool, overwrite: bool, printOnly: bool,
+            targets: list[str] | None = None) -> None:
+        selected = targets or ["all"]
+        arguments = ["--app-config", str(cls.manifestPath()), "--target", ",".join(selected)]
 
         if uninstall:
             arguments.append("--uninstall")
@@ -24,6 +28,16 @@ class StudioInstaller:
 
         if printOnly:
             arguments.append("--print")
+
+        paths = StudioSkillInstaller.paths(selected)
+        if printOnly:
+            print("Nuwa Skill installation targets:")
+            for path in paths:
+                print("  " + str(path))
+        elif uninstall:
+            StudioSkillInstaller.uninstall(selected)
+        else:
+            StudioSkillInstaller.install(selected, overwrite=overwrite)
 
         originalArguments = sys.argv
 

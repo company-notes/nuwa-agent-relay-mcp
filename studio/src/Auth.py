@@ -24,7 +24,7 @@ class OAuthCredentials:
         path = self.config.authPath()
 
         if not path.exists():
-            raise RuntimeError("Not logged in. Run nuwa-studio-mcp login.")
+            raise RuntimeError("Not logged in. Run nuwa-relay-mcp login.")
 
         auth = json.loads(path.read_text(encoding="utf-8"))
 
@@ -56,7 +56,7 @@ class OAuthCredentials:
             return auth["access_token"]
 
         if not auth.get("refresh_token"):
-            raise RuntimeError("OAuth token expired. Run nuwa-studio-mcp login.")
+            raise RuntimeError("OAuth token expired. Run nuwa-relay-mcp login.")
 
         refreshed = self._tokenRequest({
             "grant_type": "refresh_token",

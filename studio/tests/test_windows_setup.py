@@ -1,0 +1,93 @@
+"""Run the real Windows Setup and its installed stdio MCP on a disposable profile."""
+
+import asyncio
+import os
+import time
+from importlib.metadata import version
+from pathlib import Path
+
+import pytest
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+
+
+@pytest.mark.skipif(
+    os.name != "nt" or not os.environ.get("NUWA_TEST_WINDOWS_SETUP"),
+    reason="Requires a built Windows Setup on a disposable Windows test account",
+)
+class TestWindowsSetup:
+    REG_KEY = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\nuwa-relay-mcp"
+
+    @classmethod
+    def registration(cls):
+        import winreg
+
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, cls.REG_KEY) as key:
+            return {
+                name: winreg.QueryValueEx(key, name)[0]
+                for name in ("DisplayName", "DisplayVersion", "InstallLocation", "UninstallString")
+            }
+
+    @classmethod
+    async def verifyMCP(cls, executable, profile):
+        params = StdioServerParameters(command=str(executable), args=[], env=profile.env)
+        async with stdio_client(params) as (reader, writer):
+            async with ClientSession(reader, writer) as session:
+                await session.initialize()
+                tools = await session.list_tools()
+                assert {"sendToAgent", "replyThread"} <= {tool.name for tool in tools.tools}
+
+    @classmethod
+    def waitForUninstall(cls, executable, uninstaller):
+        deadline = time.monotonic() + 60
+
+        while time.monotonic() < deadline:
+            try:
+                cls.registration()
+            except FileNotFoundError:
+                if not executable.exists() and not uninstaller.exists():
+                    return
+            time.sleep(0.25)
+
+        pytest.fail("Windows uninstall did not remove the program and registry entry")
+
+    def testInstallUpgradeAndRemove(self, installerProfile):
+        """Run Setup, verify registered MCP starts, upgrade, and uninstall without losing identity data."""
+        profile = installerProfile
+        setup = Path(os.environ["NUWA_TEST_WINDOWS_SETUP"]).resolve()
+        destination = profile.home / "application"
+        executable = destination / "nuwa-relay-mcp.exe"
+        uninstaller = destination / "Uninstall.exe"
+        expectedVersion = version("nuwa-relay-mcp")
+        assert setup.is_file(), "Windows Setup must exist before running acceptance"
+
+        identity = Path(profile.env["NUWA_MCP_HOME"]) / "auth.json"
+        identity.parent.mkdir()
+        identity.write_text("local identity sentinel", encoding="utf-8")
+
+        profile.run(str(setup), "/S", f"/D={destination}", timeout=300)
+        assert executable.is_file()
+        assert profile.run(str(executable), "--version").strip() == expectedVersion
+        assert self.registration() == {
+            "DisplayName": "Nuwa Relay MCP",
+            "DisplayVersion": expectedVersion,
+            "InstallLocation": str(destination),
+            "UninstallString": f'"{uninstaller}"',
+        }
+        assert Path(profile.servers()["nuwa-agent-relay-studio"]["command"]) == executable
+        assert profile.servers()["other"]["command"] == "other"
+        assert (profile.skill / "SKILL.md").is_file()
+        assert (profile.skill / "references" / "work-clients.md").is_file()
+        asyncio.run(asyncio.wait_for(self.verifyMCP(executable, profile), timeout=90))
+
+        profile.run(str(setup), "/S", f"/D={destination}", timeout=300)
+        assert self.registration()["DisplayVersion"] == expectedVersion
+        assert Path(profile.servers()["nuwa-agent-relay-studio"]["command"]) == executable
+        assert (profile.skill / "SKILL.md").is_file()
+
+        profile.run(str(uninstaller), "/S", timeout=300)
+        self.waitForUninstall(executable, uninstaller)
+        assert "nuwa-agent-relay-studio" not in profile.servers()
+        assert profile.servers()["other"]["command"] == "other"
+        assert not profile.skill.exists()
+        assert identity.read_text(encoding="utf-8") == "local identity sentinel"

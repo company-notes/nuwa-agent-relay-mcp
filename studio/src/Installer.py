@@ -24,7 +24,7 @@ class StudioInstaller:
         if getattr(sys, "frozen", False):
             return Path(sys.executable)
 
-        name = "nuwa-studio-mcp.exe" if os.name == "nt" else "nuwa-studio-mcp"
+        name = "nuwa-relay-mcp.exe" if os.name == "nt" else "nuwa-relay-mcp"
         return Path(sysconfig.get_path("scripts")) / name
 
     @classmethod
@@ -47,7 +47,7 @@ class StudioInstaller:
             if not launcher.is_file():
                 raise RuntimeError("Install the Studio package before registering its MCP server.")
 
-            os.environ.setdefault("NUWA_STUDIO_MCP_BINARY", str(launcher))
+            os.environ.setdefault("NUWA_RELAY_MCP_BINARY", str(launcher))
 
         args = InstallCommand.createParser().parse_args(arguments)
         InstallCommand(args, loadAppConfig(str(manifest)), manifest).run()

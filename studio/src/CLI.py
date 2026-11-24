@@ -6,6 +6,7 @@ import logging
 import getpass
 import os
 import sys
+from importlib.metadata import version
 
 from .Auth import OAuthCredentials
 from .Client import AddressClient, RelayClient, RemoteBindingClient
@@ -21,8 +22,8 @@ from .WakeSubscription import WakeSubscription
 class StudioCLI:
     @classmethod
     def createParser(cls) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(prog="nuwa-studio-mcp")
-        parser.add_argument("--version", action="version", version="0.2.0")
+        parser = argparse.ArgumentParser(prog="nuwa-relay-mcp")
+        parser.add_argument("--version", action="version", version=version("nuwa-relay-mcp"))
         commands = parser.add_subparsers(dest="command", required=True)
 
         for name in ("login", "logout", "status", "run"):

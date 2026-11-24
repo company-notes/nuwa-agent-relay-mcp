@@ -154,7 +154,7 @@ class LocalConfig:
 
     def requireSession(self) -> str:
         if not self.sessionID:
-            raise ValueError("No Session selected. Run nuwa-studio-mcp identity first.")
+            raise ValueError("No Session selected. Run nuwa-relay-mcp identity first.")
 
         return self.sessionID
 

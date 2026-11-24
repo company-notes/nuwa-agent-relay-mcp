@@ -39,3 +39,23 @@ Agent Address 確認「誰有權操作」；Relay 記錄「誰和誰聊了什麼
 - [Studio 與其他工作客戶端 #56](https://github.com/company-notes/nuwa-agent-relay-mcp/issues/56)
 
 工程變更使用 PR、完整 CI、合併 main 後正式部署及 Smoke，再按影響範圍執行真實 Bot 驗收。程式修正過程與測試數值留在相應 PR／Issue，長期標準以交接文件與官方 Skill 為準。
+
+## Windows 本地 MCP 安裝工具（開發中）
+
+Windows 使用者的正式入口為 `nuwa-relay-mcp-setup.exe`，安裝精靈會透過
+`mcp_install` 註冊 MCP 和安裝官方 Skill，並在 Windows 已安裝的應用程式中提供解除安裝。
+目前尚未發布正式安裝包；仍可使用官方 Remote MCP。
+
+開發人員可在已安裝的 Python 套件或獨立執行檔使用：
+
+```bash
+nuwa-relay-mcp install --target codex --print
+nuwa-relay-mcp install --target codex
+nuwa-relay-mcp install --target codex --component skill
+nuwa-relay-mcp uninstall --target codex
+````
+
+Windows 建置：`python studio/Build.py`（需 uv 與 NSIS）。輸出位於
+`studio/dist/nuwa-relay-mcp.exe` 和 `studio/dist/nuwa-relay-mcp-setup.exe`。
+安裝及解除安裝只處理應用程式、MCP 設定及受管理的 Skill，不會清除既有 Nuwa OAuth、
+Agent、Session 或 Wake 資料，也不會自動登入。請重新啟動或重新載入 MCP 客戶端。

@@ -53,7 +53,7 @@ jobs:
       - name: Python Studio tests
         run: pytest -q studio/tests
       - name: Preview mcp_install desktop registration
-        run: nuwa-studio-mcp install --print
+        run: nuwa-relay-mcp install --print
 
   studio-windows:
     runs-on: windows-latest
@@ -68,14 +68,48 @@ jobs:
       - name: Test Studio on Windows
         run: python -m pytest -q studio/tests
       - name: Verify installed Studio CLI entrypoint
-        run: nuwa-studio-mcp --version
+        run: nuwa-relay-mcp --version
       - name: Preview desktop registration on Windows
-        run: nuwa-studio-mcp install --print
+        run: nuwa-relay-mcp install --print
+
+  studio-windows-installer:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build and test tools
+        run: python -m pip install uv "./studio[dev]"
+      - name: Ensure NSIS is available
+        shell: pwsh
+        run: |
+          $nsis = Join-Path ${env:ProgramFiles(x86)} "NSIS\makensis.exe"
+          if (-not (Get-Command makensis.exe -ErrorAction SilentlyContinue) -and -not (Test-Path $nsis)) {
+            choco install nsis --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: Build standalone Relay MCP and Windows Setup
+        run: python studio/Build.py
+      - name: Verify real Setup install, upgrade, MCP stdio and uninstall
+        shell: pwsh
+        run: |
+          $env:NUWA_TEST_WINDOWS_SETUP = (Resolve-Path studio/dist/nuwa-relay-mcp-setup.exe).Path
+          python -m pytest -q studio/tests/test_windows_setup.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nuwa-relay-mcp-windows-test-build
+          path: |
+            studio/dist/nuwa-relay-mcp.exe
+            studio/dist/nuwa-relay-mcp-setup.exe
+          if-no-files-found: error
 
   deploy:
     name: Deploy remote MCP to Cloudflare
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: [server, studio, studio-windows]
+    needs: [server, studio, studio-windows, studio-windows-installer]
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 15

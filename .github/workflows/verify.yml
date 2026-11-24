@@ -82,14 +82,26 @@ jobs:
           python-version: '3.12'
       - name: Install build and test tools
         run: python -m pip install uv "./studio[dev]"
-      - name: Ensure NSIS is available
+      - name: Provision verified NSIS compiler
         shell: pwsh
         run: |
-          $nsis = Join-Path ${env:ProgramFiles(x86)} "NSIS\makensis.exe"
-          if (-not (Get-Command makensis.exe -ErrorAction SilentlyContinue) -and -not (Test-Path $nsis)) {
-            choco install nsis --yes --no-progress
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $archive = Join-Path $env:RUNNER_TEMP "nsis-3.13.zip"
+          $root = Join-Path $env:RUNNER_TEMP "nsis-3.13"
+          $url = "https://downloads.sourceforge.net/project/nsis/NSIS%203/3.13/nsis-3.13.zip"
+          curl.exe --fail --location --retry 3 --retry-all-errors --max-time 45 $url --output $archive
+          if ($LASTEXITCODE -ne 0) { throw "Could not download NSIS 3.13" }
+          $expected = "ba63dffc4410ee89193e1cb5a41989991bd77c61068da17e3156d136b7b0b3d8"
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne $expected) {
+            throw "NSIS archive SHA256 mismatch"
           }
+          Expand-Archive -Path $archive -DestinationPath $env:RUNNER_TEMP -Force
+          $compiler = Join-Path $root "bin\makensis.exe"
+          if (-not (Test-Path $compiler -PathType Leaf)) { throw "NSIS compiler missing" }
+          $env:NSISDIR = $root
+          & $compiler /VERSION
+          if ($LASTEXITCODE -ne 0) { throw "NSIS compiler failed version check" }
+          "NSISDIR=$root" >> $env:GITHUB_ENV
+          (Split-Path $compiler) >> $env:GITHUB_PATH
       - name: Install real Claude Code native CLI for Windows acceptance
         shell: pwsh
         run: |

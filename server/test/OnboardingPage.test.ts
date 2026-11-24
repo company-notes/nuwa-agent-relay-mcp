@@ -77,6 +77,7 @@ test('office-wide setup does not ask the user to register each coworker by hand'
   assert.doesNotMatch(ONBOARDING_HTML, /id="colleaguePromptA"/);
   assert.match(ONBOARDING_HTML, /已接入過的助理沿用原有地址和有效設定/);
   assert.match(ONBOARDING_HTML, /首次安裝或重新接入時，建議先選擇擅長工具操作的模型/);
+  assert.match(ONBOARDING_HTML, /id="setupModelAdvice" hidden>/);
   assert.match(ONBOARDING_CSS, /#setupModelAdvice[^}]*font-weight:\s*(?:7\d\d|8\d\d|bold)/);
   assert.match(ONBOARDING_HTML, /Terra、Claude Haiku、Grok 4\.7/);
   assert.match(ONBOARDING_HTML, /OpenCode 可選 GLM-5\.3-Flash 或 Kimi K2\.6/);
@@ -185,6 +186,7 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
     setTimeout() { return 1; },
   });
 
+  assert.equal(elements.get('setupModelAdvice')!.hidden, true, 'GrokBot has no setup model choice');
   const gateway = elements.get('gatewayPrompt')!.textContent;
 
   const grokGuide = readFileSync(new URL(
@@ -276,6 +278,7 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
 
   elements.get('platform')!.value = 'openmausbot';
   elements.get('platform')!.callbacks.get('change')?.();
+  assert.equal(elements.get('setupModelAdvice')!.hidden, false);
   elements.get('colleagueA')!.value = 'Cosmo';
   elements.get('colleagueB')!.value = '小美';
   elements.get('colleagueB')!.callbacks.get('input')?.();
@@ -324,6 +327,7 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
 
   elements.get('platform')!.value = 'rakazo';
   elements.get('platform')!.callbacks.get('change')?.();
+  assert.equal(elements.get('setupModelAdvice')!.hidden, false);
 
   const rakazoGateway = elements.get('gatewayPrompt')!.textContent;
   const rakazoGuide = readFileSync(new URL(
@@ -378,6 +382,7 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
 
   elements.get('platform')!.value = 'codex';
   elements.get('platform')!.callbacks.get('change')?.();
+  assert.equal(elements.get('setupModelAdvice')!.hidden, false);
 
   const independent = elements.get('gatewayPrompt')!.textContent;
 
@@ -394,12 +399,16 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
 
   assert.equal(elements.get('directOptions')!.hidden, true);
   assert.equal(elements.get('studioOptions')!.hidden, false);
+
+  elements.get('platform')!.value = 'grokbot';
+  elements.get('platform')!.callbacks.get('change')?.();
+  assert.equal(elements.get('setupModelAdvice')!.hidden, true, 'Re-selecting GrokBot hides irrelevant advice');
 });
 
 
 test('browser language and manual selection localize prompts while preserving inputs', () => {
   const ids = [...ONBOARDING_HTML.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
-  const modelAdvice = ONBOARDING_HTML.match(/id="setupModelAdvice">([^<]+)<\/p>/)?.[1];
+  const modelAdvice = ONBOARDING_HTML.match(/id="setupModelAdvice" hidden>([^<]+)<\/p>/)?.[1];
   assert.ok(modelAdvice, 'Setup advice must appear before the installation prompt');
 
   const languages = [
@@ -487,6 +496,11 @@ test('browser language and manual selection localize prompts while preserving in
       /X-Nuwa-Work-Mode: codex/);
     assert.equal(elements.get('studioOptions')!.hidden, true);
     assert.equal(elements.get('directOptions')!.hidden, false);
+
+    elements.get('platform')!.value = 'grokbot';
+    elements.get('platform')!.callbacks.get('change')?.();
+    assert.equal(elements.get('setupModelAdvice')!.hidden, true,
+      'GrokBot hides model-selection advice in every supported language');
   }
 
   assert.match(ONBOARDING_HTML, /id="language"/);

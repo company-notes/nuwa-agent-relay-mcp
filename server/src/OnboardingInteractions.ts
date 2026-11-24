@@ -98,7 +98,7 @@ export const ONBOARDING_SCRIPT = `
 
   var platforms = {
     grokbot: {
-      name: 'GrokBot', office: true, gatewayIdentity: 'grokbot', examples: ['小晴', '大熊'],
+      name: 'GrokBot', office: true, configurableSetupModel: false, gatewayIdentity: 'grokbot', examples: ['小晴', '大熊'],
       setup: 'GrokBot 使用 platform 模式。安裝時確認 Routine 的實際工具能力；能直接轉交就直接送。GrokBot 的 Routine 若無原生轉交能力但支援 WakeParent，僅交接完整原始事件 JSON，由上層 Gateway 組合格式並原生轉交一次。'
     },
     openmausbot: {
@@ -480,6 +480,7 @@ export const ONBOARDING_SCRIPT = `
       : name + ' 可直接使用自己的通訊連線和聯絡地址。' +
         (platform.fixed ? '目前使用固定地址；獨立工作地址功能尚待支援。' : '每個獨立工作（Session）有自己的工作地址，恢復工作時沿用原地址。');
 
+    document.getElementById('setupModelAdvice').hidden = platform.configurableSetupModel === false;
     document.getElementById('installTitle').textContent = office ? '請接線助理帶你設定' : '安裝 Nuwa 至 ' + name;
     document.getElementById('installIntro').textContent = office
       ? '將下面的指令貼給 ' + name + ' 的接線助理。新安裝的 Gateway 名稱為「' + platform.gatewayIdentity + '」；既有辦公室沿用原身分。它會依官方指南完成安裝，並在需要登入或授權時請你操作。'

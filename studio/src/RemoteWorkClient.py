@@ -65,9 +65,9 @@ class RemoteWorkClient:
             "X-Nuwa-Work-ID": identity.nativeID,
         }
 
-    def _inbox(self, identity, suffix: str = "", params: dict | None = None) -> dict:
+    def _inbox(self, identity, params: dict) -> dict:
         with httpx.Client(timeout=45, follow_redirects=False, transport=self.transport) as client:
-            response = client.get(self.origin + "/work-inbox/events" + suffix,
+            response = client.get(self.origin + "/work-inbox/events",
                                   headers=self._inboxHeaders(identity), params=params)
             response.raise_for_status()
             result = response.json()
@@ -76,9 +76,6 @@ class RemoteWorkClient:
             raise RuntimeError("Invalid remote work Inbox response.")
 
         return result["data"]
-
-    def eventHead(self, identity) -> int:
-        return self._inbox(identity, "/head")["cursor"]
 
     def eventPage(self, identity, cursor: int) -> dict:
         return self._inbox(identity, params={"after_sequence": cursor})

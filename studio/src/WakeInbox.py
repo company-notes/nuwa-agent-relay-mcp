@@ -47,45 +47,19 @@ class WakeInbox:
 
         return cls(path, (sessionID, target))
 
-    def initializePolling(self, messageIDs: list[str], existingWork: bool) -> None:
-        """Do not replay pre-existing conversation history on first local adoption."""
-        now = time.time()
-
+    def eventCursor(self) -> int:
         with closing(sqlite3.connect(self.path, timeout=5)) as db:
             with db:
-                db.execute("CREATE TABLE IF NOT EXISTS native_poll_started (id INTEGER PRIMARY KEY)")
-                started = db.execute("INSERT OR IGNORE INTO native_poll_started VALUES (1)")
-
-                if started.rowcount and existingWork:
-                    db.executemany("""
-                        INSERT OR IGNORE INTO incoming_wake
-                            (message_id, received_at, next_attempt_at, completed_at)
-                        VALUES (?, ?, ?, ?)
-                    """, [(messageID, now, now, now) for messageID in messageIDs])
-
-    def eventCursor(self) -> int | None:
-        with closing(sqlite3.connect(self.path, timeout=5)) as db:
-            with db:
-                db.execute("CREATE TABLE IF NOT EXISTS native_event_cursor (id INTEGER PRIMARY KEY, cursor INTEGER NOT NULL)")
+                db.execute("""
+                    CREATE TABLE IF NOT EXISTS native_event_cursor (
+                        id INTEGER PRIMARY KEY CHECK (id = 1),
+                        cursor INTEGER NOT NULL
+                    )
+                """)
+                db.execute("INSERT OR IGNORE INTO native_event_cursor VALUES (1, 0)")
                 row = db.execute("SELECT cursor FROM native_event_cursor WHERE id = 1").fetchone()
 
-        return row[0] if row else None
-
-    def initializeEvents(self, cursor: int) -> None:
-        if type(cursor) is not int or cursor < 0:
-            raise ValueError("Invalid native Inbox cursor.")
-
-        with closing(sqlite3.connect(self.path, timeout=5)) as db:
-            with db:
-                legacy = db.execute(
-                    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'native_poll_started'",
-                ).fetchone()
-                existing = db.execute("SELECT cursor FROM native_event_cursor WHERE id = 1").fetchone()
-
-                if legacy and not existing:
-                    raise RuntimeError("Legacy polling Inbox requires explicit migration before event adoption.")
-
-                db.execute("INSERT OR IGNORE INTO native_event_cursor VALUES (1, ?)", (cursor,))
+        return row[0]
 
     def ingestEvents(self, previous: int, cursor: int, messageIDs: list[str]) -> None:
         now = time.time()

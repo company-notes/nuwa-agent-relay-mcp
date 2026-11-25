@@ -82,14 +82,11 @@ class WorkService:
         with self.lock:
             rows = list(reversed(self.messages[threadID]))
 
-            if request.url.path.endswith("/head"):
-                value = {"cursor": len(rows)}
-            else:
-                self.pages[threadID] = self.pages.get(threadID, 0) + 1
-                cursor = int(request.url.params["after_sequence"])
-                items = [{"sequence": index + 1, "messageID": row["id"]}
-                         for index, row in enumerate(rows) if index >= cursor]
-                value = {"items": items, "cursor": len(rows), "hasMore": False}
+            self.pages[threadID] = self.pages.get(threadID, 0) + 1
+            cursor = int(request.url.params["after_sequence"])
+            items = [{"sequence": index + 1, "messageID": row["id"]}
+                     for index, row in enumerate(rows) if index >= cursor]
+            value = {"items": items, "cursor": len(rows), "hasMore": False}
 
         return httpx.Response(200, json={"ok": True, "data": value})
 
@@ -97,7 +94,7 @@ class WorkService:
         assert request.headers["authorization"] == "Bearer oauth-work-test"
 
         if request.method == "GET":
-            assert request.url.path in ("/work-inbox/events", "/work-inbox/events/head")
+            assert request.url.path == "/work-inbox/events"
 
             return self._events(request)
 
@@ -210,7 +207,7 @@ class TestNativeWork:
 
         async def scenario():
             def server():
-                return StudioMCP(config, workClient=remote, peer=peer, pollInterval=0.05).createServer()
+                return StudioMCP(config, workClient=remote, peer=peer, reconnectDelay=0.05).createServer()
 
             codex = Implementation(name="codex-cli", version="0.172.0")
             async with MCPClient(server(), client_info=codex) as client:
@@ -268,6 +265,10 @@ class TestNativeWork:
                 assert not service.polls, "Idle native receivers must not poll the remote Inbox"
                 assert len(peer.snapshot()) == 3, "Previously submitted messages cannot be replayed"
 
+                idlePages = service.pages[threadA]
+                await asyncio.sleep(1.1)
+                assert service.pages[threadA] == idlePages, "An idle connection must not fetch the remote Inbox"
+
         asyncio.run(scenario())
 
 
@@ -288,7 +289,7 @@ class TestNativeWork:
 
         async def scenario():
             def server():
-                return StudioMCP(LocalConfig(), workClient=remote, peer=peer, pollInterval=0.05).createServer()
+                return StudioMCP(LocalConfig(), workClient=remote, peer=peer, reconnectDelay=0.05).createServer()
 
             claude = Implementation(name="claude-code", version="2.1.332")
             async with MCPClient(server(), client_info=claude) as client:
@@ -342,7 +343,7 @@ class TestNativeWork:
                 monkeypatch.setenv("GROK_SESSION_ID", identifier)
 
             meta = {"ai.opencode/sessionID": identifier} if mode == "opencode" else None
-            server = StudioMCP(LocalConfig(), workClient=remote, pollInterval=0.05).createServer()
+            server = StudioMCP(LocalConfig(), workClient=remote, reconnectDelay=0.05).createServer()
 
             async with MCPClient(server, client_info=identity) as client:
                 status = await client.call_tool("agentAddressGetStatus", {}, meta=meta, raise_on_error=False)
@@ -441,7 +442,7 @@ class TestNativeWork:
                     return list(submissions)
 
             async def scenario():
-                server = StudioMCP(LocalConfig(), workClient=remote, pollInterval=0.05).createServer()
+                server = StudioMCP(LocalConfig(), workClient=remote, reconnectDelay=0.05).createServer()
                 identity = Implementation(name="opencode", version="2.2.3")
 
                 async with MCPClient(server, client_info=identity) as client:

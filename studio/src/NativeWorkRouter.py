@@ -32,12 +32,12 @@ class NativeWorkRouter(Middleware):
     START = {"agentAddressStartWork", "agentAddressSelectSession"}
     WORK_TOOLS = START | {"agentAddressGetStatus", "agentAddressReleaseWork"}
 
-    def __init__(self, config, remote, peer=None, interval: float = 5):
+    def __init__(self, config, remote, peer=None, reconnectDelay: float = 5):
         self.config = config
         self.remote = remote
         self.peer = peer or SessionPeer()
         self.openCodePeer = peer or OpenCodePeer()
-        self.interval = interval
+        self.reconnectDelay = reconnectDelay
         self.receivers = {}
         self.lock = asyncio.Lock()
 
@@ -103,7 +103,7 @@ class NativeWorkRouter(Middleware):
         peer = self.openCodePeer if identity.mode == "opencode" else self.peer
         receiver = NativeWorkReceiver(
             self.config, self.remote, peer, identity, sessionID,
-            data.get("created") is True, self.interval,
+            self.reconnectDelay,
         )
         self.receivers[identity] = receiver
         receiver.start()

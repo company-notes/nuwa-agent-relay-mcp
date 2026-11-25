@@ -19,12 +19,11 @@ class NativeWorkReceiver:
     """One private work binding and durable submission queue for one native thread."""
 
     def __init__(self, config, remote, peer, identity: NativeWorkIdentity, sessionID: str,
-                 created: bool, interval: float = 5):
+                 reconnectDelay: float = 5):
         self.remote = remote
         self.identity = identity
         self.sessionID = sessionID
-        self.existingWork = not created
-        self.reconnectDelay = interval
+        self.reconnectDelay = reconnectDelay
         target = identity.target
         self.inbox = WakeInbox.forNative(config, sessionID, target)
         self.notification = PeerNotification(None, sessionID, target, peer)
@@ -32,10 +31,6 @@ class NativeWorkReceiver:
         self.worker = Thread(target=self._run, daemon=True, name="nuwa-native-work-receiver")
 
     def start(self) -> None:
-        if self.inbox.eventCursor() is None:
-            cursor = self.remote.eventHead(self.identity) if self.existingWork else 0
-            self.inbox.initializeEvents(cursor)
-
         self.worker.start()
 
     def stop(self) -> None:

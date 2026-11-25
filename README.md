@@ -70,7 +70,7 @@ Install the Windows Setup, reload MCP, and start a Codex, Claude Code, Grok Buil
 instructs the client to call `agentAddressStartWork` with its task name and report
 the canonical work address. On the first call a browser opens for Nuwa OAuth.
 The remote service reuses the verified host-provided work ID; the local process
-polls the authorized Inbox and submits new messages to that exact native
+uses an authorized WebSocket for Inbox notifications and submits new messages to that exact native
 work using session-peer. Claude Code uses its stdio Session ID and live host registry; resume with an explicit Session ID. No public callback or separate Python install is
 needed for this path. Saved history remains available through `relayInbox`.
 A submitted queue item is not proof of consumption. First adoption of an

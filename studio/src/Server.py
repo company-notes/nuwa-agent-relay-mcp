@@ -12,12 +12,12 @@ from .WakeSubscription import WakeSubscription
 
 class StudioMCP:
     def __init__(self, config: LocalConfig | None = None, client: RelayClient | None = None,
-                 workClient=None, peer=None, pollInterval: float = 5):
+                 workClient=None, peer=None, reconnectDelay: float = 5):
         self.config = config or LocalConfig.load()
         credentials = OAuthCredentials(self.config)
         self.client = client or RelayClient(self.config, credentials)
         self.work = NativeWorkRouter(
-            self.config, workClient or RemoteWorkClient(credentials), peer, pollInterval,
+            self.config, workClient or RemoteWorkClient(credentials), peer, reconnectDelay,
         )
 
     def createServer(self) -> FastMCP:

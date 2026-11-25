@@ -38,6 +38,7 @@ class NativeWorkReceiver:
 
     def _messages(self) -> dict:
         rows = RemoteWorkClient.value(self.remote.call(self.threadID, "relayInbox"))
+
         if not isinstance(rows, list):
             raise RuntimeError("Remote work Inbox was not a list.")
 
@@ -62,6 +63,7 @@ class NativeWorkReceiver:
 
     def _poll(self) -> None:
         messages = self._messages()
+
         if self.stopEvent.is_set():
             return
 

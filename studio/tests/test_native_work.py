@@ -145,6 +145,7 @@ class TestNativeWork:
                 second = await self.call(client, threadB, "agentAddressStartWork", {
                     "sessionName": "fix-parser", "sessionDisplayName": "Fix parser",
                 })
+
                 assert first["canonical"] == "nuwa/codex/review-build"
                 assert second["canonical"] == "nuwa/codex/fix-parser"
                 assert first["sessionID"] != second["sessionID"]
@@ -152,6 +153,7 @@ class TestNativeWork:
                 firstMessage = service.receive(threadA, "Review the build")
                 secondMessage = service.receive(threadB, "Fix the parser")
                 await self.waitUntil(lambda: len(peer.snapshot()) == 2)
+
                 submissions = dict(peer.snapshot())
                 assert firstMessage["threadId"] in submissions["codex:" + threadA]
                 assert firstMessage["body"] in submissions["codex:" + threadA]
@@ -176,6 +178,7 @@ class TestNativeWork:
                 assert resumed["canonical"] == first["canonical"]
                 assert resumed["sessionID"] == first["sessionID"]
                 assert not resumed["created"]
+
                 await self.waitUntil(lambda: len(peer.snapshot()) == 3)
                 assert peer.snapshot()[-1][0] == "codex:" + threadA
                 assert thirdMessage["body"] in peer.snapshot()[-1][1]

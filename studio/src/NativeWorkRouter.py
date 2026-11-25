@@ -67,6 +67,7 @@ class NativeWorkRouter(Middleware):
     async def _start(self, threadID: str, result) -> None:
         data = RemoteWorkClient.value(result)
         sessionID = data.get("sessionID")
+
         if (data.get("bound") is not True or not isinstance(sessionID, str) or
                 str(UUID(sessionID)) != sessionID or not data.get("canonical")):
             raise ValueError("Remote MCP did not establish a work Session.")
@@ -118,6 +119,7 @@ class NativeWorkRouter(Middleware):
 
         canonical = self.ALIASES.get(name, name)
         allowed = set(self.ALIASES.values()) | self.WORK_TOOLS | {"sendToAgent"}
+
         if canonical not in allowed:
             return ToolResult(content="Native work uses its own Inbox; this fixed-Session tool is unavailable.",
                               is_error=True)

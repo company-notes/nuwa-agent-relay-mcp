@@ -160,10 +160,12 @@ def test_native_work_onboarding_exposes_canonical_skill_tools():
 
         async with MCPClient(server) as client:
             names = {tool.name for tool in await client.list_tools()}
+
             assert {
                 "agentAddressStartWork", "agentAddressGetStatus", "agentAddressReleaseWork",
                 "sendToAgent", "relayInbox", "relayReplyThread",
             } <= names
+
             result = await client.call_tool("agentAddressStartWork", {
                 "sessionName": "review-build", "sessionDisplayName": "Review build",
             }, raise_on_error=False)

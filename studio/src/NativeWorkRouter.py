@@ -1,12 +1,15 @@
-"""Route host-scoped Codex tool calls to the existing remote work connector."""
+"""Route host-scoped native tool calls to the existing remote work connector."""
 
 import asyncio
 from contextlib import asynccontextmanager
 from uuid import UUID
 
+import psutil
+
 from fastmcp.server.middleware import Middleware
 from fastmcp.tools import ToolResult
 
+from .NativeWorkIdentity import ClaudeHost, NativeWorkIdentity
 from .NativeWorkReceiver import NativeWorkReceiver
 from .RemoteWorkClient import RemoteWorkClient
 from .SessionPeer import SessionPeer
@@ -43,17 +46,18 @@ class NativeWorkRouter(Middleware):
         clientName = params.client_info.name.lower() if params else ""
         metadata = (request.meta or {}) if request else {}
 
-        if "codex" not in clientName:
-            return None
+        if "codex" in clientName:
+            if not isinstance(metadata, dict):
+                raise ValueError("Invalid native host metadata.")
 
-        if not isinstance(metadata, dict):
-            raise ValueError("Invalid native host metadata.")
+            return NativeWorkIdentity("codex", metadata.get("threadId"))
 
-        threadID = metadata.get("threadId")
-        if not isinstance(threadID, str) or str(UUID(threadID)) != threadID:
-            raise ValueError("Codex must supply its native thread ID in tool-call metadata.")
+        if "claude" in clientName and "code" in clientName:
+            host = ClaudeHost.current()
 
-        return threadID
+            return NativeWorkIdentity("claude-code", host.sessionID)
+
+        return None
 
     @asynccontextmanager
     async def lifespan(self, server):
@@ -64,7 +68,7 @@ class NativeWorkRouter(Middleware):
                                    for receiver in self.receivers.values()))
             self.receivers.clear()
 
-    async def _start(self, threadID: str, result) -> None:
+    async def _start(self, identity: NativeWorkIdentity, result) -> None:
         data = RemoteWorkClient.value(result)
         sessionID = data.get("sessionID")
 
@@ -72,49 +76,57 @@ class NativeWorkRouter(Middleware):
                 str(UUID(sessionID)) != sessionID or not data.get("canonical")):
             raise ValueError("Remote MCP did not establish a work Session.")
 
-        current = self.receivers.get(threadID)
+        current = self.receivers.get(identity)
         if current and current.sessionID == sessionID:
             return
 
         if current:
             await asyncio.to_thread(current.stop)
-            self.receivers.pop(threadID)
+            self.receivers.pop(identity)
 
         receiver = NativeWorkReceiver(
-            self.config, self.remote, self.peer, threadID, sessionID,
+            self.config, self.remote, self.peer, identity, sessionID,
             data.get("created") is True, self.interval,
         )
-        self.receivers[threadID] = receiver
+        self.receivers[identity] = receiver
         receiver.start()
 
-    async def _call(self, threadID: str, name: str, arguments: dict):
+    async def _call(self, identity: NativeWorkIdentity, name: str, arguments: dict):
         if name in self.START or name == "agentAddressReleaseWork":
             async with self.lock:
                 if name == "agentAddressReleaseWork":
-                    current = self.receivers.pop(threadID, None)
+                    current = self.receivers.pop(identity, None)
                     if current:
                         await asyncio.to_thread(current.stop)
 
                 result = await asyncio.to_thread(
-                    self.remote.call, threadID, name, arguments, name in self.START,
+                    self.remote.call, identity.nativeID, name, arguments, name in self.START,
+                    mode=identity.mode,
                 )
 
                 if name in self.START and not result.is_error:
-                    await self._start(threadID, result)
+                    await self._start(identity, result)
 
                 return result
 
-        return await asyncio.to_thread(self.remote.call, threadID, name, arguments)
+        return await asyncio.to_thread(
+            self.remote.call, identity.nativeID, name, arguments,
+            name == "agentAddressGetStatus", mode=identity.mode,
+        )
 
     async def on_call_tool(self, context, call_next):
         name = context.message.name
 
         try:
-            threadID = self._identity(context)
-        except (ValueError, AttributeError):
-            return ToolResult(content="Native Codex thread identity is missing or invalid.", is_error=True)
+            identity = self._identity(context)
+        except (ValueError, AttributeError, OSError, RuntimeError, psutil.Error):
+            return ToolResult(
+                content="Current native work identity could not be verified. Reopen the intended work "
+                        "(Claude Code: use explicit --resume with its Session ID) and reconnect MCP.",
+                is_error=True,
+            )
 
-        if not threadID:
+        if not identity:
             return await call_next(context)
 
         canonical = self.ALIASES.get(name, name)
@@ -125,7 +137,7 @@ class NativeWorkRouter(Middleware):
                               is_error=True)
 
         try:
-            result = await self._call(threadID, canonical, context.message.arguments or {})
+            result = await self._call(identity, canonical, context.message.arguments or {})
         except Exception:
             return ToolResult(content="Nuwa work operation could not be confirmed. Check sign-in and work status.",
                               is_error=True)

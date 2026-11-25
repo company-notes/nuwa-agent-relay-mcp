@@ -21,19 +21,20 @@ class RemoteWorkClient:
         self.transport = transport
 
     def call(self, threadID: str, tool: str, arguments: dict | None = None,
-             firstUse: bool = False) -> CallToolResult:
+             firstUse: bool = False, *, mode: str = "codex") -> CallToolResult:
         token = (self.credentials.ensureAccessToken() if firstUse else
                  self.credentials.accessToken())
         requestID = str(uuid4())
         headers = {
             "Authorization": f"Bearer {token}",
-            "X-Nuwa-Work-Mode": "codex",
+            "X-Nuwa-Work-Mode": mode,
             "Accept": "application/json, text/event-stream",
             "MCP-Protocol-Version": "2025-06-18",
         }
+        identityKey = "threadId" if mode == "codex" else "sessionId"
         request = {
             "jsonrpc": "2.0", "id": requestID, "method": "tools/call",
-            "params": {"name": tool, "arguments": arguments or {}, "_meta": {"threadId": threadID}},
+            "params": {"name": tool, "arguments": arguments or {}, "_meta": {identityKey: threadID}},
         }
 
         with httpx.Client(timeout=45, follow_redirects=False, transport=self.transport) as client:

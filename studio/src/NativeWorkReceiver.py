@@ -4,6 +4,7 @@ import logging
 from threading import Event, Thread
 from uuid import UUID
 
+from .NativeWorkIdentity import ClaudeHost, NativeWorkIdentity
 from .PeerNotification import PeerNotification
 from .RemoteWorkClient import RemoteWorkClient
 from .SessionPeer import PeerSubmissionUncertain
@@ -16,14 +17,14 @@ logger = logging.getLogger(__name__)
 class NativeWorkReceiver:
     """One private work binding and durable submission queue for one native thread."""
 
-    def __init__(self, config, remote, peer, threadID: str, sessionID: str,
+    def __init__(self, config, remote, peer, identity: NativeWorkIdentity, sessionID: str,
                  created: bool, interval: float = 5):
         self.remote = remote
-        self.threadID = threadID
+        self.identity = identity
         self.sessionID = sessionID
         self.existingWork = not created
         self.interval = interval
-        target = "codex:" + threadID
+        target = identity.target
         self.inbox = WakeInbox.forNative(config, sessionID, target)
         self.notification = PeerNotification(None, sessionID, target, peer)
         self.stopEvent = Event()
@@ -37,7 +38,7 @@ class NativeWorkReceiver:
         self.worker.join(timeout=50)
 
     def _messages(self) -> dict:
-        rows = RemoteWorkClient.value(self.remote.call(self.threadID, "relayInbox"))
+        rows = RemoteWorkClient.value(self.remote.call(self.identity.nativeID, "relayInbox", mode=self.identity.mode))
 
         if not isinstance(rows, list):
             raise RuntimeError("Remote work Inbox was not a list.")
@@ -62,6 +63,9 @@ class NativeWorkReceiver:
         return messages
 
     def _poll(self) -> None:
+        if self.identity.mode == "claude-code":
+            ClaudeHost.current(self.identity.nativeID)
+
         messages = self._messages()
 
         if self.stopEvent.is_set():
@@ -79,6 +83,9 @@ class NativeWorkReceiver:
                 continue
 
             try:
+                if self.identity.mode == "claude-code":
+                    ClaudeHost.current(self.identity.nativeID)
+
                 self.notification.submit(messageID, messages[messageID])
             except PeerSubmissionUncertain:
                 logger.warning("Native work submission uncertain (messageID=%s)", messageID)

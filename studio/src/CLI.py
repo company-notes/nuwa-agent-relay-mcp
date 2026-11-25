@@ -100,7 +100,7 @@ class StudioCLI:
         wakeListen = wakeCommands.add_parser("listen")
         wakeListen.add_argument("--port", type=int, default=8765)
         mode = wakeListen.add_mutually_exclusive_group(required=True)
-        mode.add_argument("--peer-target", help="Exact local codex:<thread UUID>.")
+        mode.add_argument("--peer-target", help="Exact local codex:<thread UUID> or current claude:<Session UUID>.")
         mode.add_argument("--echo", action="store_true", help="Explicit diagnostic Echo mode.")
 
         return parser

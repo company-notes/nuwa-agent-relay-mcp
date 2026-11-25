@@ -24,8 +24,10 @@ class StudioMCP:
         server = FastMCP(
             "Nuwa Agent Relay Studio",
             instructions=(
-                "For Codex, before any new task call agentAddressStartWork with a meaningful "
+                "For Codex and Claude Code, before any new task call agentAddressStartWork with a meaningful "
                 "kebab-case sessionName and sessionDisplayName. On resume call it without names. "
+                "When asked for your work address, call agentAddressGetStatus. If there is no bound "
+                "Session, initialize the current work with agentAddressStartWork, using its meaningful task or project name. "
                 "Immediately report the returned canonical address to the user. First use may "
                 "open a browser for OAuth login. Use sendToAgent and relayReplyThread, never from. "
                 "Native work receives new messages while the work is open; use relayInbox for history. "
@@ -152,22 +154,22 @@ class StudioMCP:
         def agentAddressStartWork(sessionName: str | None = None,
                                   sessionDisplayName: str | None = None):
             """Initialize or resume the host's native work, then report its canonical address."""
-            raise ValueError("Native Codex host metadata is required.")
+            raise ValueError("Native Codex or Claude Code host identity is required.")
 
         @server.tool()
         def agentAddressGetStatus():
             """Read the host's work address without changing its identity."""
-            raise ValueError("Native Codex host metadata is required.")
+            raise ValueError("Native Codex or Claude Code host identity is required.")
 
         @server.tool()
         def agentAddressSelectSession(address: str):
             """Restore a known work address only at its owner's explicit request."""
-            raise ValueError("Native Codex host metadata is required.")
+            raise ValueError("Native Codex or Claude Code host identity is required.")
 
         @server.tool()
         def agentAddressReleaseWork():
             """Explicitly release this native work's Runtime, retaining history."""
-            raise ValueError("Native Codex host metadata is required.")
+            raise ValueError("Native Codex or Claude Code host identity is required.")
 
         return server
 

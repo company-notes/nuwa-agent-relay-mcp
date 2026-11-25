@@ -1,4 +1,4 @@
-"""Local Codex submission through the published session-peer CLI."""
+"""Local native work submission through the published session-peer CLI."""
 
 import json
 import logging
@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from uuid import UUID
+from .NativeWorkIdentity import ClaudeHost, NativeWorkIdentity
 
 
 logger = logging.getLogger(__name__)
@@ -25,16 +25,14 @@ class SessionPeer:
 
     @classmethod
     def validateTarget(cls, target: str) -> str:
-        if not isinstance(target, str) or not target.startswith("codex:"):
-            raise ValueError("Choose an explicit local codex:<thread UUID> destination.")
+        if not isinstance(target, str):
+            raise ValueError("Choose an exact native work destination.")
 
-        try:
-            threadID = str(UUID(target.removeprefix("codex:")))
-        except ValueError as error:
-            raise ValueError("Choose a full Codex thread UUID.") from error
+        prefix, separator, nativeID = target.partition(":")
+        if not separator or prefix not in ("codex", "claude"):
+            raise ValueError("Choose codex:<UUID> or claude:<UUID>.")
 
-        if target != "codex:" + threadID:
-            raise ValueError("Choose the canonical full Codex thread UUID.")
+        NativeWorkIdentity.canonicalID(nativeID)
 
         return target
 
@@ -74,15 +72,57 @@ class SessionPeer:
 
         return payload
 
+    def _claudeDestination(self, nativeID: str) -> tuple[int, str]:
+        host = ClaudeHost.current(nativeID)
+        if not host.socket:
+            raise RuntimeError("Claude Code has not registered a native inbox.")
+
+        listing = self._invoke(["list", "--agent", "claude", "--with-target-generation"])
+        payload = self._decode(listing.stdout)
+
+        if listing.returncode != 0 or payload.get("ok") is not True:
+            raise RuntimeError("Claude Code inbox discovery failed.")
+
+        sessions = payload.get("sessions")
+        if not isinstance(sessions, list):
+            raise RuntimeError("Claude Code inbox discovery returned invalid data.")
+
+        matches = [row for row in sessions if isinstance(row, dict) and
+                   row.get("pid") == host.pid and row.get("socket") == host.socket and
+                   row.get("reachable") is True]
+
+        if len(matches) != 1:
+            raise RuntimeError("Claude Code inbox is unavailable or ambiguous.")
+
+        generation = matches[0].get("targetGeneration")
+        if not isinstance(generation, str) or not generation.startswith("tg1:"):
+            raise RuntimeError("Claude Code inbox generation could not be verified.")
+
+        if ClaudeHost.current(nativeID) != host:
+            raise RuntimeError("Claude Code inbox changed before submission.")
+
+        return host.pid, generation
+
     def send(self, target: str, message: str) -> dict:
         target = self.validateTarget(target)
 
         if not message or len(message.encode("utf-8")) > self.MAX_MESSAGE_BYTES:
             raise ValueError("Native session message exceeds the UTF-8 size limit.")
 
+        prefix, nativeID = target.split(":", 1)
+        destination = target
+        generation = None
+        pid = None
+
+        if prefix == "claude":
+            pid, generation = self._claudeDestination(nativeID)
+            destination = str(pid)
+
         arguments = [
-            "send", "--to", target, "--message", "-", "--no-from", "--no-reply-to",
+            "send", "--to", destination, "--message", "-", "--no-from", "--no-reply-to",
         ]
+        if generation is not None:
+            arguments.extend(["--target-generation", generation])
 
         try:
             result = self._invoke(arguments, message)
@@ -102,8 +142,16 @@ class SessionPeer:
 
             raise PeerSubmissionUncertain("Native session delivery was not positively confirmed.")
 
+        if prefix == "claude":
+            selected = payload.get("target")
+            if (payload.get("dryRun") is not False or not isinstance(selected, dict) or
+                    selected.get("pid") != pid or payload.get("targetGeneration") != generation):
+                raise PeerSubmissionUncertain("Claude Code response lacks exact submission evidence.")
+
+            return {"submitted": True, "status": "posted", "consumptionConfirmed": False}
+
         if (payload.get("submitted") is not True or payload.get("status") != "queued" or
-                payload.get("target") != {"agent": "codex", "id": target.removeprefix("codex:")}):
+                payload.get("target") != {"agent": "codex", "id": nativeID}):
             raise PeerSubmissionUncertain("Native session response lacks exact submission evidence.")
 
         return {

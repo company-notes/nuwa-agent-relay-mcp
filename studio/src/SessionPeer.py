@@ -92,7 +92,12 @@ class SessionPeer:
             raise PeerSubmissionUncertain("Native submission outcome is unknown.") from error
 
         if result.returncode != 0 or payload.get("ok") is not True:
-            if payload.get("submitted") is False and payload.get("retryAllowed") is True:
+            resolution = payload.get("codexHomeResolution")
+            notSaved = (isinstance(resolution, dict) and
+                        resolution.get("reason") == "thread_not_yet_persisted" and
+                        payload.get("submitted") is not True)
+
+            if notSaved or (payload.get("submitted") is False and payload.get("retryAllowed") is True):
                 raise RuntimeError("Native session rejected the request before submission.")
 
             raise PeerSubmissionUncertain("Native session delivery was not positively confirmed.")

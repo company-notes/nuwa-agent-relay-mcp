@@ -1,5 +1,6 @@
 """Durable, idempotent local Wake delivery queue."""
 
+import hashlib
 import os
 import sqlite3
 import time
@@ -38,6 +39,29 @@ class WakeInbox:
 
         if os.name != "nt":
             self.path.chmod(0o600)
+
+    @classmethod
+    def forNative(cls, config, sessionID: str, target: str):
+        digest = hashlib.sha256(sessionID.encode("utf-8")).hexdigest()
+        path = config.wakeInboxPath().with_name(f"wake-native-{digest}.sqlite3")
+
+        return cls(path, (sessionID, target))
+
+    def initializePolling(self, messageIDs: list[str], existingWork: bool) -> None:
+        """Do not replay pre-existing conversation history on first local adoption."""
+        now = time.time()
+
+        with closing(sqlite3.connect(self.path, timeout=5)) as db:
+            with db:
+                db.execute("CREATE TABLE IF NOT EXISTS native_poll_started (id INTEGER PRIMARY KEY)")
+                started = db.execute("INSERT OR IGNORE INTO native_poll_started VALUES (1)")
+
+                if started.rowcount and existingWork:
+                    db.executemany("""
+                        INSERT OR IGNORE INTO incoming_wake
+                            (message_id, received_at, next_attempt_at, completed_at)
+                        VALUES (?, ?, ?, ?)
+                    """, [(messageID, now, now, now) for messageID in messageIDs])
 
     @classmethod
     def _bind(cls, db, binding: tuple[str, str]) -> None:

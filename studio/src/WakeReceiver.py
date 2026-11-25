@@ -44,8 +44,7 @@ class WakeReceiver:
 
         if peerTarget is not None:
             target = SessionPeer.validateTarget(peerTarget)
-            digest = hashlib.sha256(sessionID.encode("utf-8")).hexdigest()
-            self.inbox = WakeInbox(inboxPath.with_name(f"wake-native-{digest}.sqlite3"), (sessionID, target))
+            self.inbox = WakeInbox.forNative(config, sessionID, target)
             self.handler = PeerNotification(client, sessionID, target, peer)
         else:
             self.inbox = WakeInbox(inboxPath)

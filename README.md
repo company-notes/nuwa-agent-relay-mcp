@@ -61,6 +61,23 @@ Windows 建置：`python studio/Build.py`（需 uv 與 NSIS）。輸出位於
 Agent、Session 或 Wake 資料，也不會自動登入。請重新啟動或重新載入 MCP 客戶端。
 
 
+### Codex native work (test release)
+
+Install the Windows Setup, restart Codex, and start a task. The installed MCP
+instructs Codex to call `agentAddressStartWork` with its task name and report
+the canonical work address. On the first call a browser opens for Nuwa OAuth.
+The remote service reuses the host-provided thread ID; the local process
+polls the authorized Inbox and submits new messages to that exact native
+thread using session-peer. No public callback or separate Python install is
+needed for this path. Saved history remains available through `relayInbox`.
+A submitted queue item is not proof of consumption. First adoption of an
+existing remote work does not replay its historical Inbox automatically.
+Closing the work stops receiving; resume restores the work binding and
+continues the durable local queue.
+
+The following explicit signed Wake diagnostic remains available for separately
+configured local identities.
+
 ### Native Codex Wake (development / explicit binding)
 
 The local package includes the pinned session-peer 1.6.2 runtime. It does not

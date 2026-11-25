@@ -54,7 +54,9 @@ class InstallerProfile:
         before = database.read_bytes()
         discovery = json.loads(self.run(launcher, "peer", "list"))
         assert discovery["version"] == "1.6.2"
-        assert {session["id"] for session in discovery["sessions"]} == set(identifiers[:2])
+        assert {session["id"]: session["name"] for session in discovery["sessions"]} == {
+            identifier: f"測試工作 {index}" for index, identifier in enumerate(identifiers[:2])
+        }
         assert database.read_bytes() == before
 
     def runResult(self, *command: str, timeout: int = 60):

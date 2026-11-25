@@ -146,7 +146,7 @@ class StudioCLI:
         args = cls.createParser().parse_args(sys.argv[1:] or ["run"])
 
         if args.command == "peer":
-            print(json.dumps(SessionPeer().list(), indent=2, ensure_ascii=False))
+            print(json.dumps(SessionPeer().list(), indent=2))
             return
 
         config = LocalConfig.load()

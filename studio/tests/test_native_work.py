@@ -88,10 +88,10 @@ class WorkService:
             },
         })
 
-    def receive(self, threadID, body):
+    def receive(self, threadID, body, kind="message"):
         with self.lock:
             message = {
-                "id": str(uuid4()), "threadId": str(uuid4()), "kind": "message",
+                "id": str(uuid4()), "threadId": str(uuid4()), "kind": kind,
                 "senderCanonicalAddress": "nuwa/reviewer/main",
                 "recipientSessionID": self.sessions[threadID]["sessionID"], "body": body,
             }
@@ -183,14 +183,16 @@ class TestNativeWork:
                 await self.call(client, threadA, "agentAddressReleaseWork")
                 await self.call(client, threadB, "agentAddressReleaseWork")
 
-            thirdMessage = service.receive(threadA, "Follow-up after restart")
+            thirdMessage = service.receive(threadA, "Reply received while offline", kind="reply")
+            pollsBeforeResume = service.polls[threadA]
             async with MCPClient(server(), client_info=codex) as restarted:
                 resumed = await self.call(restarted, threadA, "agentAddressStartWork")
                 assert resumed["canonical"] == first["canonical"]
                 assert resumed["sessionID"] == first["sessionID"]
                 assert not resumed["created"]
 
-                await self.waitUntil(lambda: len(peer.snapshot()) == 3)
+                await self.waitUntil(lambda: service.polls[threadA] >= pollsBeforeResume + 2)
+                assert len(peer.snapshot()) == 3, "An offline reply must reach the resumed native work"
                 assert peer.snapshot()[-1][0] == "codex:" + threadA
                 assert thirdMessage["body"] in peer.snapshot()[-1][1]
 

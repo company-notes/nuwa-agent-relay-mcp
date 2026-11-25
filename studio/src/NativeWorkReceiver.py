@@ -48,7 +48,7 @@ class NativeWorkReceiver:
             if not isinstance(row, dict):
                 raise RuntimeError("Remote work Inbox contains an invalid row.")
 
-            if row.get("kind") != "message":
+            if row.get("kind") not in ("message", "reply"):
                 continue
 
             if row.get("recipientSessionID") != self.sessionID:

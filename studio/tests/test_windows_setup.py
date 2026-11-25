@@ -94,9 +94,7 @@ class TestWindowsSetup:
         profile.run(str(setup), "/S", f"/D={destination}", timeout=300)
         assert executable.is_file()
         assert profile.run(str(executable), "--version").strip() == expectedVersion
-        discovery = json.loads(profile.run(str(executable), "peer", "list"))
-        assert discovery["version"] == "1.6.2"
-        assert isinstance(discovery["sessions"], list)
+        profile.verifyPeerDiscovery(str(executable))
         assert self.registration() == {
             "DisplayName": "Nuwa Relay MCP",
             "DisplayVersion": expectedVersion,

@@ -1,9 +1,12 @@
 """Shared isolated user profile for installation scenarios."""
 
+import json
 import os
+import sqlite3
 import subprocess
 import tomllib
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 
@@ -30,6 +33,29 @@ class InstallerProfile:
         self.config.write_text('[mcp_servers.other]\ncommand = "other"\n', encoding="utf-8")
         self.originalConfig = self.config.read_bytes()
         self.skill = home / ".agents" / "skills" / "nuwa-agent-relay"
+
+    def verifyPeerDiscovery(self, launcher: str) -> None:
+        """Read two saved threads and exclude an archived thread from an isolated Codex DB."""
+        identifiers = [str(uuid4()) for _ in range(3)]
+        database = self.config.parent / "state_5.sqlite"
+        self.env["CODEX_HOME"] = str(self.config.parent)
+
+        with sqlite3.connect(database) as connection:
+            connection.execute(
+                "CREATE TABLE threads (id TEXT PRIMARY KEY, title TEXT, cwd TEXT, "
+                "updated_at INTEGER, archived INTEGER, rollout_path TEXT)"
+            )
+            connection.executemany(
+                "INSERT INTO threads VALUES (?, ?, ?, ?, ?, ?)",
+                [(identifier, f"測試工作 {index}", str(self.home), index,
+                  int(index == 2), "") for index, identifier in enumerate(identifiers)],
+            )
+
+        before = database.read_bytes()
+        discovery = json.loads(self.run(launcher, "peer", "list"))
+        assert discovery["version"] == "1.6.2"
+        assert {session["id"] for session in discovery["sessions"]} == set(identifiers[:2])
+        assert database.read_bytes() == before
 
     def runResult(self, *command: str, timeout: int = 60):
         return subprocess.run(

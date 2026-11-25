@@ -2,8 +2,10 @@
 
 import json
 import logging
+import os
 import subprocess
 import sys
+from pathlib import Path
 from uuid import UUID
 
 
@@ -45,9 +47,16 @@ class SessionPeer:
     @classmethod
     def _command(cls) -> list[str]:
         if getattr(sys, "frozen", False):
+            if os.name == "nt":
+                interpreter = Path(sys._MEIPASS) / "peer-runtime" / "python.exe"
+                if not interpreter.is_file():
+                    raise RuntimeError("The bundled session-peer interpreter is missing.")
+
+                return [str(interpreter), "-X", "utf8", "-m", "session_peer"]
+
             return [sys.executable, cls.CHILD_COMMAND]
 
-        return [sys.executable, "-m", "session_peer"]
+        return [sys.executable, "-X", "utf8", "-m", "session_peer"]
 
     @classmethod
     def _invoke(cls, arguments: list[str], message: str | None = None):

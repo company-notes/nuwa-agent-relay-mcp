@@ -1,28 +1,27 @@
 """Exercise the installed Relay MCP CLI against an isolated Codex profile."""
 
-import json
 import os
 import sysconfig
 from pathlib import Path
 
 
 class TestStudioInstall:
-    def runLauncher(self, profile, *arguments: str):
+    def launcher(self):
         name = "nuwa-relay-mcp.exe" if os.name == "nt" else "nuwa-relay-mcp"
         launcher = Path(sysconfig.get_path("scripts")) / name
         assert launcher.is_file(), "The installed distribution must expose nuwa-relay-mcp"
 
-        return profile.run(str(launcher), *arguments)
+        return str(launcher)
+
+    def runLauncher(self, profile, *arguments: str):
+        return profile.run(self.launcher(), *arguments)
 
     def runInstaller(self, profile, *arguments: str):
         return self.runLauncher(profile, *arguments, "--target", "codex")
 
     def testBundledPeerDiscovery(self, installerProfile):
         """An installed CLI must discover native sessions without another session-peer installation."""
-        output = self.runLauncher(installerProfile, "peer", "list")
-        result = json.loads(output)
-        assert result["version"] == "1.6.2"
-        assert isinstance(result["sessions"], list)
+        installerProfile.verifyPeerDiscovery(self.launcher())
 
     def testCodexInstallUpdateAndUninstall(self, installerProfile):
         """Install the official Skill and MCP, preserve unrelated config, then remove both."""

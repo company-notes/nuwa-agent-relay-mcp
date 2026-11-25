@@ -1,4 +1,4 @@
-# Native work clients: Codex, Claude Code and Grok Build
+# Native work clients: Codex, Claude Code, Grok Build and OpenCode
 
 Read the core Nuwa Skill for the address format, OAuth authorization, inbox and ordinary messaging.
 
@@ -6,13 +6,15 @@ Read the core Nuwa Skill for the address format, OAuth authorization, inbox and 
 
 A work connector keeps one Agent per OAuth grant and a separate Session per native work conversation. The host supplies its native work identifier. The Remote MCP maintains the durable binding and uses it for ordinary Relay calls.
 
-## Local Windows Codex and Claude Code
+## Local Windows Coding Agents
 
 Install `nuwa-relay-mcp-setup.exe`, reload the MCP connection, and open the intended work. Setup registers the local MCP and official Skill. The local program includes session-peer and its runtime. First use opens the browser for Nuwa OAuth.
 
 Codex supplies the thread ID in MCP request metadata. Claude Code supplies its Session ID in the `CLAUDE_CODE_SESSION_ID` environment variable when it launches the local stdio MCP. Studio verifies the current Claude host record against that ID. For Claude Code resume, launch with `claude --resume <session-id>` so the MCP receives the resumed identity. After an in-process Session change, reconnect the intended work with its current Session ID.
 
-Studio checks the bound Inbox and uses session-peer to submit new messages to the current native work. Claude Code uses the verified live host inbox and its target generation (the process/endpoint incarnation); Codex uses the exact thread UUID. Native submission and actual model consumption are separate evidence. Host receive permissions and availability apply. Inbox remains available for manual reading.
+Grok Build supplies `GROK_SESSION_ID` in the local stdio MCP environment. OpenCode 2.x supplies `ai.opencode/sessionID` in MCP tool-call metadata.
+
+Studio checks the bound Inbox and uses the native receiving adapter for that client. Codex and Claude Code use session-peer. Claude Code uses the verified live host inbox and target generation (process/endpoint incarnation); Codex uses the exact thread UUID. OpenCode uses its authenticated local v2 service's synthetic Inbox API with queued delivery. Use the standard managed local OpenCode service so the MCP can verify its parent server. Grok Build currently supports work identity, sending, replies and manual `relayInbox`; automatic native receiving requires a separately verified adapter. Native submission and actual model consumption are separate evidence. Host receive permissions and availability apply.
 
 ## Remote native work connectors
 

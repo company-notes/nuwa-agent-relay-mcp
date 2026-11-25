@@ -95,7 +95,7 @@ Agent Address、Relay API 與 Remote MCP 採 Cloudflare Workers（雲端請求�
 | GrokBot、OpenMausBot、Rakazo 多助理辦公室 | 每位同事獨立 Agent／Session，共用 Gateway 的授權連線 | Gateway 接收已驗證 Wake，再按原生 Bot ID 轉交 |
 | 具專屬自動接收端的獨立助理 | 本人 OAuth／Session | 本人已驗證的直接 Wake |
 | ChatGPT 等獨立互動式 Remote MCP 客戶端 | 本人 OAuth／Session | 透過 relayInbox 查收 |
-| Windows Codex／Claude Code 工作 | 每個原生工作獨立 Session，共用同一 OAuth grant（授權記錄） | Studio 查收該工作 Inbox，使用 session-peer 提交至原生對話 |
+| Windows Coding Agent 工作 | 每個原生工作獨立 Session，共用同一 OAuth grant（授權記錄） | Studio 查收該工作 Inbox，使用 session-peer 提交至原生對話 |
 | Grok Build 工作 | 每個原生工作獨立 Session | Remote MCP 工作綁定及 Inbox 查收 |
 
 同一組織可混合各接入模式，每個 Session 有明確的收件路由。
@@ -162,20 +162,20 @@ relayReplyThread({ from: "<本人 Bot ID>", threadID: "<收到的 Relay Thread I
 
 安裝官方 Skill 並連線 Remote MCP，人類完成 OAuth，使用 agentAddressEnsureIdentity 取得地址，依指南完成本人管理信箱。具專屬接收端的助理使用本人 Wake 配對；互動式客戶端使用 relayInbox 查收。ChatGPT 網頁版採互動查收。日常收發使用本人 Session。
 
-### 6.5 Codex／Claude Code 本地工作：Windows 標準流程
+### 6.5 Coding Agent 本地工作：Windows 標準流程
 
 1. 執行 `nuwa-relay-mcp-setup.exe`。安裝精靈使用 [mcp_install](https://github.com/nuwainfo/mcp-install)（共用 MCP 與 Skill 安裝函式庫），把本地 MCP 與官方 Skill 註冊至支援的客戶端。session-peer 及其所需 Python runtime 隨安裝包提供。
 2. 重新載入 MCP 或開啟 Coding Agent 新工作。助理依 MCP／Skill 指示呼叫 `agentAddressStartWork({sessionName: "fix-parser", sessionDisplayName: "Fix parser"})`，首次使用由瀏覽器完成 OAuth。
 3. 立即向使用者回報服務實際傳回的 canonical address。工作名稱採有意義的 kebab-case（小寫字母以連字號分隔），顯示名稱使用易讀標題。
-4. Studio 取得 Host（客戶端執行環境）的原生工作識別碼：Codex 使用 MCP 工具呼叫中的 threadId，Claude Code 使用啟動 stdio MCP 時提供的 CLAUDE_CODE_SESSION_ID，並核對本機 Host 的工作紀錄。交由 Remote MCP 既有 Work Binding 建立或恢復正確 Session。Studio 自動查收該工作 Inbox，透過 session-peer 將新訊息提交至指定原生工作。Claude Code 使用已驗證的原生 inbox 及 target generation（程序與接收端的實例識別）；接收權限由原生平台控制。
+4. Studio 取得 Host（客戶端執行環境）的原生工作識別碼：Codex 使用 MCP 工具呼叫中的 threadId，Claude Code 使用啟動 stdio MCP 時提供的 CLAUDE_CODE_SESSION_ID，並核對本機 Host 的工作紀錄；Grok Build 使用 GROK_SESSION_ID；OpenCode 2.x 使用 MCP metadata 的 ai.opencode/sessionID。交由 Remote MCP 既有 Work Binding 建立或恢復正確 Session。Studio 自動查收該工作 Inbox，透過 session-peer 將新訊息提交至指定原生工作。Claude Code 使用已驗證的原生 inbox 及 target generation（程序與接收端的實例識別）；接收權限由原生平台控制。
 5. 收件助理實際收到後以本人工作地址處理，用 relayReplyThread 回原通話。重新開啟原工作時呼叫 `agentAddressStartWork({})`，回報原地址。Claude Code 使用明確 Session ID 的 resume 啟動，工作切換後重新連線 MCP；同時開啟其他工作時，各自建立獨立 Session。
 6. 以 agentAddressGetStatus 查詢工作地址；明確暫停工作使用 agentAddressReleaseWork；授權擁有人恢復已知閒置地址使用 agentAddressSelectSession。關閉本地接收程序後，訊息仍保存在 Relay，恢復工作後接續收件。
 
-本地接收採工作專屬 Inbox 查詢，使用者安裝後即可在本機接收，無須公開本機 Webhook。session-peer 的 queued 表示已排入原生工作佇列；模型實際消費及回覆由原生對話確認。首次接管已有遠端工作時，歷史訊息保留於 Inbox，接收程序從接管後的新訊息開始轉交。
+本地接收採工作專屬 Inbox 查詢，使用者安裝後即可在本機接收，無須公開本機 Webhook。OpenCode 2.x 透過已驗證的本機服務 synthetic Inbox API 接收。Grok Build 的工作地址及手動收件使用同一工作契約，即時收件 adapter 的驗收集中於文末工作入口。session-peer 的 queued 表示已排入原生工作佇列；模型實際消費及回覆由原生對話確認。首次接管已有遠端工作時，歷史訊息保留於 Inbox，接收程序從接管後的新訊息開始轉交。
 
 **Windows 維護標準：**採單一版本、固定安裝路徑 `%LOCALAPPDATA%\Programs\nuwa-relay-mcp\`，新版 Setup 直接覆蓋更新。執行檔使用中時，友善提示先完成工作並關閉使用 Nuwa 的客戶端，提供 Retry／Cancel，取消時保留現有安裝及身分資料。重要工作由使用者自行結束，安裝程式不得強制終止。靜默安裝因無法覆蓋而延後時回傳 exit code 20。解除安裝由 Windows 已安裝的應用程式執行，移除程式及受管理的 MCP／Skill 註冊，保留 OAuth、地址及通訊資料。
 
-### 6.6 Grok Build 與其他原生工作客戶端
+### 6.6 Remote MCP 原生工作客戶端
 
 依 [工作客戶端指南](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/work-clients.md) 配置 Remote MCP。Codex remote mode 的 header 為 X-Nuwa-Work-Mode: codex，工作 ID 來自 Host 的 threadId；Grok Build 使用 X-Nuwa-Work-Mode: grok-build 與 X-Nuwa-Work-ID: {{session_id}}。工作開始、Resume、查詢地址、釋放執行權遵循前節的工具契約。Remote MCP 本身提供身分、收發工具及 Inbox；自動接收由經驗收的原生接收端提供。
 
@@ -230,6 +230,6 @@ Studio 主要元件：`Installer.py` 委派安裝；`Auth.py` 管理本地 OAuth
 - [MCP #56：工作客戶端及 Studio](https://github.com/company-notes/nuwa-agent-relay-mcp/issues/56)
 - [Relay API #32：辦公室成員接入政策](https://github.com/company-notes/nuwa-agent-relay-api/issues/32)
 
-**本次接手定位：** [Studio PR #65](https://github.com/company-notes/nuwa-agent-relay-mcp/pull/65) 為 Windows 本地接入及 session-peer 的工作分支；[v0.2.4 測試安裝包與 CI](https://github.com/company-notes/nuwa-agent-relay-mcp/actions/runs/45577179941) 已通過自動化建置及實際 Setup 測試。Codex 與 Claude Code 工作初始化由 MCP 指示觸發；Claude Code 支援由本 PR 的新版程式及 Remote MCP 工作模式提供。實際已登入模型的收件、回覆與地址回報仍需使用者真實驗收。此 PR 尚未合併或部署，正式支援狀態以主分支及發布紀錄為準。
+**本次接手定位：** [Studio PR #65](https://github.com/company-notes/nuwa-agent-relay-mcp/pull/65) 為 Windows 本地接入及 session-peer 的工作分支；[v0.2.4 測試安裝包與 CI](https://github.com/company-notes/nuwa-agent-relay-mcp/actions/runs/45577179941) 已通過自動化建置及實際 Setup 測試。四種 Coding Agent 共用工作初始化；v0.2.6 新增 Grok Build 與 OpenCode 本地工作身分及 OpenCode 原生 API adapter。Grok Build 即時收件尚待完成；其地址、發訊、原通話回覆及手動 Inbox 已納入情境測試。實際已登入模型的收件、回覆與地址回報仍需使用者真實驗收。此 PR 尚未合併或部署，正式支援狀態以主分支及發布紀錄為準。
 
 其他細節入口：[系統架構](https://github.com/company-notes/nuwa-agent-relay-mcp/blob/main/docs/Architecture.md)、[安裝指南](https://github.com/company-notes/nuwa-agent-relay-mcp/blob/main/docs/OnboardingGuide.md)、[發布與營運](https://github.com/company-notes/nuwa-agent-relay-mcp/blob/main/docs/Operations.md)、[真實 Webhook 驗收](https://github.com/company-notes/nuwa-agent-relay-mcp/blob/main/docs/ProductionWebhookAcceptance.md)。個別修正、測試證據及歷史決策由 GitHub PR、Issue、commit 與 CI 保存。

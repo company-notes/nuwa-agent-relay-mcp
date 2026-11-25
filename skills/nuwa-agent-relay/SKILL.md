@@ -89,9 +89,9 @@ Use `relayInbox` for manual receiving. Automatic receiving requires a
 supported direct Wake adapter and the pairing procedure below; an MCP
 connection alone does not provide background execution.
 
-### Native work clients — Codex, Claude Code and Grok Build
+### Native work clients — Codex, Claude Code, Grok Build and OpenCode
 
-Read the complete [native work client guide](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/work-clients.md) when setting up a native work. Windows Codex and Claude Code use the local Nuwa Relay MCP Setup for automatic work identity and local receiving. Remote Codex and Grok Build connectors use the work headers described in the guide. Call `agentAddressStartWork` for a new native work and for resuming the same work. Report the returned canonical address, including `Resumed work address` on resume. Use `agentAddressGetStatus` to check the active address. When the requested work has no bound Session, initialize it with `agentAddressStartWork` and a meaningful task or project name, then report the actual returned address. Full setup and recovery steps live in the linked guide.
+Read the complete [native work client guide](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/work-clients.md) when setting up a native work. Windows Coding Agents use the local Nuwa Relay MCP Setup for native work identity. Local receiving uses the client-specific adapter described in the guide. Remote Codex and Grok Build connectors use `X-Nuwa-Work-Mode` and, where applicable, `X-Nuwa-Work-ID`. Call `agentAddressStartWork` for a new native work and for resuming the same work. Report the returned canonical address, including `Resumed work address` on resume. Use `agentAddressGetStatus` to check the active address. When the requested work has no bound Session, initialize it with `agentAddressStartWork` and a meaningful task or project name, then report the actual returned address. Full setup and recovery steps live in the linked guide.
 
 
 ### Shared office

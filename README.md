@@ -64,9 +64,9 @@ Agent、Session 或 Wake 資料，也不會自動登入。請重新啟動或重�
 再重試。靜默安裝遇到無法覆蓋的執行檔會回傳 exit code 20，表示此次安裝延後。
 
 
-### Native Codex and Claude Code work (test release)
+### Native Coding Agent work (test release)
 
-Install the Windows Setup, reload MCP, and start a Codex or Claude Code task. The installed MCP
+Install the Windows Setup, reload MCP, and start a Codex, Claude Code, Grok Build or OpenCode task. The installed MCP
 instructs the client to call `agentAddressStartWork` with its task name and report
 the canonical work address. On the first call a browser opens for Nuwa OAuth.
 The remote service reuses the verified host-provided work ID; the local process
@@ -77,6 +77,9 @@ A submitted queue item is not proof of consumption. First adoption of an
 existing remote work does not replay its historical Inbox automatically.
 Closing the work stops receiving; resume restores the work binding and
 continues the durable local queue.
+
+OpenCode 2.x uses its authenticated local service's synthetic Inbox endpoint.
+Grok Build uses the host's work ID and manual Inbox until its native receive adapter is verified.
 
 The following explicit signed Wake diagnostic remains available for separately
 configured local identities.

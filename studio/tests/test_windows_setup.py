@@ -136,6 +136,7 @@ class TestWindowsSetup:
         assert (profile.skill / "SKILL.md").is_file()
         assert (profile.skill / "references" / "work-clients.md").is_file()
         self.verifyClaudeRegistration(profile, claude, executable)
+        profile.verifyAdditionalClients(executable)
         assert (profile.home / ".claude" / "skills" / "nuwa-agent-relay" / "SKILL.md").is_file()
         asyncio.run(asyncio.wait_for(self.verifyMCP(executable, profile), timeout=90))
 
@@ -150,6 +151,7 @@ class TestWindowsSetup:
         assert (profile.skill / "SKILL.md").is_file()
 
         self.verifyClaudeRegistration(profile, claude, executable)
+        profile.verifyAdditionalClients(executable)
 
         profile.run(str(uninstaller), "/S", timeout=300)
         self.waitForUninstall(executable, uninstaller)
@@ -159,4 +161,5 @@ class TestWindowsSetup:
         assert identity.read_text(encoding="utf-8") == "local identity sentinel"
         assert not (profile.home / ".claude" / "skills" / "nuwa-agent-relay").exists()
         self.verifyClaudeAbsent(profile, claude)
+        profile.verifyAdditionalClients(None)
         profile.run(str(claude), "mcp", "remove", "-s", "user", "nuwa-unrelated")

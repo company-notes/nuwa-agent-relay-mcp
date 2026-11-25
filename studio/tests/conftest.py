@@ -33,6 +33,12 @@ class InstallerProfile:
         self.config.write_text('[mcp_servers.other]\ncommand = "other"\n', encoding="utf-8")
         self.originalConfig = self.config.read_bytes()
         self.skill = home / ".agents" / "skills" / "nuwa-agent-relay"
+        self.grokConfig = home / ".grok" / "config.toml"
+        self.openCodeConfig = home / ".config" / "opencode" / "opencode.json"
+        self.grokConfig.parent.mkdir()
+        self.grokConfig.write_text('[mcp_servers.other]\ncommand = "other"\n', encoding="utf-8")
+        self.openCodeConfig.parent.mkdir(parents=True)
+        self.openCodeConfig.write_text(json.dumps({"mcp": {"servers": {"other": {"type": "local", "command": ["other"]}}}}), encoding="utf-8")
 
     def verifyPeerDiscovery(self, launcher: str) -> None:
         """Read two saved threads and exclude an archived thread from an isolated Codex DB."""
@@ -70,6 +76,23 @@ class InstallerProfile:
 
         assert result.returncode == 0, result.stdout + result.stderr
         return result.stdout
+
+    def verifyAdditionalClients(self, executable: Path | None) -> None:
+        grok = tomllib.loads(self.grokConfig.read_text(encoding="utf-8"))["mcp_servers"]
+        opencode = json.loads(self.openCodeConfig.read_text(encoding="utf-8"))["mcp"]["servers"]
+        assert grok["other"]["command"] == "other"
+        assert opencode["other"]["command"] == ["other"]
+        name = "nuwa-agent-relay-studio"
+        skills = [self.grokConfig.parent / "skills" / "nuwa-agent-relay" / "SKILL.md",
+                  self.openCodeConfig.parent / "skills" / "nuwa-agent-relay" / "SKILL.md"]
+
+        if executable is None:
+            assert name not in grok and name not in opencode
+            assert all(not skill.exists() for skill in skills)
+        else:
+            assert Path(grok[name]["command"]) == executable
+            assert Path(opencode[name]["command"][0]) == executable
+            assert all(skill.is_file() for skill in skills)
 
     def servers(self) -> dict:
         return tomllib.loads(self.config.read_text(encoding="utf-8"))["mcp_servers"]

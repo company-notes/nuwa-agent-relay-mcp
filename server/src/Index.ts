@@ -76,7 +76,7 @@ export class HTTPMCPApplication {
       /^\/v2\/management\/agents\/([^/]+)\/bindings$/,
     );
 
-    const inbox = url.pathname === '/work-inbox/events' || url.pathname === '/work-inbox/events/stream';
+    const inbox = ['/work-inbox/events', '/work-inbox/events/head', '/work-inbox/events/stream'].includes(url.pathname);
 
     if (url.pathname !== '/mcp' && url.pathname !== '/session-bindings' && !resetMatch && !inbox) {
       return new Response('Not found', { status: 404 });
@@ -138,7 +138,8 @@ export class HTTPMCPApplication {
           return await relay.openInboxStream();
         }
 
-        const data = await relay.call('GET', '/v2/inbox/events', undefined, {
+        const path = url.pathname.endsWith('/head') ? '/v2/inbox/events/head' : '/v2/inbox/events';
+        const data = await relay.call('GET', path, undefined, {
           after_sequence: url.searchParams.get('after_sequence') ?? '0',
         });
 

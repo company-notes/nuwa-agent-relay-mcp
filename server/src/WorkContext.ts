@@ -26,6 +26,25 @@ export class WorkContext {
     return new WorkContext(mode, id);
   }
 
+  static fromInboxHeaders(headers: Headers): WorkContext {
+    const id = headers.get('x-nuwa-work-id');
+    const connector = new Headers(headers);
+
+    if (connector.get('x-nuwa-work-mode') !== 'grok-build') {
+      connector.delete('x-nuwa-work-id');
+    }
+
+    const work = WorkContext.fromHeaders(connector);
+
+    if (!work) {
+      throw new APIError(400, 'native_work_required', 'Native work context is required.');
+    }
+
+    work.bind({ threadId: id, sessionId: id, 'ai.opencode/sessionID': id });
+
+    return work;
+  }
+
   bind(meta: unknown): void {
     const context = meta as { threadId?: unknown; sessionId?: unknown; 'ai.opencode/sessionID'?: unknown } | undefined;
     const id = this.mode === 'grok-build' ? this.headerID

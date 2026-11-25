@@ -16,6 +16,7 @@ import pytest
 from src.Client import RelayClient
 from src.Config import LocalConfig
 from src.WakeReceiver import WakeHTTPServer, WakeReceiver
+from src.WakeInbox import WakeInbox
 from src.WakeSubscription import WakeSubscription
 
 
@@ -277,3 +278,25 @@ def test_local_wake_rejects_other_work_credentials_before_listening(tmp_path, mo
 
     with pytest.raises(RuntimeError, match="different Session"):
         WakeReceiver(changed, client)
+
+
+class TestNativeWakeRecovery:
+    def testConcurrentWorkersAndRestartDoNotResubmitClaimedMessage(self, tmp_path):
+        """Regression: a second worker must not send while a prior native submission may be live."""
+        inbox = WakeInbox(tmp_path / "wake.sqlite3")
+        messageID = str(uuid4())
+        assert inbox.enqueue(messageID)
+
+        # Two workers can read the same due row before either starts processing.
+        second = WakeInbox(inbox.path)
+        assert inbox.due() == second.due() == [(messageID, 0)]
+        assert inbox.claim(messageID)
+        assert not second.claim(messageID)
+
+        restarted = WakeInbox(inbox.path)
+        assert restarted.due() == []
+        assert restarted.uncertain() == [messageID]
+
+        # Only a known pre-submit failure may return the claim to retryable work.
+        inbox.retryLater(messageID, 0)
+        assert restarted.uncertain() == []

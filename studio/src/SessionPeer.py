@@ -76,12 +76,14 @@ class SessionPeer:
 
     def send(self, target: str, message: str) -> dict:
         target = self.validateTarget(target)
+
         if not message or len(message.encode("utf-8")) > self.MAX_MESSAGE_BYTES:
             raise ValueError("Native session message exceeds the UTF-8 size limit.")
 
         arguments = [
             "send", "--to", target, "--message", "-", "--no-from", "--no-reply-to",
         ]
+
         try:
             result = self._invoke(arguments, message)
             payload = self._decode(result.stdout)
@@ -111,6 +113,7 @@ class SessionPeer:
 
         if result.returncode != 0 or payload.get("ok") is not True:
             raise RuntimeError("Native session discovery failed; inspect the Codex installation.")
+
         if not isinstance(payload.get("sessions"), list):
             raise RuntimeError("Native session discovery returned an unexpected result.")
 

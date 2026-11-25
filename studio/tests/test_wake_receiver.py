@@ -287,6 +287,7 @@ class TestNativeWakeRecovery:
         """Regression: a second worker must not send while a prior native submission may be live."""
         inbox = WakeInbox(tmp_path / "wake.sqlite3")
         messageID = str(uuid4())
+
         assert inbox.enqueue(messageID)
 
         # Two workers can read the same due row before either starts processing.
@@ -328,15 +329,18 @@ class TestNativeWakeRecovery:
             try:
                 assert not TestWakeReceiver._request(url, raw, signature, 202)["duplicate"]
                 receiver.processDue()
+
                 assert len(peer.submissions) == 1
                 assert peer.submissions[0][0] == target
                 assert backend.threadID in peer.submissions[0][1]
                 assert backend.messages[0]["body"] in peer.submissions[0][1]
+
                 assert receiver.inbox.uncertain() == [backend.messageID]
 
                 restarted = WakeReceiver(config, client, peerTarget=target, peer=peer)
                 assert TestWakeReceiver._request(url, raw, signature, 202)["duplicate"]
                 restarted.processDue()
+
                 assert len(peer.submissions) == 1
                 assert len(backend.messages) == 1
 

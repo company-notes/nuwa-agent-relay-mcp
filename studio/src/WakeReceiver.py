@@ -50,6 +50,7 @@ class WakeReceiver:
         else:
             self.inbox = WakeInbox(inboxPath)
             self.handler = EchoAgentHandler(client, sessionID)
+
         self._stopEvent = Event()
 
     def accept(self, body: bytes, signature: str | None) -> dict:
@@ -94,6 +95,7 @@ class WakeReceiver:
             raise WakeRequestError(403, "Wake targeted another Session.")
 
         isNew = self.inbox.enqueue(messageID)
+
         return {"accepted": True, "messageID": messageID, "duplicate": not isNew}
 
     def processDue(self) -> None:

@@ -16,6 +16,7 @@ class PeerNotification:
 
     def process(self, messageID: str) -> dict:
         message = self.client.getMessage(messageID)
+
         if message["id"] != messageID or message["recipientSessionID"] != self.sessionID:
             raise ValueError("Native Wake message does not belong to the selected Session.")
 

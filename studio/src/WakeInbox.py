@@ -28,6 +28,7 @@ class WakeInbox:
                         uncertain_at REAL
                     )
                 """)
+
                 columns = {row[1] for row in db.execute("PRAGMA table_info(incoming_wake)")}
                 if "uncertain_at" not in columns:
                     db.execute("ALTER TABLE incoming_wake ADD COLUMN uncertain_at REAL")
@@ -65,6 +66,7 @@ class WakeInbox:
                         (message_id, received_at, next_attempt_at)
                     VALUES (?, ?, ?)
                 """, (messageID, now, now))
+
                 return result.rowcount == 1
 
     def due(self) -> list[tuple[str, int]]:
@@ -87,6 +89,7 @@ class WakeInbox:
                     WHERE message_id = ? AND completed_at IS NULL
                         AND uncertain_at IS NULL AND next_attempt_at <= ?
                 """, (now, messageID, now))
+
                 return result.rowcount == 1
 
     def complete(self, messageID: str) -> None:

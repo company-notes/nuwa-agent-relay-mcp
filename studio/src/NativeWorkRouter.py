@@ -41,10 +41,13 @@ class NativeWorkRouter(Middleware):
         request = context.fastmcp_context.request_context
         params = request.session.client_params if request else None
         clientName = params.client_info.name.lower() if params else ""
-        metadata = request.meta or {} if request else {}
+        metadata = (request.meta or {}) if request else {}
 
         if "codex" not in clientName:
             return None
+
+        if not isinstance(metadata, dict):
+            raise ValueError("Invalid native host metadata.")
 
         threadID = metadata.get("threadId")
         if not isinstance(threadID, str) or str(UUID(threadID)) != threadID:

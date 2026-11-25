@@ -43,11 +43,14 @@ class NativeWorkReceiver:
 
         messages = {}
         for row in reversed(rows):
-            if not isinstance(row, dict) or row.get("recipientSessionID") != self.sessionID:
-                raise RuntimeError("Inbox belongs to a different work Session.")
+            if not isinstance(row, dict):
+                raise RuntimeError("Remote work Inbox contains an invalid row.")
 
             if row.get("kind") != "message":
                 continue
+
+            if row.get("recipientSessionID") != self.sessionID:
+                raise RuntimeError("Inbox belongs to a different work Session.")
 
             messageID = row.get("id")
             if not isinstance(messageID, str) or str(UUID(messageID)) != messageID:

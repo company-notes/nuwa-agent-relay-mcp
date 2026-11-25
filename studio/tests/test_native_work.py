@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 import threading
 from uuid import uuid4
 
@@ -36,12 +37,13 @@ class WorkService:
         assert request.method == "POST"
         assert request.url.path == "/mcp"
         assert request.headers["authorization"] == "Bearer oauth-work-test"
-        assert request.headers["x-nuwa-work-mode"] == "codex"
+        mode = request.headers["x-nuwa-work-mode"]
+        assert mode in ("codex", "claude-code")
         rpc = json.loads(request.content)
         assert rpc["method"] == "tools/call"
         params = rpc["params"]
         name = params["name"]
-        threadID = params["_meta"]["threadId"]
+        threadID = params["_meta"]["threadId" if mode == "codex" else "sessionId"]
         arguments = params["arguments"]
         assert "threadId" not in arguments
         assert "from" not in arguments
@@ -53,7 +55,7 @@ class WorkService:
                 if created:
                     self.sessions[threadID] = {
                         "bound": True, "sessionID": str(uuid4()),
-                        "canonical": "nuwa/codex/" + arguments["sessionName"],
+                        "canonical": "nuwa/" + mode + "/" + arguments["sessionName"],
                     }
                     self.messages[threadID] = []
 
@@ -186,5 +188,57 @@ class TestNativeWork:
                 polls = service.polls[threadA]
                 await self.waitUntil(lambda: service.polls[threadA] >= polls + 2)
                 assert len(peer.snapshot()) == 3, "Previously submitted messages cannot be replayed"
+
+        asyncio.run(scenario())
+
+
+    def testClaudeCodeWorkAddressUsesHostSessionAndResumes(self, tmp_path, monkeypatch):
+        """An installed Claude Code work can initialize its own address and resume it."""
+        monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path / "nuwa"))
+        monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude"))
+        threadID = str(uuid4())
+        monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", threadID)
+        records = tmp_path / "claude" / "sessions"
+        records.mkdir(parents=True)
+        record = records / f"{os.getppid()}.json"
+        record.write_text(json.dumps({"pid": os.getppid(), "sessionId": threadID}), encoding="utf-8")
+        service = WorkService()
+        peer = NativeQueue()
+        remote = RemoteWorkClient(WorkCredentials(), "https://mcp-test.example.com",
+                                  httpx.MockTransport(service.handle))
+
+        async def scenario():
+            def server():
+                return StudioMCP(LocalConfig(), workClient=remote, peer=peer, pollInterval=0.05).createServer()
+
+            claude = Implementation(name="claude-code", version="2.1.332")
+            async with MCPClient(server(), client_info=claude) as client:
+                result = await client.call_tool("agentAddressStartWork", {
+                    "sessionName": "file-share", "sessionDisplayName": "File Share",
+                }, raise_on_error=False)
+
+                assert not result.is_error, result.content
+                first = json.loads(result.content[0].text)
+                assert first["canonical"] == "nuwa/claude-code/file-share"
+                message = service.receive(threadID, "Review the file sharing workflow")
+                await self.waitUntil(lambda: len(peer.snapshot()) == 1)
+                assert peer.snapshot()[0][0] == "claude:" + threadID
+                assert message["threadId"] in peer.snapshot()[0][1]
+
+                status = await client.call_tool("agentAddressGetStatus", {})
+                assert json.loads(status.content[0].text)["session"]["sessionID"] == first["sessionID"]
+                await client.call_tool("agentAddressReleaseWork", {})
+
+            async with MCPClient(server(), client_info=claude) as restarted:
+                resumed = await restarted.call_tool("agentAddressStartWork", {})
+                assert json.loads(resumed.content[0].text)["canonical"] == first["canonical"]
+
+                # Claude retains the startup env after /clear; a changed host record must
+                # block the old work rather than route a fresh tool call through it.
+                record.write_text(json.dumps({
+                    "pid": os.getppid(), "sessionId": str(uuid4()),
+                }), encoding="utf-8")
+                denied = await restarted.call_tool("agentAddressGetStatus", {}, raise_on_error=False)
+                assert denied.is_error
 
         asyncio.run(scenario())

@@ -12,6 +12,16 @@ export class APIError extends Error {
   }
 }
 
+type HTTPRequestOptions = {
+  sessionID?: string;
+  runtimeToken?: string;
+  body?: Record<string, unknown>;
+  query?: Record<string, string>;
+  timeoutMs?: number;
+  upgrade?: boolean;
+  onResponse?: (response: Response) => Promise<void>;
+};
+
 export class HTTPAPIClient {
   private static readonly logger = Logger.forModule('mcp.http');
 
@@ -31,15 +41,22 @@ export class HTTPAPIClient {
   async request(
     method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     path: string,
-    options: {
-      sessionID?: string;
-      runtimeToken?: string;
-      body?: Record<string, unknown>;
-      query?: Record<string, string>;
-      timeoutMs?: number;
-      onResponse?: (response: Response) => Promise<void>;
-    } = {},
+    options: HTTPRequestOptions = {},
   ): Promise<unknown> {
+    const response = await this.requestRaw(method, path, options);
+    const result = await this.readResponse(response);
+
+    if (options.onResponse) {
+      await options.onResponse(response);
+    }
+
+    return result;
+  }
+
+  protected async requestRaw(
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+    path: string, options: HTTPRequestOptions,
+  ): Promise<Response> {
     if (!path.startsWith('/') || path.startsWith('//')) {
       throw new Error('Service path must remain relative to its origin.');
     }
@@ -66,12 +83,13 @@ export class HTTPAPIClient {
         headers: {
           authorization: this.authorization,
           accept: 'application/json',
+          ...(options.upgrade ? { upgrade: 'websocket' } : {}),
           ...(options.runtimeToken ? { 'x-nuwa-runtime-token': options.runtimeToken } : {}),
           ...(options.body ? { 'content-type': 'application/json' } : {}),
         },
         body: options.body ? JSON.stringify(options.body) : undefined,
         redirect: 'manual',
-        signal: AbortSignal.timeout(options.timeoutMs ?? 20_000),
+        ...(options.upgrade ? {} : { signal: AbortSignal.timeout(options.timeoutMs ?? 20_000) }),
       });
     } catch (error) {
       HTTPAPIClient.logger.exception('backend_request_failed', error);
@@ -90,13 +108,7 @@ export class HTTPAPIClient {
         'Backend connection failed. Check its progress before retrying.');
     }
 
-    const result = await this.readResponse(response);
-
-    if (options.onResponse) {
-      await options.onResponse(response);
-    }
-
-    return result;
+    return response;
   }
 
   protected async readResponse(response: Response): Promise<unknown> {
@@ -159,10 +171,16 @@ export class RelayAPIClient extends HTTPAPIClient {
     query?: Record<string, string>,
     timeoutMs?: number,
   ): Promise<unknown> {
+    const options = await this.sessionOptions();
+
+    return this.request(method, path, { ...options, body, query, timeoutMs });
+  }
+
+  private async sessionOptions(): Promise<HTTPRequestOptions> {
     const { sessionID, runtimeToken, onRenewed } = await this.boundSession();
 
-    return this.request(method, path, {
-      sessionID, runtimeToken, body, query, timeoutMs,
+    return {
+      sessionID, runtimeToken,
       onResponse: async (response) => {
         const expiresAt = response.headers.get('x-nuwa-lease-expires-at');
 
@@ -170,7 +188,21 @@ export class RelayAPIClient extends HTTPAPIClient {
           this.tasks.waitUntil(onRenewed(expiresAt, response.headers.get('x-nuwa-canonical-address') ?? undefined));
         }
       },
-    });
+    };
+  }
+
+  async openInboxStream(): Promise<Response> {
+    const options = await this.sessionOptions();
+    const response = await this.requestRaw('GET', '/v2/inbox/events/stream', { ...options, upgrade: true });
+
+    if (response.status !== 101) {
+      await this.readResponse(response);
+      throw new APIError(502, 'inbox_stream_unavailable', 'Relay did not upgrade the Inbox stream.');
+    }
+
+    await options.onResponse?.(response);
+
+    return response;
   }
 }
 

@@ -8,17 +8,19 @@ import httpx
 from mcp.types import CallToolResult
 
 from .Config import LocalConfig
+from .WorkInboxStream import WorkInboxStream
 
 
 class RemoteWorkClient:
     """Reuse the server's OAuth work binding; local code never claims Runtime credentials."""
 
-    def __init__(self, credentials, origin: str | None = None, transport=None):
+    def __init__(self, credentials, origin: str | None = None, transport=None, streamConnector=None):
         self.credentials = credentials
         self.origin = LocalConfig.validateOrigin(
             origin or os.environ.get("NUWA_MCP_URL", "https://mcp.agent-relay.company-notes.com"),
         )
         self.transport = transport
+        self.streamConnector = streamConnector
 
     def call(self, threadID: str, tool: str, arguments: dict | None = None,
              firstUse: bool = False, *, mode: str = "codex") -> CallToolResult:
@@ -55,6 +57,35 @@ class RemoteWorkClient:
             raise RuntimeError("Remote MCP returned an invalid tool response.")
 
         return CallToolResult.model_validate(result["result"])
+
+    def _inboxHeaders(self, identity) -> dict:
+        return {
+            "Authorization": f"Bearer {self.credentials.accessToken()}",
+            "X-Nuwa-Work-Mode": identity.mode,
+            "X-Nuwa-Work-ID": identity.nativeID,
+        }
+
+    def _inbox(self, identity, params: dict) -> dict:
+        with httpx.Client(timeout=45, follow_redirects=False, transport=self.transport) as client:
+            response = client.get(self.origin + "/work-inbox/events",
+                                  headers=self._inboxHeaders(identity), params=params)
+            response.raise_for_status()
+            result = response.json()
+
+        if not isinstance(result, dict) or result.get("ok") is not True or not isinstance(result.get("data"), dict):
+            raise RuntimeError("Invalid remote work Inbox response.")
+
+        return result["data"]
+
+    def eventPage(self, identity, cursor: int) -> dict:
+        return self._inbox(identity, params={"after_sequence": cursor})
+
+    def openInboxStream(self, identity):
+        headers = self._inboxHeaders(identity)
+        stream = (WorkInboxStream(self.origin, headers, self.streamConnector) if self.streamConnector
+                  else WorkInboxStream(self.origin, headers))
+
+        return stream.open()
 
     @staticmethod
     def value(result: CallToolResult):

@@ -1,9 +1,9 @@
 [project]
 name = "nuwa-relay-mcp"
-version = "0.2.6"
+version = "0.2.7"
 description = "Local FastMCP Studio adapter for Nuwa Agent Relay"
 requires-python = ">=3.12"
-dependencies = ["fastmcp==4.0.3", "httpx>=0.27,<1", "session-peer==1.6.2", "filelock>=3.20,<4", "psutil>=7,<8", "mcp-install @ git+https://github.com/nuwainfo/mcp-install.git@f2ed5dce92ae334dde156f12a59f90663bf8d10c"]
+dependencies = ["fastmcp==4.0.3", "httpx>=0.27,<1", "websockets>=15,<16", "session-peer==1.6.2", "filelock>=3.20,<4", "psutil>=7,<8", "mcp-install @ git+https://github.com/nuwainfo/mcp-install.git@f2ed5dce92ae334dde156f12a59f90663bf8d10c"]
 [project.optional-dependencies]
 dev = ["pytest>=8,<10", "ruff>=0.13,<1"]
 [project.scripts]

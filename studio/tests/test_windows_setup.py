@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import time
+from contextlib import asynccontextmanager
 from importlib.metadata import version
 from pathlib import Path
 
@@ -31,13 +32,42 @@ class TestWindowsSetup:
             }
 
     @classmethod
-    async def verifyMCP(cls, executable, profile):
+    @asynccontextmanager
+    async def runningMCP(cls, executable, profile):
         params = StdioServerParameters(command=str(executable), args=[], env=profile.env)
+
         async with stdio_client(params) as (reader, writer):
             async with ClientSession(reader, writer) as session:
                 await session.initialize()
-                tools = await session.list_tools()
-                assert {"sendToAgent", "replyThread"} <= {tool.name for tool in tools.tools}
+                yield session
+
+    @classmethod
+    async def verifyMCP(cls, executable, profile):
+        async with cls.runningMCP(executable, profile) as session:
+            tools = await session.list_tools()
+            assert {"sendToAgent", "relayReplyThread"} <= {tool.name for tool in tools.tools}
+
+    @classmethod
+    async def verifyBlockedUpgrade(cls, setup, destination, executable, profile, identity):
+        """A busy MCP stays alive and all installed data remains unchanged."""
+        async with cls.runningMCP(executable, profile) as session:
+            paths = [executable, profile.config, profile.skill / "SKILL.md", identity]
+            before = {path: path.read_bytes() for path in paths}
+            registration = cls.registration()
+
+            result = await asyncio.to_thread(
+                profile.runResult, str(setup), "/S", f"/D={destination}", timeout=90,
+            )
+
+            assert result.returncode == 20, (
+                "A locked installation must return the update-deferred status, "
+                f"not fail with the default extraction error: {result.returncode}"
+            )
+            assert cls.registration() == registration
+            assert {path: path.read_bytes() for path in paths} == before
+
+            tools = await session.list_tools()
+            assert {"sendToAgent", "relayReplyThread"} <= {tool.name for tool in tools.tools}
 
     @classmethod
     def verifyClaudeRegistration(cls, profile, claude, executable):
@@ -109,6 +139,11 @@ class TestWindowsSetup:
         assert (profile.home / ".claude" / "skills" / "nuwa-agent-relay" / "SKILL.md").is_file()
         asyncio.run(asyncio.wait_for(self.verifyMCP(executable, profile), timeout=90))
 
+        asyncio.run(asyncio.wait_for(
+            self.verifyBlockedUpgrade(setup, destination, executable, profile, identity), timeout=120,
+        ))
+
+        # Retry the same installer after the running MCP has closed normally.
         profile.run(str(setup), "/S", f"/D={destination}", timeout=300)
         assert self.registration()["DisplayVersion"] == expectedVersion
         assert Path(profile.servers()["nuwa-agent-relay-studio"]["command"]) == executable

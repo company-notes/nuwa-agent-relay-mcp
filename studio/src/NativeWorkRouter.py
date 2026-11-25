@@ -5,7 +5,6 @@ from contextlib import asynccontextmanager
 from uuid import UUID
 
 import psutil
-
 from fastmcp.server.middleware import Middleware
 from fastmcp.tools import ToolResult
 

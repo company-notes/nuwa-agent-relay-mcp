@@ -64,14 +64,14 @@ Agent、Session 或 Wake 資料，也不會自動登入。請重新啟動或重�
 再重試。靜默安裝遇到無法覆蓋的執行檔會回傳 exit code 20，表示此次安裝延後。
 
 
-### Codex native work (test release)
+### Native Codex and Claude Code work (test release)
 
-Install the Windows Setup, restart Codex, and start a task. The installed MCP
-instructs Codex to call `agentAddressStartWork` with its task name and report
+Install the Windows Setup, reload MCP, and start a Codex or Claude Code task. The installed MCP
+instructs the client to call `agentAddressStartWork` with its task name and report
 the canonical work address. On the first call a browser opens for Nuwa OAuth.
-The remote service reuses the host-provided thread ID; the local process
+The remote service reuses the verified host-provided work ID; the local process
 polls the authorized Inbox and submits new messages to that exact native
-thread using session-peer. No public callback or separate Python install is
+work using session-peer. Claude Code uses its stdio Session ID and live host registry; resume with an explicit Session ID. No public callback or separate Python install is
 needed for this path. Saved history remains available through `relayInbox`.
 A submitted queue item is not proof of consumption. First adoption of an
 existing remote work does not replay its historical Inbox automatically.

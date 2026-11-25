@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+
 from .NativeWorkIdentity import ClaudeHost, NativeWorkIdentity
 
 
@@ -67,6 +68,7 @@ class SessionPeer:
     @classmethod
     def _decode(cls, output: str) -> dict:
         payload = json.loads(output)
+
         if not isinstance(payload, dict):
             raise ValueError("Expected a structured session-peer result.")
 
@@ -74,6 +76,7 @@ class SessionPeer:
 
     def _claudeDestination(self, nativeID: str) -> tuple[int, str]:
         host = ClaudeHost.current(nativeID)
+
         if not host.socket:
             raise RuntimeError("Claude Code has not registered a native inbox.")
 
@@ -84,6 +87,7 @@ class SessionPeer:
             raise RuntimeError("Claude Code inbox discovery failed.")
 
         sessions = payload.get("sessions")
+
         if not isinstance(sessions, list):
             raise RuntimeError("Claude Code inbox discovery returned invalid data.")
 
@@ -95,6 +99,7 @@ class SessionPeer:
             raise RuntimeError("Claude Code inbox is unavailable or ambiguous.")
 
         generation = matches[0].get("targetGeneration")
+
         if not isinstance(generation, str) or not generation.startswith("tg1:"):
             raise RuntimeError("Claude Code inbox generation could not be verified.")
 

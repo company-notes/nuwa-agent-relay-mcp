@@ -17,6 +17,7 @@ from src.Client import RelayClient
 from src.Config import LocalConfig
 from src.WakeReceiver import WakeHTTPServer, WakeReceiver
 from src.WakeInbox import WakeInbox
+from src.SessionPeer import PeerSubmissionUncertain
 from src.WakeSubscription import WakeSubscription
 
 
@@ -38,6 +39,7 @@ class WakeFlowBackend:
             "id": self.messageID,
             "threadId": self.threadID,
             "senderSessionID": "session-a",
+            "senderCanonicalAddress": "nuwa/alpha/main",
             "recipientSessionID": "session-b",
             "kind": "message",
             "body": "Please check my build.",
@@ -300,3 +302,57 @@ class TestNativeWakeRecovery:
         # Only a known pre-submit failure may return the claim to retryable work.
         inbox.retryLater(messageID, 0)
         assert restarted.uncertain() == []
+
+    def testSignedNativeWakeDoesNotEchoOrRepeatAmbiguousDelivery(self, tmp_path, monkeypatch):
+        """An ambiguous native submission must not cause an Echo, automatic retry or reroute."""
+        monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path))
+        config = LocalConfig(apiURL="https://relay-test.example.com").selectSession("session-b", "runtime-b")
+        backend = WakeFlowBackend()
+        client = RelayClient(config, TestCredentials(), httpx.MockTransport(backend.receive))
+        WakeSubscription(config, client).register("https://wake-tunnel.example.com/wake")
+        target = "codex:" + str(uuid4())
+        peer = NativePeerRecorder()
+        receiver = WakeReceiver(config, client, peerTarget=target, peer=peer)
+
+        raw = json.dumps({
+            "event": "nuwa.message.available", "eventVersion": 2,
+            "messageID": backend.messageID, "recipientSessionID": "session-b",
+        }).encode("utf-8")
+        signature = "sha256=" + hmac.new(backend.signingSecret.encode(), raw, hashlib.sha256).hexdigest()
+
+        with WakeHTTPServer(("127.0.0.1", 0), receiver) as server:
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            url = "http://127.0.0.1:%d/wake" % server.server_port
+
+            try:
+                assert not TestWakeReceiver._request(url, raw, signature, 202)["duplicate"]
+                receiver.processDue()
+                assert len(peer.submissions) == 1
+                assert peer.submissions[0][0] == target
+                assert backend.threadID in peer.submissions[0][1]
+                assert backend.messages[0]["body"] in peer.submissions[0][1]
+                assert receiver.inbox.uncertain() == [backend.messageID]
+
+                restarted = WakeReceiver(config, client, peerTarget=target, peer=peer)
+                assert TestWakeReceiver._request(url, raw, signature, 202)["duplicate"]
+                restarted.processDue()
+                assert len(peer.submissions) == 1
+                assert len(backend.messages) == 1
+
+                with pytest.raises(ValueError, match="different native thread"):
+                    WakeReceiver(config, client, peerTarget="codex:" + str(uuid4()), peer=peer)
+            finally:
+                server.shutdown()
+                thread.join(timeout=3)
+
+
+class NativePeerRecorder:
+    """External native-agent substitute when no authenticated test session is available."""
+
+    def __init__(self):
+        self.submissions = []
+
+    def send(self, target, message):
+        self.submissions.append((target, message))
+        raise PeerSubmissionUncertain("Connection lost after possible queue submission.")

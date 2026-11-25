@@ -10,7 +10,7 @@ from threading import Event, Thread
 
 from .Config import LocalConfig
 from .PeerNotification import PeerNotification
-from .SessionPeer import PeerSubmissionUncertain
+from .SessionPeer import PeerSubmissionUncertain, SessionPeer
 from .WakeEcho import EchoAgentHandler
 from .WakeInbox import WakeInbox
 from .WakeSubscription import WakeSubscription
@@ -39,9 +39,17 @@ class WakeReceiver:
     def __init__(self, config: LocalConfig, client, peerTarget: str | None = None, peer=None):
         self.config = config
         self.settings = WakeSubscription(config, client).load()
-        self.inbox = WakeInbox(config.wakeInboxPath())
-        self.handler = (PeerNotification(client, config.requireSession(), peerTarget, peer)
-                        if peerTarget else EchoAgentHandler(client, config.requireSession()))
+        sessionID = config.requireSession()
+        inboxPath = config.wakeInboxPath()
+
+        if peerTarget is not None:
+            target = SessionPeer.validateTarget(peerTarget)
+            digest = hashlib.sha256(sessionID.encode("utf-8")).hexdigest()
+            self.inbox = WakeInbox(inboxPath.with_name(f"wake-native-{digest}.sqlite3"), (sessionID, target))
+            self.handler = PeerNotification(client, sessionID, target, peer)
+        else:
+            self.inbox = WakeInbox(inboxPath)
+            self.handler = EchoAgentHandler(client, sessionID)
         self._stopEvent = Event()
 
     def accept(self, body: bytes, signature: str | None) -> dict:
@@ -90,13 +98,14 @@ class WakeReceiver:
 
     def processDue(self) -> None:
         for messageID, attempts in self.inbox.due():
+            if not self.inbox.claim(messageID):
+                continue
+
             try:
                 self.handler.process(messageID)
-                self.inbox.complete(messageID)
             except PeerSubmissionUncertain:
                 logger.warning("Native submission unconfirmed (messageID=%s); held for inspection",
                                messageID)
-                self.inbox.holdUncertain(messageID)
             except Exception as error:
                 # A remote client error may embed credentials in its message.
                 logger.warning(
@@ -104,6 +113,8 @@ class WakeReceiver:
                     type(error).__name__, messageID,
                 )
                 self.inbox.retryLater(messageID, attempts)
+            else:
+                self.inbox.complete(messageID)
 
     def _processLoop(self) -> None:
         while not self._stopEvent.wait(0.25):
@@ -123,7 +134,7 @@ class WakeReceiver:
             try:
                 server.serve_forever(poll_interval=0.2)
             except KeyboardInterrupt:
-                logger.info("Stopping local Wake Echo listener")
+                logger.info("Stopping local Wake listener")
             finally:
                 self._stopEvent.set()
                 server.shutdown()

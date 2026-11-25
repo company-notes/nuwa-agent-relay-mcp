@@ -15,6 +15,7 @@ from .Installer import StudioInstaller
 from .LocalSmoke import LocalEchoRoundTrip
 from .RemoteSessionTransfer import RemoteSessionTransfer
 from .Server import StudioMCP
+from .SessionPeer import SessionPeer
 from .WakeReceiver import WakeReceiver
 from .WakeSubscription import WakeSubscription
 
@@ -75,6 +76,10 @@ class StudioCLI:
         roundTrip.add_argument("--to", required=True)
         roundTrip.add_argument("--timeout", type=float, default=45.0)
 
+        peer = commands.add_parser("peer", help="Discover local native Codex threads.")
+        peerCommands = peer.add_subparsers(dest="peerCommand", required=True)
+        peerCommands.add_parser("list")
+
         wake = commands.add_parser("wake", help="Manage and run an Agent Wake receiver.")
         wakeCommands = wake.add_subparsers(dest="wakeCommand", required=True)
 
@@ -94,6 +99,9 @@ class StudioCLI:
         wakeCommands.add_parser("unregister")
         wakeListen = wakeCommands.add_parser("listen")
         wakeListen.add_argument("--port", type=int, default=8765)
+        mode = wakeListen.add_mutually_exclusive_group(required=True)
+        mode.add_argument("--peer-target", help="Exact local codex:<thread UUID>.")
+        mode.add_argument("--echo", action="store_true", help="Explicit diagnostic Echo mode.")
 
         return parser
 
@@ -136,6 +144,10 @@ class StudioCLI:
     @classmethod
     def run(cls) -> None:
         args = cls.createParser().parse_args(sys.argv[1:] or ["run"])
+
+        if args.command == "peer":
+            print(json.dumps(SessionPeer().list(), indent=2, ensure_ascii=False))
+            return
 
         config = LocalConfig.load()
         credentials = OAuthCredentials(config)
@@ -225,7 +237,7 @@ class StudioCLI:
                 result = subscription.remove()
             elif args.wakeCommand == "listen":
                 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-                WakeReceiver(config, relay).serve(args.port)
+                WakeReceiver(config, relay, peerTarget=args.peer_target).serve(args.port)
                 return
             else:
                 raise ValueError("Unsupported Wake command.")
@@ -236,4 +248,8 @@ class StudioCLI:
 
 
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == SessionPeer.CHILD_COMMAND:
+        SessionPeer.runChild(sys.argv[2:])
+        return
+
     StudioCLI.run()

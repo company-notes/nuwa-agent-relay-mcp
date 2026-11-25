@@ -11,7 +11,7 @@ class PeerNotification:
     def __init__(self, client, sessionID: str, target: str, peer: SessionPeer | None = None):
         self.client = client
         self.sessionID = sessionID
-        self.target = target
+        self.target = SessionPeer.validateTarget(target)
         self.peer = peer or SessionPeer()
 
     def process(self, messageID: str) -> dict:
@@ -31,7 +31,7 @@ class PeerNotification:
             f"{content}\n"
             "Read and handle this message using your own authorized Nuwa identity. "
             "When you choose to answer, use replyThread with this Relay Thread ID. "
-            "The sending agent decides what to say; the local bridge submits no reply."
+            "The receiving agent decides what to say; the local bridge submits no reply."
         )
 
         return self.peer.send(self.target, instruction)

@@ -59,3 +59,26 @@ Windows 建置：`python studio/Build.py`（需 uv 與 NSIS）。輸出位於
 `studio/dist/nuwa-relay-mcp.exe` 和 `studio/dist/nuwa-relay-mcp-setup.exe`。
 安裝及解除安裝只處理應用程式、MCP 設定及受管理的 Skill，不會清除既有 Nuwa OAuth、
 Agent、Session 或 Wake 資料，也不會自動登入。請重新啟動或重新載入 MCP 客戶端。
+
+
+### Native Codex Wake (development / explicit binding)
+
+The local package includes the pinned session-peer 1.6.2 runtime. It does not
+install a second MCP server or configure session-peer's optional relay.
+
+```powershell
+nuwa-relay-mcp peer list
+nuwa-relay-mcp wake listen --peer-target codex:<full-thread-uuid> --port 8765
+```
+
+Use an explicitly selected Nuwa Session (login and identity first), a verified
+HMAC Wake subscription with a public HTTPS callback forwarding to the local
+listener, and the exact running Codex thread UUID. Separate profiles must use
+distinct absolute `NUWA_MCP_HOME` directories. The local Wake queue binds to one
+Nuwa Session and one native thread and will not silently switch destinations.
+A queued submission is not proof of consumption, read, or reply. Ambiguous
+submissions are held rather than retried. For the diagnostic Echo mode use
+`wake listen --echo` explicitly.
+
+Automatic native work enrollment and live Codex reply acceptance remain separate
+from these manual binding and packaging checks.

@@ -7,6 +7,7 @@ import threading
 from uuid import uuid4
 
 import httpx
+import pytest
 from fastmcp import Client as MCPClient
 from mcp.types import Implementation
 
@@ -30,6 +31,7 @@ class WorkService:
         self.sessions = {}
         self.messages = {}
         self.replies = []
+        self.sends = []
         self.lock = threading.Lock()
         self.polls = {}
 
@@ -38,12 +40,13 @@ class WorkService:
         assert request.url.path == "/mcp"
         assert request.headers["authorization"] == "Bearer oauth-work-test"
         mode = request.headers["x-nuwa-work-mode"]
-        assert mode in ("codex", "claude-code")
+        assert mode in ("codex", "claude-code", "grok-build", "opencode")
         rpc = json.loads(request.content)
         assert rpc["method"] == "tools/call"
         params = rpc["params"]
         name = params["name"]
-        threadID = params["_meta"]["threadId" if mode == "codex" else "sessionId"]
+        threadID = (request.headers["x-nuwa-work-id"] if mode == "grok-build" else
+                    params["_meta"]["threadId" if mode == "codex" else "sessionId"])
         arguments = params["arguments"]
         assert "threadId" not in arguments
         assert "from" not in arguments
@@ -65,6 +68,9 @@ class WorkService:
             elif name == "relayInbox":
                 self.polls[threadID] = self.polls.get(threadID, 0) + 1
                 value = list(self.messages[threadID])
+            elif name == "sendToAgent":
+                self.sends.append((threadID, arguments))
+                value = {"id": str(uuid4()), "threadId": str(uuid4())}
             elif name == "relayReplyThread":
                 self.replies.append((threadID, arguments))
                 value = {"threadId": arguments["threadID"], "id": str(uuid4())}
@@ -240,5 +246,63 @@ class TestNativeWork:
                 }), encoding="utf-8")
                 denied = await restarted.call_tool("agentAddressGetStatus", {}, raise_on_error=False)
                 assert denied.is_error
+
+        asyncio.run(scenario())
+
+
+    @pytest.mark.parametrize("mode, clientName", [
+        ("grok-build", "grok-cli"),
+        ("opencode", "opencode"),
+    ])
+    def testNativeClientInitializesDistinctWorkAndResumes(self, tmp_path, monkeypatch, mode, clientName):
+        """Ask for an address, start work, exchange a message, and recover the same address."""
+        monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path))
+        service = WorkService()
+        remote = RemoteWorkClient(WorkCredentials(), "https://mcp-test.example.com",
+                                  httpx.MockTransport(service.handle))
+        nativeID = str(uuid4()) if mode == "grok-build" else "ses_" + uuid4().hex
+        secondID = str(uuid4()) if mode == "grok-build" else "ses_" + uuid4().hex
+        identity = Implementation(name=clientName, version="2.2.3")
+
+        async def work(identifier, name=None):
+            if mode == "grok-build":
+                monkeypatch.setenv("GROK_SESSION_ID", identifier)
+
+            meta = {"ai.opencode/sessionID": identifier} if mode == "opencode" else None
+            server = StudioMCP(LocalConfig(), workClient=remote, pollInterval=0.05).createServer()
+
+            async with MCPClient(server, client_info=identity) as client:
+                status = await client.call_tool("agentAddressGetStatus", {}, meta=meta, raise_on_error=False)
+
+                assert not status.is_error, status.content
+                args = {"sessionName": name, "sessionDisplayName": name} if name else {}
+                result = await client.call_tool("agentAddressStartWork", args, meta=meta)
+                started = json.loads(result.content[0].text)
+                message = service.receive(identifier, "Review the API")
+                inbox = await client.call_tool("relayInbox", {}, meta=meta)
+                assert message["id"] in inbox.content[0].text
+
+                reply = await client.call_tool("relayReplyThread", {
+                    "threadID": message["threadId"], "body": "Reviewed.",
+                }, meta=meta)
+                assert not reply.is_error
+                sent = await client.call_tool("sendToAgent", {
+                    "to": "nuwa/reviewer/main", "message": "Independent message",
+                }, meta=meta)
+                assert not sent.is_error
+
+                await client.call_tool("agentAddressReleaseWork", {}, meta=meta)
+                return started
+
+        async def scenario():
+            first = await work(nativeID, "review-api")
+            second = await work(secondID, "fix-parser")
+            resumed = await work(nativeID)
+
+            assert first["canonical"] == "nuwa/" + mode + "/review-api"
+            assert second["sessionID"] != first["sessionID"]
+            assert resumed["canonical"] == first["canonical"]
+            assert [identifier for identifier, _ in service.replies] == [nativeID, secondID, nativeID]
+            assert [identifier for identifier, _ in service.sends] == [nativeID, secondID, nativeID]
 
         asyncio.run(scenario())

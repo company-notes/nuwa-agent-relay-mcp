@@ -42,7 +42,7 @@ test('native work Sessions preserve addresses, isolate traffic and share Agent m
   scenario.env.BINDINGS_DB = sqlite;
   scenario.install();
 
-  const call = (id: string | undefined, name: string, input = {}, token = 'oauth-a', mode: 'codex' | 'grok-build' | 'claude-code' = 'codex') =>
+  const call = (id: string | undefined, name: string, input = {}, token = 'oauth-a', mode: 'codex' | 'grok-build' | 'claude-code' | 'opencode' = 'codex') =>
     scenario.tool(name, input, token, true, { mode, id });
   const payload = (response: Awaited<ReturnType<typeof scenario.tool>>) => {
     assert.notEqual(response.result.isError, true, response.result.content[0].text);
@@ -132,6 +132,12 @@ test('native work Sessions preserve addresses, isolate traffic and share Agent m
     assert.notEqual(claude.sessionID, grok.sessionID);
     assert.equal(payload(await call(claudeID, 'agentAddressStartWork', {}, 'oauth-c', 'claude-code')).canonical, claude.canonical);
     assert.equal((await call(undefined, 'agentAddressGetStatus', {}, 'oauth-c', 'claude-code')).result.isError, true);
+
+    const openID = 'ses_4d1c4a9e02cb';
+    const open = payload(await call(openID, 'agentAddressStartWork', name, 'oauth-c', 'opencode'));
+    assert.notEqual(open.sessionID, claude.sessionID);
+    assert.equal(payload(await call(openID, 'agentAddressStartWork', {}, 'oauth-c', 'opencode')).canonical, open.canonical);
+    assert.equal((await call(undefined, 'agentAddressGetStatus', {}, 'oauth-c', 'opencode')).result.isError, true);
   } finally {
     scenario.restore();
     sqlite.database.close();

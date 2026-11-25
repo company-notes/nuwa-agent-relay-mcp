@@ -605,7 +605,7 @@ export class RemoteMCPScenario {
   async tool(
     name: string, argumentsValue: Record<string, unknown>, token = 'oauth-a',
     waitForBackground = true,
-    work?: { mode: 'codex' | 'grok-build' | 'claude-code'; id?: string },
+    work?: { mode: 'codex' | 'grok-build' | 'claude-code' | 'opencode'; id?: string },
   ): Promise<{ result: { content: Array<{ text: string }>; isError?: boolean } }> {
     const response = await this.application.handle(new Request(
       'https://mcp.agent-relay.company-notes.com/mcp', {
@@ -624,6 +624,7 @@ export class RemoteMCPScenario {
             name, arguments: argumentsValue,
             ...(work?.mode === 'codex' && work.id ? { _meta: { threadId: work.id } } : {}),
             ...(work?.mode === 'claude-code' && work.id ? { _meta: { sessionId: work.id } } : {}),
+            ...(work?.mode === 'opencode' && work.id ? { _meta: { sessionId: work.id } } : {}),
           },
         }),
       },

@@ -6,6 +6,7 @@ import json
 import os
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from queue import Empty, Queue
 from uuid import uuid4
 
 import httpx
@@ -26,6 +27,31 @@ class WorkCredentials:
         return "oauth-work-test"
 
 
+class WorkSocket:
+    """External service notification transport substitute."""
+
+    def __init__(self, service, threadID):
+        self.service = service
+        self.threadID = threadID
+        self.events = Queue()
+
+    def __enter__(self):
+        with self.service.lock:
+            self.service.sockets.setdefault(self.threadID, []).append(self)
+
+        return self
+
+    def __exit__(self, *args):
+        with self.service.lock:
+            self.service.sockets[self.threadID].remove(self)
+
+    def recv(self, timeout):
+        try:
+            return self.events.get(timeout=timeout)
+        except Empty as error:
+            raise TimeoutError from error
+
+
 class WorkService:
     """Substitute only the external remote work service; assert the wire contract."""
 
@@ -36,8 +62,45 @@ class WorkService:
         self.sends = []
         self.lock = threading.Lock()
         self.polls = {}
+        self.pages = {}
+        self.sockets = {}
+
+    def connect(self, url, additional_headers, **options):
+        assert url == "wss://mcp-test.example.com/work-inbox/events/stream"
+        assert additional_headers["Authorization"] == "Bearer oauth-work-test"
+
+        return WorkSocket(self, additional_headers["X-Nuwa-Work-ID"])
+
+    def signal(self, threadID):
+        with self.lock:
+            for socket in self.sockets.get(threadID, []):
+                socket.events.put(json.dumps({"inboxChanged": True}))
+
+    def _events(self, request):
+        threadID = request.headers["x-nuwa-work-id"]
+
+        with self.lock:
+            rows = list(reversed(self.messages[threadID]))
+
+            if request.url.path.endswith("/head"):
+                value = {"cursor": len(rows)}
+            else:
+                self.pages[threadID] = self.pages.get(threadID, 0) + 1
+                cursor = int(request.url.params["after_sequence"])
+                items = [{"sequence": index + 1, "messageID": row["id"]}
+                         for index, row in enumerate(rows) if index >= cursor]
+                value = {"items": items, "cursor": len(rows), "hasMore": False}
+
+        return httpx.Response(200, json={"ok": True, "data": value})
 
     def handle(self, request):
+        assert request.headers["authorization"] == "Bearer oauth-work-test"
+
+        if request.method == "GET":
+            assert request.url.path in ("/work-inbox/events", "/work-inbox/events/head")
+
+            return self._events(request)
+
         assert request.method == "POST"
         assert request.url.path == "/mcp"
         assert request.headers["authorization"] == "Bearer oauth-work-test"
@@ -71,6 +134,8 @@ class WorkService:
             elif name == "relayInbox":
                 self.polls[threadID] = self.polls.get(threadID, 0) + 1
                 value = list(self.messages[threadID])
+            elif name == "relayMessage":
+                value = next(row for row in self.messages[threadID] if row["id"] == arguments["messageID"])
             elif name == "sendToAgent":
                 self.sends.append((threadID, arguments))
                 value = {"id": str(uuid4()), "threadId": str(uuid4())}
@@ -96,6 +161,8 @@ class WorkService:
                 "recipientSessionID": self.sessions[threadID]["sessionID"], "body": body,
             }
             self.messages[threadID].insert(0, message)
+
+        self.signal(threadID)
 
         return message
 
@@ -137,7 +204,7 @@ class TestNativeWork:
         service = WorkService()
         peer = NativeQueue()
         remote = RemoteWorkClient(WorkCredentials(), "https://mcp-test.example.com",
-                                  httpx.MockTransport(service.handle))
+                                  httpx.MockTransport(service.handle), streamConnector=service.connect)
         config = LocalConfig()
         threadA, threadB = str(uuid4()), str(uuid4())
 
@@ -184,20 +251,21 @@ class TestNativeWork:
                 await self.call(client, threadB, "agentAddressReleaseWork")
 
             thirdMessage = service.receive(threadA, "Reply received while offline", kind="reply")
-            pollsBeforeResume = service.polls[threadA]
             async with MCPClient(server(), client_info=codex) as restarted:
                 resumed = await self.call(restarted, threadA, "agentAddressStartWork")
                 assert resumed["canonical"] == first["canonical"]
                 assert resumed["sessionID"] == first["sessionID"]
                 assert not resumed["created"]
 
-                await self.waitUntil(lambda: service.polls[threadA] >= pollsBeforeResume + 2)
+                await self.waitUntil(lambda: len(peer.snapshot()) == 3)
                 assert len(peer.snapshot()) == 3, "An offline reply must reach the resumed native work"
                 assert peer.snapshot()[-1][0] == "codex:" + threadA
                 assert thirdMessage["body"] in peer.snapshot()[-1][1]
 
-                polls = service.polls[threadA]
-                await self.waitUntil(lambda: service.polls[threadA] >= polls + 2)
+                pages = service.pages[threadA]
+                service.signal(threadA)
+                await self.waitUntil(lambda: service.pages[threadA] > pages)
+                assert not service.polls, "Idle native receivers must not poll the remote Inbox"
                 assert len(peer.snapshot()) == 3, "Previously submitted messages cannot be replayed"
 
         asyncio.run(scenario())
@@ -216,7 +284,7 @@ class TestNativeWork:
         service = WorkService()
         peer = NativeQueue()
         remote = RemoteWorkClient(WorkCredentials(), "https://mcp-test.example.com",
-                                  httpx.MockTransport(service.handle))
+                                  httpx.MockTransport(service.handle), streamConnector=service.connect)
 
         async def scenario():
             def server():
@@ -264,7 +332,7 @@ class TestNativeWork:
         monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path))
         service = WorkService()
         remote = RemoteWorkClient(WorkCredentials(), "https://mcp-test.example.com",
-                                  httpx.MockTransport(service.handle))
+                                  httpx.MockTransport(service.handle), streamConnector=service.connect)
         nativeID = str(uuid4()) if mode == "grok-build" else "ses_" + uuid4().hex
         secondID = str(uuid4()) if mode == "grok-build" else "ses_" + uuid4().hex
         identity = Implementation(name=clientName, version="2.2.3")
@@ -318,7 +386,7 @@ class TestNativeWork:
         monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
         service = WorkService()
         remote = RemoteWorkClient(WorkCredentials(), "https://mcp-test.example.com",
-                                  httpx.MockTransport(service.handle))
+                                  httpx.MockTransport(service.handle), streamConnector=service.connect)
         firstID, secondID = "ses_" + uuid4().hex, "ses_" + uuid4().hex
         password = uuid4().hex
         submissions = []
@@ -396,8 +464,10 @@ class TestNativeWork:
                         assert payload["delivery"] == "queue" and payload["resume"] is True
                     assert second["body"] not in delivered[firstID]["text"]
 
-                    polls = service.polls[firstID]
-                    await self.waitUntil(lambda: service.polls[firstID] >= polls + 2)
+                    pages = service.pages[firstID]
+                    service.signal(firstID)
+                    await self.waitUntil(lambda: service.pages[firstID] > pages)
+                    assert not service.polls
                     assert len(snapshot()) == 2
 
             try:

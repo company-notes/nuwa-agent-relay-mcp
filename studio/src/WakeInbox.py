@@ -63,6 +63,48 @@ class WakeInbox:
                         VALUES (?, ?, ?, ?)
                     """, [(messageID, now, now, now) for messageID in messageIDs])
 
+    def eventCursor(self) -> int | None:
+        with closing(sqlite3.connect(self.path, timeout=5)) as db:
+            with db:
+                db.execute("CREATE TABLE IF NOT EXISTS native_event_cursor (id INTEGER PRIMARY KEY, cursor INTEGER NOT NULL)")
+                row = db.execute("SELECT cursor FROM native_event_cursor WHERE id = 1").fetchone()
+
+        return row[0] if row else None
+
+    def initializeEvents(self, cursor: int) -> None:
+        if type(cursor) is not int or cursor < 0:
+            raise ValueError("Invalid native Inbox cursor.")
+
+        with closing(sqlite3.connect(self.path, timeout=5)) as db:
+            with db:
+                legacy = db.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'native_poll_started'",
+                ).fetchone()
+                existing = db.execute("SELECT cursor FROM native_event_cursor WHERE id = 1").fetchone()
+
+                if legacy and not existing:
+                    raise RuntimeError("Legacy polling Inbox requires explicit migration before event adoption.")
+
+                db.execute("INSERT OR IGNORE INTO native_event_cursor VALUES (1, ?)", (cursor,))
+
+    def ingestEvents(self, previous: int, cursor: int, messageIDs: list[str]) -> None:
+        now = time.time()
+
+        with closing(sqlite3.connect(self.path, timeout=5)) as db:
+            with db:
+                updated = db.execute(
+                    "UPDATE native_event_cursor SET cursor = ? WHERE id = 1 AND cursor = ?",
+                    (cursor, previous),
+                )
+
+                if updated.rowcount != 1:
+                    raise RuntimeError("Concurrent Inbox cursor update.")
+
+                db.executemany("""
+                    INSERT OR IGNORE INTO incoming_wake
+                        (message_id, received_at, next_attempt_at) VALUES (?, ?, ?)
+                    """, [(messageID, now, now) for messageID in messageIDs])
+
     @classmethod
     def _bind(cls, db, binding: tuple[str, str]) -> None:
         db.execute("""

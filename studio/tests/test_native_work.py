@@ -1,9 +1,11 @@
 """Scenario tests for two native works through the real local MCP and remote HTTPS adapter."""
 
 import asyncio
+import base64
 import json
 import os
 import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from uuid import uuid4
 
 import httpx
@@ -307,3 +309,97 @@ class TestNativeWork:
             assert [identifier for identifier, _ in service.sends] == [nativeID, secondID, nativeID]
 
         asyncio.run(scenario())
+
+    def testOpenCodeNativeInboxRoutesOnlyToTheBoundWork(self, tmp_path, monkeypatch):
+        """Exercise native delivery through the authenticated local HTTP contract."""
+        monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path / "nuwa"))
+        monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+        service = WorkService()
+        remote = RemoteWorkClient(WorkCredentials(), "https://mcp-test.example.com",
+                                  httpx.MockTransport(service.handle))
+        firstID, secondID = "ses_" + uuid4().hex, "ses_" + uuid4().hex
+        password = uuid4().hex
+        submissions = []
+        lock = threading.Lock()
+        owner = os.getppid()
+        auth = "Basic " + base64.b64encode(("opencode:" + password).encode()).decode()
+
+        class NativeService(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def respond(self, value):
+                payload = json.dumps(value).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+            def do_GET(self):
+                assert self.headers["Authorization"] == auth
+                assert self.path == "/api/info"
+                self.respond({"pid": owner, "version": "2.2.3"})
+
+            def do_POST(self):
+                assert self.headers["Authorization"] == auth
+                identifier = self.path.split("/")[3]
+                assert self.path == f"/api/session/{identifier}/synthetic"
+                assert identifier in (firstID, secondID)
+                payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+
+                with lock:
+                    submissions.append((identifier, payload))
+
+                self.respond({"data": {
+                    "id": "msg_" + uuid4().hex, "sessionID": identifier, "type": "synthetic",
+                }})
+
+        with ThreadingHTTPServer(("127.0.0.1", 0), NativeService) as native:
+            registration = tmp_path / "opencode" / "service.json"
+            registration.parent.mkdir()
+            registration.write_text(json.dumps({
+                "pid": owner, "version": "2.2.3",
+                "url": f"http://127.0.0.1:{native.server_port}", "password": password,
+            }), encoding="utf-8")
+            registration.chmod(0o600)
+            worker = threading.Thread(target=native.serve_forever, daemon=True)
+            worker.start()
+
+            def snapshot():
+                with lock:
+                    return list(submissions)
+
+            async def scenario():
+                server = StudioMCP(LocalConfig(), workClient=remote, pollInterval=0.05).createServer()
+                identity = Implementation(name="opencode", version="2.2.3")
+
+                async with MCPClient(server, client_info=identity) as client:
+                    for identifier, name in ((firstID, "review"), (secondID, "fix")):
+                        result = await client.call_tool("agentAddressStartWork", {
+                            "sessionName": name, "sessionDisplayName": name,
+                        }, meta={"ai.opencode/sessionID": identifier})
+                        assert not result.is_error
+
+                    first = service.receive(firstID, "Review only")
+                    second = service.receive(secondID, "Fix only")
+                    await self.waitUntil(lambda: len(snapshot()) >= 2)
+
+                    delivered = dict(snapshot())
+                    assert len(snapshot()) == 2
+                    for identifier, message in ((firstID, first), (secondID, second)):
+                        payload = delivered[identifier]
+                        assert message["threadId"] in payload["text"]
+                        assert message["body"] in payload["text"]
+                        assert payload["delivery"] == "queue" and payload["resume"] is True
+                    assert second["body"] not in delivered[firstID]["text"]
+
+                    polls = service.polls[firstID]
+                    await self.waitUntil(lambda: service.polls[firstID] >= polls + 2)
+                    assert len(snapshot()) == 2
+
+            try:
+                asyncio.run(scenario())
+            finally:
+                native.shutdown()
+                worker.join()

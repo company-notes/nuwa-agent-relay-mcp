@@ -47,13 +47,13 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install Studio FastMCP and test deps
-        run: pip install -e './studio[dev]'
+        run: pip install './studio[dev]'
       - name: Check Python imports and style
         run: ruff check studio/src studio/tests --select E4,E7,E9,F
       - name: Python Studio tests
         run: pytest -q studio/tests
       - name: Preview mcp_install desktop registration
-        run: nuwa-studio-mcp install --print
+        run: nuwa-relay-mcp install --print
 
   studio-windows:
     runs-on: windows-latest
@@ -64,18 +64,76 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install Studio Python package
-        run: python -m pip install -e "./studio[dev]"
+        run: python -m pip install "./studio[dev]"
       - name: Test Studio on Windows
         run: python -m pytest -q studio/tests
       - name: Verify installed Studio CLI entrypoint
-        run: nuwa-studio-mcp --version
+        run: nuwa-relay-mcp --version
       - name: Preview desktop registration on Windows
-        run: nuwa-studio-mcp install --print
+        run: nuwa-relay-mcp install --print
+
+  studio-windows-installer:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build and test tools
+        run: python -m pip install uv "./studio[dev]"
+      - name: Provision verified NSIS compiler
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP "nsis-3.13.zip"
+          $root = Join-Path $env:RUNNER_TEMP "nsis-3.13"
+          $url = "https://downloads.sourceforge.net/project/nsis/NSIS%203/3.13/nsis-3.13.zip"
+          curl.exe --fail --location --retry 3 --retry-all-errors --max-time 45 $url --output $archive
+          if ($LASTEXITCODE -ne 0) { throw "Could not download NSIS 3.13" }
+          $expected = "ba63dffc4410ee89193e1cb5a41989991bd77c61068da17e3156d136b7b0b3d8"
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne $expected) {
+            throw "NSIS archive SHA256 mismatch"
+          }
+          Expand-Archive -Path $archive -DestinationPath $env:RUNNER_TEMP -Force
+          $compiler = Join-Path $root "bin\makensis.exe"
+          if (-not (Test-Path $compiler -PathType Leaf)) { throw "NSIS compiler missing" }
+          $env:NSISDIR = $root
+          & $compiler /VERSION
+          if ($LASTEXITCODE -ne 0) { throw "NSIS compiler failed version check" }
+          "NSISDIR=$root" >> $env:GITHUB_ENV
+          (Split-Path $compiler) >> $env:GITHUB_PATH
+      - name: Install real Claude Code native CLI for Windows acceptance
+        shell: pwsh
+        run: |
+          $prefix = Join-Path $env:RUNNER_TEMP "claude-cli"
+          npm install --prefix $prefix --no-save --ignore-scripts @anthropic-ai/claude-code-win32-x64@2.1.331
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $binaries = @(Get-ChildItem -Path $prefix -Recurse -File -Filter claude.exe)
+          if ($binaries.Count -ne 1) { throw "Expected one native Claude Code executable" }
+          $claude = $binaries[0].FullName
+          & $claude --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "NUWA_TEST_CLAUDE_CLI=$claude" >> $env:GITHUB_ENV
+      - name: Build standalone Relay MCP and Windows Setup
+        run: python studio/Build.py
+      - name: Verify real Setup install, upgrade, MCP stdio and uninstall
+        shell: pwsh
+        run: |
+          $env:NUWA_TEST_WINDOWS_SETUP = (Resolve-Path studio/dist/nuwa-relay-mcp-setup.exe).Path
+          python -m pytest -q studio/tests/test_windows_setup.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nuwa-relay-mcp-windows-test-build
+          path: |
+            studio/dist/nuwa-relay-mcp.exe
+            studio/dist/nuwa-relay-mcp-setup.exe
+          if-no-files-found: error
 
   deploy:
     name: Deploy remote MCP to Cloudflare
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: [server, studio, studio-windows]
+    needs: [server, studio, studio-windows, studio-windows-installer]
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 15

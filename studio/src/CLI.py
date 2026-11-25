@@ -5,6 +5,8 @@ import json
 import logging
 import getpass
 import os
+import sys
+from importlib.metadata import version
 
 from .Auth import OAuthCredentials
 from .Client import AddressClient, RelayClient, RemoteBindingClient
@@ -13,6 +15,7 @@ from .Installer import StudioInstaller
 from .LocalSmoke import LocalEchoRoundTrip
 from .RemoteSessionTransfer import RemoteSessionTransfer
 from .Server import StudioMCP
+from .SessionPeer import SessionPeer
 from .WakeReceiver import WakeReceiver
 from .WakeSubscription import WakeSubscription
 
@@ -20,8 +23,8 @@ from .WakeSubscription import WakeSubscription
 class StudioCLI:
     @classmethod
     def createParser(cls) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(prog="nuwa-studio-mcp")
-        parser.add_argument("--version", action="version", version="0.2.0")
+        parser = argparse.ArgumentParser(prog="nuwa-relay-mcp")
+        parser.add_argument("--version", action="version", version=version("nuwa-relay-mcp"))
         commands = parser.add_subparsers(dest="command", required=True)
 
         for name in ("login", "logout", "status", "run"):
@@ -47,6 +50,9 @@ class StudioCLI:
 
         for name in ("install", "uninstall"):
             command = commands.add_parser(name)
+            command.add_argument("--target", default="all")
+            command.add_argument("--component", choices=("auto", "mcp", "skill", "all"),
+                                 default="auto")
             command.add_argument("--overwrite", action="store_true")
             command.add_argument("--print", dest="printOnly", action="store_true")
 
@@ -70,6 +76,10 @@ class StudioCLI:
         roundTrip.add_argument("--to", required=True)
         roundTrip.add_argument("--timeout", type=float, default=45.0)
 
+        peer = commands.add_parser("peer", help="Discover local native Codex threads.")
+        peerCommands = peer.add_subparsers(dest="peerCommand", required=True)
+        peerCommands.add_parser("list")
+
         wake = commands.add_parser("wake", help="Manage and run an Agent Wake receiver.")
         wakeCommands = wake.add_subparsers(dest="wakeCommand", required=True)
 
@@ -89,6 +99,9 @@ class StudioCLI:
         wakeCommands.add_parser("unregister")
         wakeListen = wakeCommands.add_parser("listen")
         wakeListen.add_argument("--port", type=int, default=8765)
+        mode = wakeListen.add_mutually_exclusive_group(required=True)
+        mode.add_argument("--peer-target", help="Exact local codex:<thread UUID> or current claude:<Session UUID>.")
+        mode.add_argument("--echo", action="store_true", help="Explicit diagnostic Echo mode.")
 
         return parser
 
@@ -130,7 +143,11 @@ class StudioCLI:
 
     @classmethod
     def run(cls) -> None:
-        args = cls.createParser().parse_args()
+        args = cls.createParser().parse_args(sys.argv[1:] or ["run"])
+
+        if args.command == "peer":
+            print(json.dumps(SessionPeer().list(), indent=2))
+            return
 
         config = LocalConfig.load()
         credentials = OAuthCredentials(config)
@@ -176,7 +193,8 @@ class StudioCLI:
             return
 
         if args.command in ("install", "uninstall"):
-            StudioInstaller.run(args.command == "uninstall", args.overwrite, args.printOnly)
+            StudioInstaller.run(args.command == "uninstall", args.overwrite, args.printOnly,
+                                args.target, args.component)
             return
 
         if args.command == "run":
@@ -219,7 +237,7 @@ class StudioCLI:
                 result = subscription.remove()
             elif args.wakeCommand == "listen":
                 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-                WakeReceiver(config, relay).serve(args.port)
+                WakeReceiver(config, relay, peerTarget=args.peer_target).serve(args.port)
                 return
             else:
                 raise ValueError("Unsupported Wake command.")
@@ -230,4 +248,8 @@ class StudioCLI:
 
 
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == SessionPeer.CHILD_COMMAND:
+        SessionPeer.runChild(sys.argv[2:])
+        return
+
     StudioCLI.run()

@@ -151,3 +151,25 @@ def test_studio_mcp_verifies_signed_wake_with_selected_session():
             assert "api2.cursor.sh" in str(status)
 
     asyncio.run(verify())
+
+
+def test_native_work_onboarding_exposes_canonical_skill_tools():
+    """A newly opened Coding Agent must be able to initialize work and reply using the installed Skill."""
+    async def verify():
+        server = StudioMCP(LocalConfig()).createServer()
+
+        async with MCPClient(server) as client:
+            names = {tool.name for tool in await client.list_tools()}
+
+            assert {
+                "agentAddressStartWork", "agentAddressGetStatus", "agentAddressReleaseWork",
+                "sendToAgent", "relayInbox", "relayReplyThread",
+            } <= names
+
+            result = await client.call_tool("agentAddressStartWork", {
+                "sessionName": "review-build", "sessionDisplayName": "Review build",
+            }, raise_on_error=False)
+
+            assert result.is_error, "A model cannot invent native identity without host metadata"
+
+    asyncio.run(verify())

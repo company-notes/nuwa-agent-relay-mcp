@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import secrets
+import sys
 import time
 import webbrowser
 from base64 import urlsafe_b64encode
@@ -12,6 +13,7 @@ from threading import Thread, Timer
 from urllib.parse import parse_qs, urlencode, urlparse
 
 import httpx
+from filelock import FileLock
 
 from .Config import LocalConfig
 
@@ -24,7 +26,7 @@ class OAuthCredentials:
         path = self.config.authPath()
 
         if not path.exists():
-            raise RuntimeError("Not logged in. Run nuwa-studio-mcp login.")
+            raise RuntimeError("Not logged in. Run nuwa-relay-mcp login.")
 
         auth = json.loads(path.read_text(encoding="utf-8"))
 
@@ -44,7 +46,25 @@ class OAuthCredentials:
 
         return data
 
+    def _lock(self) -> FileLock:
+        directory = self.config.configDir()
+        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+
+        return FileLock(str(directory / "auth.lock"), timeout=210)
+
     def accessToken(self) -> str:
+        with self._lock():
+            return self._accessToken()
+
+    def ensureAccessToken(self) -> str:
+        """Only an explicit first-use tool opens a browser; polling never prompts."""
+        with self._lock():
+            if not os.environ.get("NUWA_ACCESS_TOKEN") and not self.config.authPath().exists():
+                self._login(sys.stderr)
+
+            return self._accessToken()
+
+    def _accessToken(self) -> str:
         override = os.environ.get("NUWA_ACCESS_TOKEN")
 
         if override:
@@ -56,7 +76,7 @@ class OAuthCredentials:
             return auth["access_token"]
 
         if not auth.get("refresh_token"):
-            raise RuntimeError("OAuth token expired. Run nuwa-studio-mcp login.")
+            raise RuntimeError("OAuth token expired. Run nuwa-relay-mcp login.")
 
         refreshed = self._tokenRequest({
             "grant_type": "refresh_token",
@@ -73,10 +93,11 @@ class OAuthCredentials:
         return auth["access_token"]
 
     def logout(self) -> None:
-        self.config.authPath().unlink(missing_ok=True)
-        self.config.runtimePath().unlink(missing_ok=True)
-        self.config.resumePath().unlink(missing_ok=True)
-        self.config.wakePath().unlink(missing_ok=True)
+        with self._lock():
+            self.config.authPath().unlink(missing_ok=True)
+            self.config.runtimePath().unlink(missing_ok=True)
+            self.config.resumePath().unlink(missing_ok=True)
+            self.config.wakePath().unlink(missing_ok=True)
 
     @classmethod
     def _callbackServer(cls, state: str) -> HTTPServer:
@@ -118,6 +139,10 @@ class OAuthCredentials:
         return CallbackServer(("127.0.0.1", 0), CallbackHandler)
 
     def login(self) -> None:
+        with self._lock():
+            self._login(sys.stdout)
+
+    def _login(self, output) -> None:
         verifier = secrets.token_urlsafe(32)
         challenge = urlsafe_b64encode(
             hashlib.sha256(verifier.encode()).digest()
@@ -150,8 +175,8 @@ class OAuthCredentials:
                 "code_challenge_method": "S256",
             })
 
-            print("Sign in to Agent Address using your browser:")
-            print(authorizeURL)
+            print("Sign in to Agent Address using your browser:", file=output)
+            print(authorizeURL, file=output)
             webbrowser.open(authorizeURL)
 
             timer.start()

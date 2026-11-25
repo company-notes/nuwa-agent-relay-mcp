@@ -1,37 +1,53 @@
-"""mcp_install desktop registration adapter."""
+"""Delegate Studio's MCP and Skill installation to mcp-install."""
 
 import os
 import sys
+import sysconfig
 from pathlib import Path
 
-from mcp_install.Install import main as installMain
+from mcp_install.Install import InstallCommand, loadAppConfig
 
 
 class StudioInstaller:
     @classmethod
     def manifestPath(cls) -> Path:
-        return Path(__file__).resolve().parent.parent / "scripts" / "install.config.json"
+        module = Path(__file__).resolve()
+        packaged = module.parent / "install.config.json"
+
+        if packaged.is_file():
+            return packaged
+
+        return module.parents[2] / "install.config.json"
 
     @classmethod
-    def run(cls, uninstall: bool, overwrite: bool, printOnly: bool) -> None:
-        arguments = ["--app-config", str(cls.manifestPath())]
+    def _launcherPath(cls) -> Path:
+        if getattr(sys, "frozen", False):
+            return Path(sys.executable)
+
+        name = "nuwa-relay-mcp.exe" if os.name == "nt" else "nuwa-relay-mcp"
+        return Path(sysconfig.get_path("scripts")) / name
+
+    @classmethod
+    def run(cls, uninstall: bool, overwrite: bool, printOnly: bool,
+            target: str = "all", component: str = "auto") -> None:
+        manifest = cls.manifestPath()
+        arguments = ["--app-config", str(manifest), "--target", target,
+                     "--component", component]
 
         if uninstall:
             arguments.append("--uninstall")
-
         if overwrite:
             arguments.append("--overwrite")
-
         if printOnly:
             arguments.append("--print")
 
-        originalArguments = sys.argv
+        # Register the installed launcher, not an unpublished PyPI distribution.
+        if component != "skill" and not uninstall:
+            launcher = cls._launcherPath()
+            if not launcher.is_file():
+                raise RuntimeError("Install the Studio package before registering its MCP server.")
 
-        try:
-            if getattr(sys, "frozen", False):
-                os.environ["NUWA_STUDIO_MCP_BINARY"] = sys.executable
+            os.environ.setdefault("NUWA_RELAY_MCP_BINARY", str(launcher))
 
-            sys.argv = [originalArguments[0], *arguments]
-            installMain()
-        finally:
-            sys.argv = originalArguments
+        args = InstallCommand.createParser().parse_args(arguments)
+        InstallCommand(args, loadAppConfig(str(manifest)), manifest).run()

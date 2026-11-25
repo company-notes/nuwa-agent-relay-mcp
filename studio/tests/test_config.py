@@ -75,8 +75,8 @@ def test_installer_uses_project_manifest():
     manifest = StudioInstaller.manifestPath()
     payload = json.loads(manifest.read_text())
 
-    assert payload["entrypoint"] == "nuwa-studio-mcp"
-    assert payload["binaryEnvVar"] == "NUWA_STUDIO_MCP_BINARY"
+    assert payload["entrypoint"] == "nuwa-relay-mcp"
+    assert payload["binaryEnvVar"] == "NUWA_RELAY_MCP_BINARY"
     assert payload["serverName"] == "nuwa-agent-relay-studio"
 
 

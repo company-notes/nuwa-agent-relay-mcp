@@ -9,6 +9,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Event, Thread
 
 from .Config import LocalConfig
+from .PeerNotification import PeerNotification
+from .SessionPeer import PeerSubmissionUncertain, SessionPeer
 from .WakeEcho import EchoAgentHandler
 from .WakeInbox import WakeInbox
 from .WakeSubscription import WakeSubscription
@@ -34,11 +36,20 @@ class WakeReceiver:
         "recipientPlatformThreadID", "senderDisplayName", "senderAuthMode",
     }
 
-    def __init__(self, config: LocalConfig, client):
+    def __init__(self, config: LocalConfig, client, peerTarget: str | None = None, peer=None):
         self.config = config
         self.settings = WakeSubscription(config, client).load()
-        self.inbox = WakeInbox(config.wakeInboxPath())
-        self.handler = EchoAgentHandler(client, config.requireSession())
+        sessionID = config.requireSession()
+        inboxPath = config.wakeInboxPath()
+
+        if peerTarget is not None:
+            target = SessionPeer.validateTarget(peerTarget)
+            self.inbox = WakeInbox.forNative(config, sessionID, target)
+            self.handler = PeerNotification(client, sessionID, target, peer)
+        else:
+            self.inbox = WakeInbox(inboxPath)
+            self.handler = EchoAgentHandler(client, sessionID)
+
         self._stopEvent = Event()
 
     def accept(self, body: bytes, signature: str | None) -> dict:
@@ -83,13 +94,19 @@ class WakeReceiver:
             raise WakeRequestError(403, "Wake targeted another Session.")
 
         isNew = self.inbox.enqueue(messageID)
+
         return {"accepted": True, "messageID": messageID, "duplicate": not isNew}
 
     def processDue(self) -> None:
         for messageID, attempts in self.inbox.due():
+            if not self.inbox.claim(messageID):
+                continue
+
             try:
                 self.handler.process(messageID)
-                self.inbox.complete(messageID)
+            except PeerSubmissionUncertain:
+                logger.warning("Native submission unconfirmed (messageID=%s); held for inspection",
+                               messageID)
             except Exception as error:
                 # A remote client error may embed credentials in its message.
                 logger.warning(
@@ -97,6 +114,8 @@ class WakeReceiver:
                     type(error).__name__, messageID,
                 )
                 self.inbox.retryLater(messageID, attempts)
+            else:
+                self.inbox.complete(messageID)
 
     def _processLoop(self) -> None:
         while not self._stopEvent.wait(0.25):
@@ -107,15 +126,16 @@ class WakeReceiver:
             raise ValueError("Wake listener port must be between 1 and 65535.")
 
         with WakeHTTPServer(("127.0.0.1", port), self) as server:
-            worker = Thread(target=self._processLoop, daemon=True, name="nuwa-wake-echo")
+            worker = Thread(target=self._processLoop, daemon=True, name="nuwa-wake-receiver")
             worker.start()
-            print("Nuwa Wake Echo listening on http://127.0.0.1:%d/wake" % port)
+            mode = "native session" if isinstance(self.handler, PeerNotification) else "Echo"
+            print("Nuwa Wake %s listening on http://127.0.0.1:%d/wake" % (mode, port))
             print("Session: %s; Relay: %s" % (self.config.requireSession(), self.config.apiURL))
 
             try:
                 server.serve_forever(poll_interval=0.2)
             except KeyboardInterrupt:
-                logger.info("Stopping local Wake Echo listener")
+                logger.info("Stopping local Wake listener")
             finally:
                 self._stopEvent.set()
                 server.shutdown()

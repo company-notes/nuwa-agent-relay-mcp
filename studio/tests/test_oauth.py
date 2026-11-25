@@ -1,5 +1,4 @@
 import json
-import sys
 import threading
 import urllib.error
 import urllib.request
@@ -9,8 +8,6 @@ import pytest
 
 from src.Auth import OAuthCredentials
 from src.Config import LocalConfig
-from src import Installer
-from src.Installer import StudioInstaller
 
 
 def test_browser_pkce_oauth_saves_private_tokens_and_refreshes(tmp_path, monkeypatch):
@@ -113,19 +110,3 @@ def test_browser_pkce_oauth_saves_private_tokens_and_refreshes(tmp_path, monkeyp
 
     credentials.logout()
     assert not config.authPath().exists()
-
-
-def test_mcp_install_print_restores_sys_argv_and_uses_manifest(monkeypatch):
-    oldArguments = sys.argv
-    result = []
-
-    def fakeInstallerMain():
-        result.append(list(sys.argv))
-
-    monkeypatch.setattr(Installer, "installMain", fakeInstallerMain)
-    StudioInstaller.run(uninstall=False, overwrite=True, printOnly=True)
-
-    assert sys.argv is oldArguments
-    assert result[0][1:3] == ["--app-config", str(StudioInstaller.manifestPath())]
-    assert "--print" in result[0]
-    assert "--overwrite" in result[0]

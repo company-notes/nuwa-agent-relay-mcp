@@ -31,10 +31,19 @@ class RemoteWorkClient:
             "Accept": "application/json, text/event-stream",
             "MCP-Protocol-Version": "2025-06-18",
         }
-        identityKey = "threadId" if mode == "codex" else "sessionId"
+        identityKey = {"codex": "threadId", "claude-code": "sessionId",
+                       "opencode": "ai.opencode/sessionID"}.get(mode)
+        params = {"name": tool, "arguments": arguments or {}}
+        if mode == "grok-build":
+            headers["X-Nuwa-Work-ID"] = threadID
+        elif identityKey:
+            params["_meta"] = {identityKey: threadID}
+        else:
+            raise ValueError("Unsupported native work mode.")
+
         request = {
             "jsonrpc": "2.0", "id": requestID, "method": "tools/call",
-            "params": {"name": tool, "arguments": arguments or {}, "_meta": {identityKey: threadID}},
+            "params": params,
         }
 
         with httpx.Client(timeout=45, follow_redirects=False, transport=self.transport) as client:

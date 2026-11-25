@@ -1,6 +1,7 @@
 """Route host-scoped native tool calls to the existing remote work connector."""
 
 import asyncio
+import os
 from contextlib import asynccontextmanager
 from uuid import UUID
 
@@ -10,6 +11,7 @@ from fastmcp.tools import ToolResult
 
 from .NativeWorkIdentity import ClaudeHost, NativeWorkIdentity
 from .NativeWorkReceiver import NativeWorkReceiver
+from .OpenCodePeer import OpenCodePeer
 from .RemoteWorkClient import RemoteWorkClient
 from .SessionPeer import SessionPeer
 
@@ -34,6 +36,7 @@ class NativeWorkRouter(Middleware):
         self.config = config
         self.remote = remote
         self.peer = peer or SessionPeer()
+        self.openCodePeer = peer or OpenCodePeer()
         self.interval = interval
         self.receivers = {}
         self.lock = asyncio.Lock()
@@ -56,6 +59,15 @@ class NativeWorkRouter(Middleware):
 
             return NativeWorkIdentity("claude-code", host.sessionID)
 
+        if "grok" in clientName:
+            return NativeWorkIdentity("grok-build", os.environ.get("GROK_SESSION_ID"))
+
+        if "opencode" in clientName:
+            if not isinstance(metadata, dict):
+                raise ValueError("Invalid native host metadata.")
+
+            return NativeWorkIdentity("opencode", metadata.get("ai.opencode/sessionID"))
+
         return None
 
     @asynccontextmanager
@@ -75,6 +87,11 @@ class NativeWorkRouter(Middleware):
                 str(UUID(sessionID)) != sessionID or not data.get("canonical")):
             raise ValueError("Remote MCP did not establish a work Session.")
 
+        # Grok's work identity and manual Inbox are supported; a native
+        # submission endpoint must be verified before enabling a receiver.
+        if identity.mode == "grok-build":
+            return
+
         current = self.receivers.get(identity)
         if current and current.sessionID == sessionID:
             return
@@ -83,8 +100,9 @@ class NativeWorkRouter(Middleware):
             await asyncio.to_thread(current.stop)
             self.receivers.pop(identity)
 
+        peer = self.openCodePeer if identity.mode == "opencode" else self.peer
         receiver = NativeWorkReceiver(
-            self.config, self.remote, self.peer, identity, sessionID,
+            self.config, self.remote, peer, identity, sessionID,
             data.get("created") is True, self.interval,
         )
         self.receivers[identity] = receiver

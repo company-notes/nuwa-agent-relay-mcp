@@ -2,6 +2,7 @@
 
 import json
 
+from .NativeWorkIdentity import NativeWorkIdentity
 from .SessionPeer import SessionPeer
 
 
@@ -11,7 +12,11 @@ class PeerNotification:
     def __init__(self, client, sessionID: str, target: str, peer: SessionPeer | None = None):
         self.client = client
         self.sessionID = sessionID
-        self.target = SessionPeer.validateTarget(target)
+        if target.startswith("opencode:"):
+            NativeWorkIdentity("opencode", target.removeprefix("opencode:"))
+            self.target = target
+        else:
+            self.target = SessionPeer.validateTarget(target)
         self.peer = peer or SessionPeer()
 
     def process(self, messageID: str) -> dict:

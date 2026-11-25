@@ -46,7 +46,8 @@ class WorkService:
         params = rpc["params"]
         name = params["name"]
         threadID = (request.headers["x-nuwa-work-id"] if mode == "grok-build" else
-                    params["_meta"]["threadId" if mode == "codex" else "sessionId"])
+                    params["_meta"][{"codex": "threadId", "claude-code": "sessionId",
+                                     "opencode": "ai.opencode/sessionID"}[mode]])
         arguments = params["arguments"]
         assert "threadId" not in arguments
         assert "from" not in arguments

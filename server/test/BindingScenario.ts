@@ -624,7 +624,7 @@ export class RemoteMCPScenario {
             name, arguments: argumentsValue,
             ...(work?.mode === 'codex' && work.id ? { _meta: { threadId: work.id } } : {}),
             ...(work?.mode === 'claude-code' && work.id ? { _meta: { sessionId: work.id } } : {}),
-            ...(work?.mode === 'opencode' && work.id ? { _meta: { sessionId: work.id } } : {}),
+            ...(work?.mode === 'opencode' && work.id ? { _meta: { 'ai.opencode/sessionID': work.id } } : {}),
           },
         }),
       },

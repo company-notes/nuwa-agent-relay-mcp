@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from uuid import UUID
@@ -22,14 +23,17 @@ class NativeWorkIdentity:
         return value
 
     def __post_init__(self):
-        self.canonicalID(self.nativeID)
-
-        if self.mode not in ("codex", "claude-code"):
+        if self.mode == "opencode":
+            if not isinstance(self.nativeID, str) or not re.fullmatch(r"ses_[A-Za-z0-9_-]{1,124}", self.nativeID):
+                raise ValueError("A canonical OpenCode Session ID is required.")
+        elif self.mode in ("codex", "claude-code", "grok-build"):
+            self.canonicalID(self.nativeID)
+        else:
             raise ValueError("Unsupported native work mode.")
 
     @property
     def target(self) -> str:
-        prefix = "codex" if self.mode == "codex" else "claude"
+        prefix = "claude" if self.mode == "claude-code" else self.mode
 
         return f"{prefix}:{self.nativeID}"
 

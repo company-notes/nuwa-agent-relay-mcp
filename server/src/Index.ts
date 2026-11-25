@@ -5,7 +5,7 @@ import { NuwaMCPServer } from './MCPServer';
 import { AGENT_SKILL_MD } from './SkillDocument';
 import { AGENT_SKILL_REFERENCES } from './SkillReferences';
 import { OAuthResourceServer, type AuthenticatedRequest } from './OAuthResourceServer';
-import { AddressAPIClient, APIError } from './APIClients';
+import { AddressAPIClient, APIError, RelayAPIClient } from './APIClients';
 import { Logger } from './Logger';
 import { SessionBindings } from './SessionBindings';
 import { SessionBindingController } from './SessionBindingController';
@@ -76,7 +76,9 @@ export class HTTPMCPApplication {
       /^\/v2\/management\/agents\/([^/]+)\/bindings$/,
     );
 
-    if (url.pathname !== '/mcp' && url.pathname !== '/session-bindings' && !resetMatch) {
+    const inbox = url.pathname === '/work-inbox/events' || url.pathname === '/work-inbox/events/stream';
+
+    if (url.pathname !== '/mcp' && url.pathname !== '/session-bindings' && !resetMatch && !inbox) {
       return new Response('Not found', { status: 404 });
     }
 
@@ -113,6 +115,36 @@ export class HTTPMCPApplication {
         ).handle(request);
       } catch (error) {
         HTTPMCPApplication.logger.exception('session_binding_failed', error);
+
+        return SessionBindingController.error(error);
+      }
+    }
+
+    if (inbox) {
+      try {
+        if (request.method !== 'GET') {
+          throw new APIError(405, 'method_not_allowed', 'Inbox events require GET.');
+        }
+
+        const work = WorkContext.fromInboxHeaders(request.headers);
+        const bindings = new SessionBindings(this.env, address, work);
+        const relay = new RelayAPIClient(this.env, result.authorization, () => bindings.authorize(), this.tasks);
+
+        if (url.pathname.endsWith('/stream')) {
+          if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket') {
+            throw new APIError(426, 'websocket_required', 'A WebSocket upgrade is required.');
+          }
+
+          return await relay.openInboxStream();
+        }
+
+        const data = await relay.call('GET', '/v2/inbox/events', undefined, {
+          after_sequence: url.searchParams.get('after_sequence') ?? '0',
+        });
+
+        return Response.json({ ok: true, data }, { headers: { 'cache-control': 'no-store' } });
+      } catch (error) {
+        HTTPMCPApplication.logger.exception('work_inbox_failed', error);
 
         return SessionBindingController.error(error);
       }

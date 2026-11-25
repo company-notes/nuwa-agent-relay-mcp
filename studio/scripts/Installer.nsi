@@ -41,11 +41,28 @@ ShowUninstDetails show
 !insertmacro MUI_LANGUAGE "English"
 
 Section "Install"
-  SetOutPath "$INSTDIR"
   ClearErrors
-  File /oname=nuwa-relay-mcp.exe "${EXE_PATH}"
+  SetOutPath "$INSTDIR"
   IfErrors installFailed
 
+  copyExecutable:
+  ClearErrors
+  SetOverwrite try
+  File /oname=nuwa-relay-mcp.exe "${EXE_PATH}"
+  SetOverwrite on
+  IfErrors 0 executableReady
+
+  ; A locked executable must never be skipped or forcibly stopped.
+  DetailPrint "Nuwa Relay MCP cannot be replaced. It may still be in use."
+  IfSilent updateDeferred
+  MessageBox MB_RETRYCANCEL|MB_ICONINFORMATION|MB_DEFBUTTON2 "Nuwa Relay MCP cannot be updated right now. It may still be in use.$\r$\n$\r$\nFinish your work and close the AI clients using Nuwa Relay MCP (such as Codex or Claude Code), then choose Retry.$\r$\n$\r$\nChoose Cancel to update later. Setup will not stop your running work. If the problem persists after closing the clients, check the installation folder permissions and available disk space." IDRETRY copyExecutable
+
+  updateDeferred:
+  DetailPrint "Installation deferred. Close the clients using Nuwa Relay MCP and retry later."
+  SetErrorLevel 20
+  Abort
+
+  executableReady:
   DetailPrint "Checking the installed executable version..."
   nsExec::ExecToStack /TIMEOUT=120000 '"$INSTDIR\nuwa-relay-mcp.exe" --version'
   Pop $0

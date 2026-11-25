@@ -59,6 +59,9 @@ Windows 建置：`python studio/Build.py`（需 uv 與 NSIS）。輸出位於
 `studio/dist/nuwa-relay-mcp.exe` 和 `studio/dist/nuwa-relay-mcp-setup.exe`。
 安裝及解除安裝只處理應用程式、MCP 設定及受管理的 Skill，不會清除既有 Nuwa OAuth、
 Agent、Session 或 Wake 資料，也不會自動登入。請重新啟動或重新載入 MCP 客戶端。
+更新只覆蓋單一版本；若執行檔仍在使用，Setup 提供 Retry / Cancel 提示，
+不會強制停止工作或略過執行檔繼續註冊。請先完成工作並關閉使用 Nuwa Relay MCP 的客戶端，
+再重試。靜默安裝遇到無法覆蓋的執行檔會回傳 exit code 20，表示此次安裝延後。
 
 
 ### Codex native work (test release)

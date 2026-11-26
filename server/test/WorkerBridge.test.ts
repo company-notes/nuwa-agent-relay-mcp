@@ -51,7 +51,17 @@ class WorkerDeviceScenario {
     const response = await this.base.tool('worker_provider_pair', {});
 
     assert.equal(response.result.isError, undefined);
-    const { pairingCode } = JSON.parse(response.result.content[0].text);
+    const { pairingCode, authorizationURL, expiresInSeconds } = JSON.parse(response.result.content[0].text);
+    assert.equal(expiresInSeconds, 300);
+    assert.equal(authorizationURL, 'https://mcp.agent-relay.company-notes.com/worker-pairing');
+
+    const landing = await this.base.application.handle(new Request(authorizationURL));
+    assert.equal(landing.status, 200);
+    const html = await landing.text();
+    assert.match(html, /href="nuwa-studio-worker:pair"/);
+    assert.ok(!html.includes(pairingCode), 'The public entrypoint must never contain the pairing secret.');
+    assert.doesNotMatch(html, /<script|http-equiv="refresh"|<form/i,
+      'The owner must initiate Studio explicitly; the public page never submits credentials.');
     const [route, secret] = pairingCode.split('.');
     this.route = route;
 

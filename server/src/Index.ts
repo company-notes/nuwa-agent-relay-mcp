@@ -14,6 +14,7 @@ import { WorkContext } from './WorkContext';
 import { ManagementBindingCleanup } from './ManagementBindingCleanup';
 import { WorkerBridge } from './WorkerBridge';
 import { WorkerBridgeTools } from './WorkerBridgeTools';
+import { WorkerPairingPage } from './WorkerPairingPage';
 
 export { WorkerBridgeChannel } from './WorkerBridgeChannel';
 
@@ -31,6 +32,10 @@ export class HTTPMCPApplication {
 
     if (onboarding) {
       return onboarding;
+    }
+
+    if (url.pathname === WorkerPairingPage.path && request.method === 'GET') {
+      return WorkerPairingPage.response();
     }
 
     if (url.pathname === '/health' && request.method === 'GET') {

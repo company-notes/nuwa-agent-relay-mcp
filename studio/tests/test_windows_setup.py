@@ -11,6 +11,9 @@ from importlib.metadata import version
 from pathlib import Path
 
 import pytest
+
+if os.name == "nt":
+    import winreg
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
@@ -24,11 +27,18 @@ from src.WorkerServiceManager import WindowsWorkerService, WorkerTaskState
 )
 class TestWindowsSetup:
     REG_KEY = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\nuwa-relay-mcp"
+    PROTOCOL_KEY = r"Software\Classes\nuwa-studio-worker"
+
+    @classmethod
+    def verifyWorkerProtocol(cls, worker):
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, cls.PROTOCOL_KEY) as key:
+            assert winreg.QueryValueEx(key, "URL Protocol")[0] == ""
+
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, cls.PROTOCOL_KEY + r"\shell\open\command") as key:
+            assert winreg.QueryValueEx(key, "")[0] == f'"{worker}" pair'
 
     @classmethod
     def registration(cls):
-        import winreg
-
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, cls.REG_KEY) as key:
             return {
                 name: winreg.QueryValueEx(key, name)[0]
@@ -145,6 +155,7 @@ class TestWindowsSetup:
         assert executable.is_file()
         assert worker.is_file()
         assert manager.status() == WorkerTaskState.READY
+        self.verifyWorkerProtocol(worker)
 
         # A GUI-subsystem binary starts without allocating a console, and an
         # unpaired install exits without calling the cloud or local Gateway.
@@ -187,6 +198,7 @@ class TestWindowsSetup:
         # Retry the same installer after the running MCP has closed normally.
         profile.run(str(setup), "/S", f"/D={destination}", timeout=300)
         self.waitForWorker(manager, workerLog)
+        self.verifyWorkerProtocol(worker)
         assert self.registration()["DisplayVersion"] == expectedVersion
         assert Path(profile.servers()["nuwa-agent-relay-studio"]["command"]) == executable
         assert (profile.skill / "SKILL.md").is_file()
@@ -198,6 +210,8 @@ class TestWindowsSetup:
         self.waitForUninstall(executable, uninstaller)
         assert not worker.exists()
         assert manager.status() == WorkerTaskState.ABSENT
+        with pytest.raises(FileNotFoundError):
+            winreg.OpenKey(winreg.HKEY_CURRENT_USER, self.PROTOCOL_KEY)
         assert LocalConfig.workerBridgePath().is_file()
         assert "nuwa-agent-relay-studio" not in profile.servers()
         assert profile.servers()["other"]["command"] == "other"

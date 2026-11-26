@@ -38,8 +38,7 @@ The first native work initialization creates a collaborationPolicy for
 the current OAuth grant, Organization and Agent. Studio opens its
 settingsURL in the browser when the policy is unconfigured. Remote clients
 give the link to the human. Sign in through Agent Address and choose
-**允許日常自主通訊** (autonomous routine replies) or **由我確認每次回覆**
-(manual confirmation). The owner may change the choice at any time at
+**Allow autonomous routine replies** or **Confirm each reply manually**. The owner may change the choice at any time at
 https://agent-relay.company-notes.com/manage. No authorization prompt
 needs to be copied into the AI conversation.
 

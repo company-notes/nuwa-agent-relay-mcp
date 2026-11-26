@@ -3,6 +3,7 @@
 import json
 import os
 import subprocess
+from base64 import b64encode
 from importlib.resources import files
 from pathlib import Path
 
@@ -35,8 +36,9 @@ try {
             raise LocalMCPError("Worker Gateway is not installed for this Windows user.")
 
         powershell = Path(os.environ["SystemRoot"]) / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"
+        command = b64encode(cls.SCRIPT.encode("utf-16-le")).decode("ascii")
         result = subprocess.run(
-            [str(powershell), "-NoProfile", "-NonInteractive", "-Command", cls.SCRIPT],
+            [str(powershell), "-NoProfile", "-NonInteractive", "-EncodedCommand", command],
             capture_output=True, timeout=20, creationflags=subprocess.CREATE_NO_WINDOW,
         )
 

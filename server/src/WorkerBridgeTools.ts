@@ -7,7 +7,7 @@ import { WorkerBridge } from './WorkerBridge';
 import { WorkerBridgeProtocol as Protocol, type WorkerTool } from './WorkerBridgeProtocol';
 
 export class WorkerBridgeTools extends MCPToolSet {
-  private static readonly logger = Logger.forModule('worker.tools');
+  private static readonly bridgeLogger = Logger.forModule('worker.tools');
 
   constructor(server: McpServer, private readonly bridge: WorkerBridge) {
     super(server);
@@ -36,7 +36,7 @@ export class WorkerBridgeTools extends MCPToolSet {
     try {
       message = await request.json();
     } catch (error) {
-      WorkerBridgeTools.logger.exception('invalid_mcp_request', error);
+      WorkerBridgeTools.bridgeLogger.exception('invalid_mcp_request', error);
       return; // The MCP transport owns malformed request handling.
     }
 
@@ -51,13 +51,20 @@ export class WorkerBridgeTools extends MCPToolSet {
       return;
     }
 
-    const catalog = await this.bridge.catalog();
+    let tools: WorkerTool[];
 
-    for (const tool of catalog.tools) {
+    try {
+      tools = (await this.bridge.catalog()).tools;
+    } catch (error) {
+      WorkerBridgeTools.bridgeLogger.exception('worker_catalog_unavailable', error);
+      tools = [];
+    }
+
+    for (const tool of tools) {
       this.installTool(tool);
     }
 
-    if (workerCall && !catalog.tools.some((tool) => tool.name === name)) {
+    if (workerCall && !tools.some((tool) => tool.name === name)) {
       this.installTool({
         name: name as string, description: 'Paired Worker tool currently unavailable.',
         inputSchema: { type: 'object', additionalProperties: true },
@@ -73,7 +80,7 @@ export class WorkerBridgeTools extends MCPToolSet {
       try {
         return await this.bridge.call(tool.name, args);
       } catch (error) {
-        WorkerBridgeTools.logger.exception('worker_call_failed', error, { tool: tool.name });
+        WorkerBridgeTools.bridgeLogger.exception('worker_call_failed', error, { tool: tool.name });
 
         return Protocol.error(error instanceof APIError ? error.message : 'Worker operation could not be confirmed.');
       }

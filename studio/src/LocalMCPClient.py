@@ -17,10 +17,7 @@ class LocalMCPClient:
 
     def _request(self, client, method: str, params: dict, version: str | None = None):
         requestID = str(uuid4())
-        headers = {
-            "Authorization": "Bearer " + self.credential(),
-            "Accept": "application/json, text/event-stream",
-        }
+        headers = {}
         if version:
             headers["MCP-Protocol-Version"] = version
 
@@ -53,20 +50,22 @@ class LocalMCPClient:
 
         # The current Worker Gateway is stateless and forwards JSON requests.
         # MCP lifecycle notifications have no response body.
-        response = client.post(self.endpoint, headers={
-            "Authorization": "Bearer " + self.credential(),
-            "Accept": "application/json, text/event-stream",
-            "MCP-Protocol-Version": version,
-        }, json={"jsonrpc": "2.0", "method": "notifications/initialized"})
+        response = client.post(self.endpoint, headers={"MCP-Protocol-Version": version}, json={"jsonrpc": "2.0", "method": "notifications/initialized"})
 
         if response.status_code not in (200, 202, 204):
             raise LocalMCPError(f"Local MCP initialization notification returned HTTP {response.status_code}.")
 
         return version
 
+    def _client(self):
+        return httpx.Client(timeout=125, follow_redirects=False, trust_env=False,
+                            transport=self.transport, headers={
+                                "Authorization": "Bearer " + self.credential(),
+                                "Accept": "application/json, text/event-stream",
+                            })
+
     def listTools(self) -> list[dict]:
-        with httpx.Client(timeout=125, follow_redirects=False, trust_env=False,
-                          transport=self.transport) as client:
+        with self._client() as client:
             version = self._initialize(client)
             result = self._request(client, "tools/list", {}, version)
 
@@ -77,8 +76,7 @@ class LocalMCPClient:
         return tools
 
     def call(self, name: str, arguments: dict) -> dict:
-        with httpx.Client(timeout=125, follow_redirects=False, trust_env=False,
-                          transport=self.transport) as client:
+        with self._client() as client:
             version = self._initialize(client)
             result = self._request(client, "tools/call", {"name": name, "arguments": arguments}, version)
 

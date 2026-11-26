@@ -3,6 +3,7 @@
 import json
 import os
 import subprocess
+from base64 import b64encode
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 
@@ -77,7 +78,7 @@ class WorkerScenario:
         args = request["params"]["arguments"]
 
         if name == "work_start":
-            self.jobs["job-a"] = [args["prompt"]]
+            self.jobs["job-a"] = [args["task"]]
             data = {"jobId": "job-a"}
         elif name == "work_continue":
             self.jobs[args["jobId"]].append(args["prompt"])
@@ -102,9 +103,9 @@ def test_assistant_discovers_starts_and_continues_one_local_job():
         assert provider.call("fleet_status", {})["structuredContent"]["reachable"]
         assert provider.call("work_list", {})["structuredContent"]["jobs"] == []
 
-        started = provider.call("work_start", {"prompt": "Build a marketing tracker."})
+        started = provider.call("work_start", {"task": "Build a marketing tracker.", "requestId": "marketing-start", "target": {"host": "my-pc"}})
         jobID = started["structuredContent"]["jobId"]
-        provider.call("work_continue", {"jobId": jobID, "prompt": "Add monthly ROAS."})
+        provider.call("work_continue", {"jobId": jobID, "message": "Add monthly ROAS.", "requestId": "marketing-continue"})
         status = provider.call("work_status", {"jobId": jobID})["structuredContent"]
 
         assert status["messages"] == ["Build a marketing tracker.", "Add monthly ROAS."]
@@ -125,11 +126,15 @@ def test_installed_worker_credential_uses_real_windows_secure_string(tmp_path, m
     root = tmp_path / "AIWorkerGateway"
     root.mkdir()
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
-    script = (
-        "$s = ConvertTo-SecureString 'local-test-credential' -AsPlainText -Force; "
-        "ConvertFrom-SecureString $s | Set-Content -Encoding ASCII "
-        "(Join-Path $env:LOCALAPPDATA 'AIWorkerGateway\\client-token.dpapi') -NoNewline"
-    )
-    subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
-                   check=True, capture_output=True)
+    script = r"""
+$ErrorActionPreference = 'Stop'
+$secret = ConvertTo-SecureString -String 'local-test-credential' -AsPlainText -Force
+$cipher = ConvertFrom-SecureString -SecureString $secret
+$file = Join-Path $env:LOCALAPPDATA 'AIWorkerGateway\client-token.dpapi'
+[IO.File]::WriteAllText($file, $cipher, [Text.Encoding]::ASCII)
+"""
+    encoded = b64encode(script.encode("utf-16-le")).decode("ascii")
+    result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+                            capture_output=True)
+    assert result.returncode == 0, result.stderr.decode("utf-8", errors="replace")
     assert WorkerCredential.read() == WorkerScenario.TOKEN

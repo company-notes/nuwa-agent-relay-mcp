@@ -105,3 +105,7 @@ submissions are held rather than retried. For the diagnostic Echo mode use
 
 Automatic native work enrollment and live Codex reply acceptance remain separate
 from these manual binding and packaging checks.
+
+## Optional local Worker Provider pilot
+
+See [Studio Worker Provider](docs/WorkerProvider.md) for the scoped Rakazo-to-local-Gateway integration, authorization and acceptance requirements.

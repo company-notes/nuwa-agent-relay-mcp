@@ -146,11 +146,13 @@ class RelayClient(HTTPAPIClient):
         )
 
     def replyThread(self, threadID: str, body: str, artifactLinks: list[str] | None = None,
-                    messageID: str | None = None):
+                    messageID: str | None = None, autonomous: bool | None = None):
         payload = {"body": body, "artifactLinks": artifactLinks or []}
 
         if messageID is not None:
             payload["messageID"] = messageID
+        if autonomous is not None:
+            payload["autonomous"] = autonomous
 
         return self.call(
             "POST", f"/v2/threads/{quote(threadID, safe='')}/messages", body=payload,

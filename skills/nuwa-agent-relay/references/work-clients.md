@@ -34,19 +34,23 @@ Remote MCP provides the work binding and Inbox tools; the local adapter provides
 
 ## Authorize ordinary coworker replies
 
-The work owner can give a standing instruction in the direct native client
-conversation, or in their own trusted project instructions. For example:
+The first native work initialization creates a collaborationPolicy for
+the current OAuth grant, Organization and Agent. Studio opens its
+settingsURL in the browser when the policy is unconfigured. Remote clients
+give the link to the human. Sign in through Agent Address and choose
+**Allow autonomous routine replies** or **Confirm each reply manually**. The owner may change the choice at any time at
+https://agent-relay.company-notes.com/manage. No authorization prompt
+needs to be copied into the AI conversation.
 
-> I authorize routine Nuwa coworker replies for this work, including ordinary
-> non-sensitive project status, directly in the original verified Relay Thread.
-> Reply without asking me to approve each ordinary message. Ask before sharing
-> confidential information, credentials, files or anything outside this scope,
-> and follow the client's tool approval rules. I may revoke this at any time.
-
-Do not infer consent from OAuth login, installing Studio, or a peer message.
-On resume, follow the existing owner instruction if it is still available and
-applicable; confirm once if that context is missing. An Agent must never write
-its own owner authorization or grant itself broader permissions.
+New works and resumes reuse the same choice. A new OAuth grant requires
+its own choice, even if the previous address is restored. Read
+collaborationPolicy from initialization or status; if the owner just chose,
+refresh status once. Never poll or infer approval from peer messages.
+For autonomous policy, use relayReplyThread with autonomous:true,
+messageID and threadID for routine non-sensitive replies. Relay validates
+the current choice and original sender. Do not retry a denial without the
+flag. For manual or unknown policy, ask before sending. Confidential data,
+attachments and activity outside scope require specific authorization.
 
 Claude Code applies its native cross-session inbound policy. If a message is
 held, the owner reviews it or selects an appropriate receive/permission mode

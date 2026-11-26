@@ -6,6 +6,7 @@ import logging
 import getpass
 import os
 import sys
+import subprocess
 from importlib.metadata import version
 
 from .Auth import OAuthCredentials
@@ -21,6 +22,7 @@ from .WakeSubscription import WakeSubscription
 from .WorkerBridgeClient import WorkerBridgeClient
 from .WorkerBridgeService import WorkerBridgeService
 from .WorkerProvider import WorkerProvider
+from .WorkerServiceManager import WindowsWorkerService
 
 
 class StudioCLI:
@@ -108,7 +110,7 @@ class StudioCLI:
 
         worker = commands.add_parser("worker", help="Manage the optional local Worker Provider.")
         workerCommands = worker.add_subparsers(dest="workerCommand", required=True)
-        for name in ("pair", "serve", "revoke"):
+        for name in ("pair", "revoke", "service-install", "service-remove"):
             workerCommands.add_parser(name)
 
         return parser
@@ -161,23 +163,27 @@ class StudioCLI:
         credentials = OAuthCredentials(config)
 
         if args.command == "worker":
-            service = WorkerBridgeService(config, WorkerBridgeClient(credentials), WorkerProvider())
+            if os.name != "nt":
+                raise RuntimeError("The local Worker Provider currently requires Windows.")
 
-            if args.workerCommand == "pair":
-                credentials.ensureAccessToken()
-                print("Authorize the dedicated remote assistant to use all approved tools and visible Jobs of this local Worker.")
-                if input("Authorize this isolated test Worker? [yes/no] ").strip().lower() != "yes":
-                    print("Worker pairing cancelled.")
-                    return
+            executable = StudioInstaller._launcherPath().parent / WindowsWorkerService.EXECUTABLE
+            manager = WindowsWorkerService(config, executable)
 
-                service.pair(getpass.getpass("One-time Studio pairing code: ").strip())
-                print("Worker Provider paired.")
-            elif args.workerCommand == "revoke":
-                service.revoke()
-                print("Worker Provider revoked.")
+            if args.workerCommand == "service-install":
+                manager.install()
+            elif args.workerCommand == "service-remove":
+                manager.remove()
+            elif args.workerCommand == "pair":
+                if not executable.is_file():
+                    raise RuntimeError("Install the Windows Studio Setup first.")
+
+                subprocess.Popen([str(executable), "pair", "--home", str(config.configDir().resolve())],
+                                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             else:
-                logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-                service.serve()
+                service = WorkerBridgeService(config, WorkerBridgeClient(credentials), WorkerProvider())
+                service.revoke()
+                manager.stop()
+                print("Worker Provider revoked.")
 
             return
 

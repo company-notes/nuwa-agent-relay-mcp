@@ -137,8 +137,12 @@ class TestWakeReceiver:
                     "recipientAgentID": "agent-b",
                     "recipientCanonicalAddress": "nuwa/beta/main",
                     "recipientBotID": "bot-b",
-                    "body": "Please check my build.",
+                    "body": backend.messages[0]["body"],
                 }
+                body = payload["body"]
+                bodyBytes = body.encode("utf-8")
+                payload.update(bodyLength=len(body), bodyByteLength=len(bodyBytes),
+                               bodySHA256=hashlib.sha256(bodyBytes).hexdigest())
                 raw = json.dumps(payload, separators=(",", ":")).encode()
                 valid = "sha256=" + hmac.new(
                     backend.signingSecret.encode(), raw, hashlib.sha256,

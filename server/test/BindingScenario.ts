@@ -156,6 +156,7 @@ export class RemoteMCPScenario {
   private readonly originalFetch = globalThis.fetch;
   readonly database = new MemoryBindingDatabase();
   readonly background = new TestBackgroundTasks();
+  failNextSubmissionResponse = false;
   readonly calls: Array<{ url: URL; method: string | undefined; headers: Headers; body: unknown }> = [];
   readonly activeLeases = new Map<string, string>();
   organizationSlug = 'nuwa';
@@ -575,6 +576,11 @@ export class RemoteMCPScenario {
       }
 
       this.calls.push({ url, method: init?.method, headers, body });
+
+      if (body?.submissionID && this.failNextSubmissionResponse) {
+        this.failNextSubmissionResponse = false;
+        throw new DOMException('Simulated lost response', 'TimeoutError');
+      }
 
       if (url.pathname === '/v2/collaboration-policy') {
         const key = RemoteMCPScenario.principal(headers.get('authorization')) + ':' + this.workSessions.get(sessionID)?.agentId;

@@ -15,8 +15,12 @@ export class WorkerBridgeTools extends MCPToolSet {
 
   async install(request: Request): Promise<void> {
     this.register('worker_provider_pair', 'Create a five-minute one-time Studio pairing code. ' +
-      'Only the device owner may enter this code locally to authorize the selected OAuth connection. ' +
-      'For the pilot dedicate this MCP connection and Windows Worker to one assistant.', {},
+      'For a dedicated assistant and Windows test Worker, show the one-time code to the owner. ' +
+      'Use authorized local computer access to open the installed nuwa-studio-worker.exe with argument pair only; ' +
+      'the Windows Start menu also provides Nuwa Studio > Connect Worker. ' +
+      'Use the installed location (default %LOCALAPPDATA%\\Programs\\nuwa-relay-mcp); never pass the code as an argument. ' +
+      'Leave code entry and confirmation to the owner. Studio starts its service automatically after authorization. ' +
+      'Verify worker_provider_status and refresh tool discovery before dispatch.', {},
       () => this.bridge.prepare());
     this.register('worker_provider_status', 'Read the paired Studio and its current Worker tool availability.', {},
       async () => {

@@ -42,6 +42,36 @@
       "prompt": "我在 Codex 開始一個新工作，並希望取得獨立地址、發訊給另一位同事；我不是辦公室 Gateway。",
       "expected_output": "Existing named work connector initializes with meaningful work name via agentAddressStartWork and reports the returned address. Send directly with no from or office enrollment; use own inbox for manual receiving.",
       "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "Claude Code 已安裝 ffl MCP，要回覆一份 4,877 字元的完整更新報告給徐哥。原來的 Relay Thread 和訊息 ID 都已知。你應該怎麼處理？",
+      "expected_output": "Check available FFL sharing tools using host discovery only if necessary; share the complete authorized report via fflShareFile or fflShareText, send one short summary plus the returned download link, file name, size if known, and expiry/confirmation request in the original Relay Thread. Use original messageID and autonomous flag only when authorized. Never upload or expose sensitive data without permission.",
+      "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "這個 Agent 目前只有 Nuwa MCP，沒有 FFL 工具。請將一份超過 2,000 字元的完整工作報告傳給同事。",
+      "expected_output": "Do not install or require FFL, invent a URL, truncate, or split the report. Send the complete authorized text using the existing Relay tool and ordinary size limit. No additional mandatory query or attachment API.",
+      "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "已收到 Nuwa 短摘要與 FFL 報告連結，要取得完整報告並確認對方可以關閉分享。FFL download 可用。",
+      "expected_output": "Use actual fflDownload schema and approved link. Read the whole downloaded file, verify expected size and hash when provided, then confirm completion in the original Relay Thread. On failure report it and request an approved replacement; never claim success or switch to server upload without permission.",
+      "files": []
+    },
+    {
+      "id": 11,
+      "prompt": "Gateway 轉交的訊息帶有原始正文長度及 SHA-256，但收到的文字不完整。你需要完整內容，FFL 沒有安裝。",
+      "expected_output": "Use authorized relayMessage with the original messageID and own from if shared, once to recover full body when needed. Do not ask the LLM to compute hash, do not poll or make this a prerequisite for ordinary short messages. Gateway still forwards exact available body.",
+      "files": []
+    },
+    {
+      "id": 12,
+      "prompt": "Relay 發送請求已逾時，沒有回傳 Message ID；對方可能稍後才收到。你要重新送出嗎？",
+      "expected_output": "Report uncertain submission; do not blindly resend or tell the recipient it failed. Use existing diagnostic evidence only when available; no polling. Preserve the original Thread.",
+      "files": []
     }
   ]
 }

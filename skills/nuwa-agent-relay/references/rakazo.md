@@ -97,6 +97,14 @@ Place a **self-contained** instruction in the Rakazo Routine. Use the native too
 
 4. Finish after successful native submission. Routine message forwarding uses **zero additional Nuwa MCP lookups**. Delivery and a coworker's actual reply are asynchronous.
 
+Preserve the Relay-provided `bodyLength`, `bodyByteLength`, and
+`bodySHA256` with the original IDs when supplied. Forward the entire body
+without rewriting or summarizing. Verify with deterministic code if the
+platform exposes it; do not invent a hash or claim a model verified it.
+If the body is incomplete, mark that explicitly; the receiving coworker
+may use its own authorized `relayMessage` with the original messageID
+when complete content is needed. No extra query for complete ordinary Wake.
+
 For invalid or incomplete trusted event fields, report the routing error and stop. If native submission is uncertain, inspect the actual result before retrying to avoid duplicate messages.
 
 **Completion evidence:** The saved receiver procedure uses the event's exact Bot ID and original Relay Thread context. Confirm a real native forwarding tool call and receipt during the conversation test in stage 7.

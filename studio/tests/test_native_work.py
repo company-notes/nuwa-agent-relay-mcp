@@ -141,7 +141,7 @@ class WorkService:
                 value = {"id": str(uuid4()), "threadId": str(uuid4())}
             elif name == "relayReplyThread":
                 self.replies.append((threadID, arguments))
-                value = {"threadId": arguments["threadID"], "id": str(uuid4())}
+                value = {"threadId": arguments["threadID"], "id": arguments["submissionID"]}
             elif name == "agentAddressReleaseWork":
                 value = {"released": True, "sessionID": self.sessions[threadID]["sessionID"]}
             else:
@@ -255,7 +255,7 @@ class TestNativeWork:
                 assert reply["threadId"] == firstMessage["threadId"]
                 assert service.replies == [(threadA, {
                     "threadID": firstMessage["threadId"], "messageID": firstMessage["id"],
-                    "body": "Build reviewed.", "autonomous": True,
+                    "body": "Build reviewed.", "autonomous": True, "submissionID": reply["id"],
                 })]
 
                 await self.call(client, threadA, "agentAddressReleaseWork")

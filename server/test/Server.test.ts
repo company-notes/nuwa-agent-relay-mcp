@@ -9,6 +9,14 @@ import {
   THREAD_ID,
 } from './BindingScenario';
 
+function assertSubmission(actual: unknown, expected: Record<string, unknown>): string {
+  const { submissionID, ...body } = actual as Record<string, unknown>;
+  assert.equal(typeof submissionID, 'string');
+  assert.match(submissionID as string, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  assert.deepEqual(body, expected);
+  return submissionID as string;
+}
+
 test('publishes the V2 Skill without exposing internal transport infrastructure', async () => {
   const scenario = new RemoteMCPScenario();
   const expected = readFileSync(
@@ -145,7 +153,7 @@ test('user binds a Session privately; Remote MCP sends with encrypted Runtime le
     assert.equal(scenario.calls[0].url.searchParams.get('session_id'), SESSION_A);
     assert.equal(scenario.calls[0].headers.get('authorization'), 'Bearer oauth-a');
     assert.equal(scenario.calls[0].headers.get('x-nuwa-runtime-token'), RUNTIME_SECRET);
-    assert.deepEqual(scenario.calls[0].body, {
+    assertSubmission(scenario.calls[0].body, {
       to: 'nuwa/author/main', body: 'Please review the change.', subject: 'Review request',
     });
     assert.equal(scenario.heartbeatCount, 0);
@@ -489,7 +497,7 @@ test('new OAuth grant reselects its idle original Gateway Session without re-enr
     assert.equal(scenario.calls[0].url.searchParams.get('session_id'), SESSION_A);
     assert.equal(scenario.calls[0].headers.get('x-nuwa-runtime-token'),
       RUNTIME_SECRET + '_recovered');
-    assert.deepEqual(scenario.calls[0].body, {
+    assertSubmission(scenario.calls[0].body, {
       from: '小晴', to: '小安', body: 'Gateway restored original Session.',
     });
 
@@ -499,7 +507,7 @@ test('new OAuth grant reselects its idle original Gateway Session without re-enr
     assert.equal(replied.result.isError, undefined);
     assert.equal(scenario.calls[1].url.pathname, '/v2/threads/' + THREAD_ID + '/messages');
     assert.equal(scenario.calls[1].url.searchParams.get('session_id'), SESSION_A);
-    assert.deepEqual(scenario.calls[1].body, { from: '小安', body: '小晴，收到。' });
+    assertSubmission(scenario.calls[1].body, { from: '小安', body: '小晴，收到。' });
     const message = await scenario.tool('relayMessage', {
       from: '小晴', messageID: MESSAGE_ID, contextLimit: 8,
     }, 'oauth-b');
@@ -751,7 +759,7 @@ test('one MCP send call passes the familiar Bot name unchanged to Relay for rout
     assert.equal(scenario.calls.length, 1,
       'Sending by name must not require an additional model-facing MCP tool.');
     assert.equal(scenario.calls[0].url.pathname, '/v2/messages');
-    assert.deepEqual(scenario.calls[0].body, {
+    assertSubmission(scenario.calls[0].body, {
       to: '大熊',
       body: '你好，大熊！密語是星河。',
     });
@@ -787,7 +795,7 @@ test('bound Session retains message context and replies within one Relay Thread'
     assert.equal(reply.result.isError, undefined);
     assert.equal(scenario.calls.length, 2);
     assert.equal(scenario.calls[0].url.searchParams.get('context_limit'), '8');
-    assert.deepEqual(scenario.calls[1].body, { body: 'Same Thread reply.', messageID: MESSAGE_ID });
+    assertSubmission(scenario.calls[1].body, { body: 'Same Thread reply.', messageID: MESSAGE_ID });
     assert.equal(scenario.calls[1].url.searchParams.get('session_id'), SESSION_A);
   } finally {
     scenario.restore();
@@ -1044,7 +1052,7 @@ test('enrolled GrokBot coworkers send and reply by native IDs with no extra offi
     });
     assert.equal(called.result.isError, undefined);
     assert.equal(scenario.calls.at(-1)?.url.pathname, '/v2/messages');
-    assert.deepEqual(scenario.calls.at(-1)?.body, {
+    assertSubmission(scenario.calls.at(-1)?.body, {
       from: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', to: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', body: '請幫我確認 NUWA-GROK-01。',
     });
 
@@ -1054,7 +1062,7 @@ test('enrolled GrokBot coworkers send and reply by native IDs with no extra offi
     assert.equal(replied.result.isError, undefined);
     assert.equal(scenario.calls.at(-1)?.url.pathname,
       '/v2/threads/' + THREAD_ID + '/messages');
-    assert.deepEqual(scenario.calls.at(-1)?.body, {
+    assertSubmission(scenario.calls.at(-1)?.body, {
       from: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', body: '小晴，已收到。',
     });
     assert.equal(scenario.calls.length, 3,
@@ -1150,6 +1158,30 @@ test('owner resets one Agent binding after preview without affecting another OAu
     } });
     assert.equal(scenario.database.rows.size, 1);
     assert.equal([...scenario.database.rows.values()][0].sessionID, SESSION_B);
+  } finally {
+    scenario.restore();
+  }
+});
+
+
+test('uncertain send retains its ID for an identical recovery request and scoped receipt', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const request = { to: '大熊', message: 'A report is ready.' };
+    scenario.failNextSubmissionResponse = true;
+    const result = await scenario.tool('sendToAgent', request);
+    assert.equal(result.result.isError, true);
+    const id = assertSubmission(scenario.calls[0].body, { to: request.to, body: request.message });
+    assert.ok(result.result.content[0].text.includes(id));
+    const recovered = await scenario.tool('sendToAgent', { ...request, submissionID: id });
+    assert.equal(recovered.result.isError, undefined);
+    assert.equal(assertSubmission(scenario.calls[1].body, { to: request.to, body: request.message }), id);
+    const receipt = await scenario.tool('relayReceipt', { messageID: id, from: '小晴' });
+    assert.equal(receipt.result.isError, undefined);
+    assert.equal(scenario.calls[2].url.searchParams.get('from'), '小晴');
+    assert.equal(scenario.calls.length, 3);
   } finally {
     scenario.restore();
   }

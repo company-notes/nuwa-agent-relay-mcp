@@ -1,5 +1,7 @@
 """FastMCP Studio adapter. Relay owns message and identity business rules."""
 
+from uuid import uuid4
+
 from fastmcp import FastMCP
 
 from .Auth import OAuthCredentials
@@ -31,6 +33,8 @@ class StudioMCP:
                 "Immediately report the returned canonical address, not the internal Runtime lease expiry; "
                 "the Session address persists across resume. First use may "
                 "open a browser for OAuth login. Use sendToAgent and relayReplyThread, never from. "
+                "For long reports over 2,000 characters or 4 KiB UTF-8, prefer a short summary plus an authorized FFL link "
+                "when FFL share tools are available; otherwise send the complete authorized text. "
                 "Read the returned collaborationPolicy. If unconfigured, Studio opens the direct login and Session reply settings; "
                 "report the settingsURL only as a fallback. Before the first routine reply with unconfigured policy, "
                 "read agentAddressGetStatus once to see the owner choice; never poll. "
@@ -73,12 +77,13 @@ class StudioMCP:
 
         @server.tool()
         def sendToAgent(to: str, message: str, subject: str | None = None,
-                        artifactLinks: list[str] | None = None):
+                        artifactLinks: list[str] | None = None, submissionID: str | None = None):
             """Submit an asynchronous Session message; success is not receipt, Wake or execution.
 
-            Use relayReplyThread to answer an existing conversation.
+            Use relayReplyThread to answer an existing conversation. Omit submissionID for new messages;
+            reuse the same ID and request only to recover uncertain submissions.
             """
-            return client.sendMessage(to, message, subject, artifactLinks)
+            return client.sendMessage(to, message, subject, artifactLinks, submissionID or str(uuid4()))
 
         @server.tool(name="relaySendHandoff")
         @server.tool()
@@ -104,7 +109,7 @@ class StudioMCP:
         @server.tool()
         def replyThread(threadID: str, body: str,
                         artifactLinks: list[str] | None = None, messageID: str | None = None,
-                        autonomous: bool | None = None):
+                        autonomous: bool | None = None, submissionID: str | None = None):
             """Reply in an existing Relay Thread.
 
             For an incoming message, supply its messageID and original threadID.
@@ -115,7 +120,7 @@ class StudioMCP:
             obtain user confirmation. Never remove the flag to bypass denial.
             Respect host approvals and disclosure limits.
             """
-            return client.replyThread(threadID, body, artifactLinks, messageID, autonomous)
+            return client.replyThread(threadID, body, artifactLinks, messageID, autonomous, submissionID or str(uuid4()))
 
         @server.tool(name="relayReceipt")
         @server.tool()

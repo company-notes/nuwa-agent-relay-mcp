@@ -101,6 +101,17 @@ class BuildApplication:
             str(self.root / "RunMCP.py"),
         ])
 
+        if os.name == "nt":
+            self._buildWorkerExecutable(python)
+
+    def _buildWorkerExecutable(self, python: Path) -> None:
+        self.runCommand([
+            str(python), "-m", "PyInstaller", "--noconfirm", "--clean",
+            "--onefile", "--windowed", "--name", "nuwa-studio-worker",
+            "--add-data", f'{self.root.parent / "worker-provider.json"}{os.pathsep}src',
+            str(self.root / "RunWorker.py"),
+        ])
+
     def run(self) -> None:
         if not shutil.which("uv"):
             raise RuntimeError("Install uv: https://docs.astral.sh/uv/")
@@ -116,6 +127,10 @@ class BuildApplication:
         if not executable.is_file():
             raise RuntimeError("Relay MCP executable was not generated.")
 
+        worker = self.dist / "nuwa-studio-worker.exe"
+        if not worker.is_file():
+            raise RuntimeError("Studio Worker executable was not generated.")
+
         candidates = [
             shutil.which("makensis.exe"),
             str(Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / "NSIS" / "makensis.exe"),
@@ -126,6 +141,7 @@ class BuildApplication:
 
         self.runCommand([
             makensis, f"/DAPP_VERSION={self.version}", f"/DEXE_PATH={executable.resolve()}",
+            f"/DWORKER_PATH={worker.resolve()}",
             f"/DOUTPUT_PATH={(self.dist / (self.name + '-setup.exe')).resolve()}",
             str(self.root / "scripts" / "Installer.nsi"),
         ])

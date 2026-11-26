@@ -77,18 +77,22 @@ class WorkerBridgeService:
         self.bridge.result(route, request["requestID"], result)
 
     def serve(self) -> None:
+        if not self.config.workerBridgePath().is_file() or self.config.workerStopPath().exists():
+            return
+
         route = self.route()
         lock = self.config.workerBridgePath().with_suffix(".lock")
 
         with FileLock(str(lock), timeout=0):
-            while True:
+            while self.config.workerBridgePath().is_file() and not self.config.workerStopPath().exists():
                 try:
                     self.exchange(route)
                 except WorkerBridgeRejected as error:
                     logger.warning("Worker bridge rejected exchange (status=%s)", error.status)
 
                     if error.status in (401, 403):
-                        raise RuntimeError("Worker authorization expired or was revoked.") from error
+                        logger.warning("Worker authorization expired or was revoked; reconnect from Studio.")
+                        return
 
                     time.sleep(2)
                 except (httpx.HTTPError, OSError, ValueError, RuntimeError) as error:

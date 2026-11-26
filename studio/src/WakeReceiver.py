@@ -34,6 +34,7 @@ class WakeReceiver:
     }
     OPTIONAL_DISPATCH_FIELDS = {
         "recipientPlatformThreadID", "senderDisplayName", "senderAuthMode",
+        "bodyLength", "bodyByteLength", "bodySHA256",
     }
 
     def __init__(self, config: LocalConfig, client, peerTarget: str | None = None, peer=None):

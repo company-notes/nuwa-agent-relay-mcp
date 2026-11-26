@@ -10,6 +10,9 @@ SetCompressor /SOLID lzma
 !ifndef EXE_PATH
   !error "EXE_PATH must be supplied"
 !endif
+!ifndef WORKER_PATH
+  !error "WORKER_PATH must be supplied"
+!endif
 !ifndef OUTPUT_PATH
   !error "OUTPUT_PATH must be supplied"
 !endif
@@ -73,10 +76,29 @@ Section "Install"
   StrCmp $1 "${APP_VERSION}" versionOK installFailed
 
   versionOK:
+  DetailPrint "Stopping the owned Worker service after its current exchange..."
+  nsExec::ExecToLog /TIMEOUT=180000 '"$INSTDIR\nuwa-relay-mcp.exe" worker service-remove'
+  Pop $0
+  StrCmp $0 "0" 0 installFailed
+
+  ClearErrors
+  SetOverwrite on
+  File /oname=nuwa-studio-worker.exe "${WORKER_PATH}"
+  IfErrors installFailed
+
   DetailPrint "Registering MCP and installing the official Skill..."
   nsExec::ExecToLog /TIMEOUT=180000 '"$INSTDIR\nuwa-relay-mcp.exe" install --target all --overwrite'
   Pop $0
   StrCmp $0 "0" 0 installFailed
+
+  DetailPrint "Registering windowless Worker startup for the current user..."
+  nsExec::ExecToLog /TIMEOUT=180000 '"$INSTDIR\nuwa-relay-mcp.exe" worker service-install'
+  Pop $0
+  StrCmp $0 "0" 0 installFailed
+
+  CreateDirectory "$SMPROGRAMS\Nuwa Studio"
+  CreateShortCut "$SMPROGRAMS\Nuwa Studio\Connect Worker.lnk" "$INSTDIR\nuwa-studio-worker.exe" "pair"
+  IfErrors installFailed
 
   ClearErrors
   WriteUninstaller "$INSTDIR\Uninstall.exe"
@@ -102,12 +124,21 @@ Section "Install"
 SectionEnd
 
 Section "Uninstall"
+  DetailPrint "Stopping and removing the owned Worker task..."
+  nsExec::ExecToLog /TIMEOUT=180000 '"$INSTDIR\nuwa-relay-mcp.exe" worker service-remove'
+  Pop $0
+  StrCmp $0 "0" 0 uninstallFailed
+
   DetailPrint "Removing MCP registration and managed Skills..."
   nsExec::ExecToLog /TIMEOUT=180000 '"$INSTDIR\nuwa-relay-mcp.exe" uninstall --target all'
   Pop $0
   StrCmp $0 "0" 0 uninstallFailed
 
   ClearErrors
+  Delete "$INSTDIR\nuwa-studio-worker.exe"
+  IfErrors uninstallFailed
+  Delete "$SMPROGRAMS\Nuwa Studio\Connect Worker.lnk"
+  RMDir "$SMPROGRAMS\Nuwa Studio"
   Delete "$INSTDIR\nuwa-relay-mcp.exe"
   IfErrors uninstallFailed
   DeleteRegKey HKCU "${REG_KEY}"

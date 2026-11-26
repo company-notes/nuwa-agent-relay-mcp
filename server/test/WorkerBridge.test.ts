@@ -129,6 +129,17 @@ class WorkerDeviceScenario {
     return JSON.parse(call.result.content[0].text);
   }
 
+  async callBetweenPolls(name: string, args: Record<string, unknown>) {
+    const call = this.base.tool(name, args);
+    await new Promise<void>((resolve) => setTimeout(resolve, 30));
+
+    const poll = this.studio('poll', { tools: this.tools });
+    const [response] = await Promise.all([call, this.respond(poll)]);
+    assert.equal(response.result.isError, undefined);
+
+    return JSON.parse(response.result.content[0].text);
+  }
+
   async verifyRevocation() {
     const poll = this.studio('poll', { tools: this.tools });
     await this.waitForOnline();
@@ -152,7 +163,7 @@ test('a paired remote assistant discovers, starts and continues a local job', as
   try {
     await scenario.pair();
     assert.deepEqual(await scenario.call('work_list', {}, true), { jobs: [] });
-    const started = await scenario.call('work_start', { requestId: 'marketing-start', task: 'Build a marketing tracker.' });
+    const started = await scenario.callBetweenPolls('work_start', { requestId: 'marketing-start', task: 'Build a marketing tracker.' });
     const jobID = started.job.jobId;
     await scenario.call('work_continue', { requestId: 'marketing-continue', jobId: jobID, message: 'Add monthly ROAS.' });
     const status = await scenario.call('work_status', { jobId: jobID });

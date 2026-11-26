@@ -16,12 +16,18 @@ interface ChannelStorage extends ChannelTransaction {
 }
 
 type WaitingStudio = { finish: (response: Response) => void; timer: ReturnType<typeof setTimeout> };
-type ActiveCall = { request: WorkerRequest; finish: (response: Response) => void; timer: ReturnType<typeof setTimeout> };
+type ActiveCall = {
+  request: WorkerRequest;
+  finish: (response: Response) => void;
+  timer: ReturnType<typeof setTimeout>;
+  dispatched: boolean;
+};
 
 /** One isolated OAuth grant's device binding and live, non-replayed request channel. */
 export class WorkerBridgeChannel {
   private static readonly logger = Logger.forModule('worker.bridge');
   private catalog: WorkerTool[] = [];
+  private lastSeen = 0;
   private waiting?: WaitingStudio;
   private active?: ActiveCall;
 
@@ -86,17 +92,57 @@ export class WorkerBridgeChannel {
     });
   }
 
+  private online(): boolean {
+    return Date.now() - this.lastSeen < 30_000;
+  }
+
+  private finishCall(response: Response): void {
+    const active = this.active;
+
+    if (!active) {
+      return;
+    }
+
+    this.active = undefined;
+    clearTimeout(active.timer);
+    active.finish(response);
+  }
+
+  private dispatch(active: ActiveCall): Response {
+    if (!this.catalog.some((tool) => tool.name === active.request.name)) {
+      this.finishCall(WorkerBridgeChannel.failure('Worker capability changed before dispatch.', 503));
+
+      return WorkerBridgeChannel.response({ request: null });
+    }
+
+    active.dispatched = true;
+    clearTimeout(active.timer);
+    active.timer = setTimeout(() => {
+      this.lastSeen = 0;
+      this.catalog = [];
+      this.finishCall(WorkerBridgeChannel.failure(
+        'Worker response timed out; execution outcome is unknown. Check existing jobs and reuse the original requestId.', 504,
+      ));
+    }, 45_000);
+
+    return WorkerBridgeChannel.response({ request: active.request });
+  }
+
   private poll(body: Record<string, unknown>): Promise<Response> | Response {
-    if (this.waiting || this.active) {
+    if (this.waiting || this.active?.dispatched) {
       return WorkerBridgeChannel.failure('Another Studio exchange is active.', 409);
     }
 
     this.catalog = Protocol.catalog(body.tools);
+    this.lastSeen = Date.now();
+
+    if (this.active) {
+      return this.dispatch(this.active);
+    }
 
     return new Promise<Response>((finish) => {
       const timer = setTimeout(() => {
         this.waiting = undefined;
-        this.catalog = [];
         finish(WorkerBridgeChannel.response({ request: null }));
       }, 20_000);
 
@@ -105,7 +151,7 @@ export class WorkerBridgeChannel {
   }
 
   private call(body: Record<string, unknown>): Promise<Response> | Response {
-    if (!this.waiting || this.active) {
+    if (!this.online() || this.active) {
       return WorkerBridgeChannel.failure('Studio is offline or busy. Check Worker status before retrying.', 503);
     }
 
@@ -117,26 +163,28 @@ export class WorkerBridgeChannel {
     const request: WorkerRequest = {
       requestID: crypto.randomUUID(), name: body.name as string, arguments: body.arguments,
     };
-    const studio = this.waiting;
-    this.waiting = undefined;
-    clearTimeout(studio.timer);
 
     return new Promise<Response>((finish) => {
+      // Allow the next Studio poll to arrive after a completed result.
       const timer = setTimeout(() => {
-        this.active = undefined;
+        this.lastSeen = 0;
         this.catalog = [];
-        finish(WorkerBridgeChannel.failure(
-          'Worker response timed out; execution outcome is unknown. Check existing jobs and reuse the original requestId.', 504,
-        ));
-      }, 45_000);
+        this.finishCall(WorkerBridgeChannel.failure('Studio did not reconnect; request was not dispatched.', 503));
+      }, 5_000);
+      const active = { request, finish, timer, dispatched: false };
+      this.active = active;
 
-      this.active = { request, finish, timer };
-      studio.finish(WorkerBridgeChannel.response({ request }));
+      if (this.waiting) {
+        const studio = this.waiting;
+        this.waiting = undefined;
+        clearTimeout(studio.timer);
+        studio.finish(this.dispatch(active));
+      }
     });
   }
 
   private result(body: Record<string, unknown>): Response {
-    if (!this.active || this.active.request.requestID !== body.requestID) {
+    if (!this.active?.dispatched || this.active.request.requestID !== body.requestID) {
       return WorkerBridgeChannel.failure('The request is no longer active; inspect the original job before retrying.', 409);
     }
 
@@ -144,11 +192,8 @@ export class WorkerBridgeChannel {
       return WorkerBridgeChannel.failure('Invalid Worker tool result.', 400);
     }
 
-    const active = this.active;
-    this.active = undefined;
-    this.catalog = [];
-    clearTimeout(active.timer);
-    active.finish(WorkerBridgeChannel.response(body.result));
+    this.lastSeen = Date.now();
+    this.finishCall(WorkerBridgeChannel.response(body.result));
 
     return WorkerBridgeChannel.response({ accepted: true });
   }
@@ -182,11 +227,13 @@ export class WorkerBridgeChannel {
     }
 
     if (this.active) {
-      clearTimeout(this.active.timer);
-      this.active.finish(WorkerBridgeChannel.failure('Device revoked; execution outcome is unknown.', 409));
-      this.active = undefined;
+      const message = this.active.dispatched
+        ? 'Device revoked; execution outcome is unknown.'
+        : 'Device revoked before dispatch.';
+      this.finishCall(WorkerBridgeChannel.failure(message, 409));
     }
 
+    this.lastSeen = 0;
     this.catalog = [];
 
     return WorkerBridgeChannel.response({ revoked: true });
@@ -216,8 +263,8 @@ export class WorkerBridgeChannel {
 
       if (operation === '/catalog' && !studio) {
         return WorkerBridgeChannel.response({
-          paired: authorized, online: authorized && Boolean(this.waiting || this.active),
-          tools: authorized ? this.catalog : [],
+          paired: authorized, online: authorized && this.online(),
+          tools: authorized && this.online() ? this.catalog : [],
         });
       }
 

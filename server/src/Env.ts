@@ -16,7 +16,13 @@ export interface BindingDatabase {
   prepare(sql: string): BindingStatement;
 }
 
+export interface WorkerBridgeNamespace {
+  idFromName(name: string): unknown;
+  get(id: unknown): { fetch(request: Request): Promise<Response> };
+}
+
 export interface Env {
+  WORKER_BRIDGE?: WorkerBridgeNamespace;
   ADDRESS_WORKER: WorkerService;
   RELAY_WORKER: WorkerService;
   RELAY_API_URL: string;

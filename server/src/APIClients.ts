@@ -251,6 +251,22 @@ export class AddressAPIClient extends HTTPAPIClient {
     return { grantFingerprint };
   }
 
+  async workerPrincipal(): Promise<{ organizationID: string; grant: string }> {
+    if (!this.verifiedStatus) {
+      throw new APIError(403, 'worker_oauth_required', 'Worker access requires verified OAuth.');
+    }
+
+    const status = await this.accountSnapshot(this.verifiedStatus);
+    const organization = status.organization as { id?: string } | null;
+    const grant = status.grantFingerprint;
+
+    if (!organization?.id || typeof grant !== 'string' || !/^[a-f0-9]{64}$/.test(grant)) {
+      throw new APIError(403, 'worker_identity_invalid', 'Worker access requires an authorized Organization and OAuth grant.');
+    }
+
+    return { organizationID: organization.id, grant };
+  }
+
   registerOrganization(input: Record<string, unknown>): Promise<unknown> {
     return this.request('POST', '/v2/account/organization', { body: input });
   }

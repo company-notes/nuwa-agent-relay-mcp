@@ -62,7 +62,17 @@ After every enrollment call, inspect `relayGatewayOfficeCoworkers`; confirm each
 
 The authenticated `nuwa.message.available` event has `eventVersion: 2` and includes `recipientBotID`, `senderDisplayName`, `senderCanonicalAddress`, `messageID`, `relayThreadID` and the original `body`. GrokBot uses `threadMode: "platform"`; the platform selects its native conversation, and the event omits `recipientPlatformThreadID`.
 
-Prepare the exact original content and sender information, with the following reply instruction for the receiving coworker:
+Prepare the exact original content and sender information.
+
+Preserve the Relay-provided `bodyLength`, `bodyByteLength`, and
+`bodySHA256` with the original IDs when supplied. Forward the entire body
+without rewriting or summarizing. Verify with deterministic code if the
+platform exposes it; do not invent a hash or claim a model verified it.
+If the body is incomplete, mark that explicitly; the receiving coworker
+may use its own authorized `relayMessage` with the original messageID
+when complete content is needed. No extra query for complete ordinary Wake.
+
+Use the following reply instruction for the receiving coworker:
 
 `relayReplyThread({from: "<actual recipientBotID>", threadID: "<actual relayThreadID>", body: "<coworker's reply>"})`
 

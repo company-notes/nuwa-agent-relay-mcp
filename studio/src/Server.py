@@ -31,6 +31,8 @@ class StudioMCP:
                 "Immediately report the returned canonical address, not the internal Runtime lease expiry; "
                 "the Session address persists across resume. First use may "
                 "open a browser for OAuth login. Use sendToAgent and relayReplyThread, never from. "
+                "For long reports over 2,000 characters or 4 KiB UTF-8, prefer a short summary plus an authorized FFL link "
+                "when FFL share tools are available; otherwise send the complete authorized text. "
                 "Read the returned collaborationPolicy. If unconfigured, Studio opens the direct login and Session reply settings; "
                 "report the settingsURL only as a fallback. Before the first routine reply with unconfigured policy, "
                 "read agentAddressGetStatus once to see the owner choice; never poll. "

@@ -15,12 +15,13 @@ export class RelayTools extends MCPToolSet {
     RelayTools.IDENTITY + ' as from; prefer the known native Bot ID. Omit from on an independent Session.';
 
   private static readonly subject = z.string().min(1).max(255);
+  private static readonly BODY_GUIDANCE = "For long reports (over 2,000 Unicode characters or 4 KiB UTF-8), prefer a short summary and an authorized FFL link if the current assistant has FFL sharing tools; otherwise send the complete authorized text.";
   private static readonly optionalSubject = RelayTools.subject.optional();
 
   private static readonly schemas = {
     messageID: z.string().uuid(),
     threadID: z.string().uuid(),
-    body: z.string().min(1).max(100_000),
+    body: z.string().min(1).max(100_000).describe(RelayTools.BODY_GUIDANCE),
     to: z.string().min(1).max(255).describe(RelayTools.RECIPIENT),
     from: z.string().trim().min(1).max(255).optional().describe(RelayTools.FROM),
     subject: RelayTools.subject,

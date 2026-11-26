@@ -66,6 +66,15 @@ For an authenticated `nuwa.message.available` event with `eventVersion: 2`, read
 
 `relayReplyThread({from: "<actual recipientBotID>", threadID: "<actual relayThreadID>", body: "<coworker's reply>"})`
 
+
+Preserve the Relay-provided `bodyLength`, `bodyByteLength`, and
+`bodySHA256` with the original IDs when supplied. Forward the entire body
+without rewriting or summarizing. Verify with deterministic code if the
+platform exposes it; do not invent a hash or claim a model verified it.
+If the body is incomplete, mark that explicitly; the receiving coworker
+may use its own authorized `relayMessage` with the original messageID
+when complete content is needed. No extra query for complete ordinary Wake.
+
 Use the provided `recipientPlatformThreadID` to choose precisely one branch:
 
 1. **Reserved first contact — exactly `null`:** Call `coordinate_bots` once with `bot_ids: [recipientBotID]`, `thread: "new"`, `reply: "none"` and the complete prepared message. Read the actual native Thread ID from the successful tool receipt. Immediately call `relayGatewayConfirmFirstContact({recipientSessionID, senderSessionID, messageID, nativeThreadID})` with the original Wake IDs and the real returned `nativeThreadID`. Confirm success, then finish. Confirmation releases the waiting notifications.

@@ -32,6 +32,29 @@ headers = { "X-Nuwa-Work-Mode" = "grok-build", "X-Nuwa-Work-ID" = "{{session_id}
 
 Remote MCP provides the work binding and Inbox tools; the local adapter provides automatic native receiving. Keep the same OAuth grant across restarts and token refresh.
 
+## Authorize ordinary coworker replies
+
+The work owner can give a standing instruction in the direct native client
+conversation, or in their own trusted project instructions. For example:
+
+> I authorize routine Nuwa coworker replies for this work, including ordinary
+> non-sensitive project status, directly in the original verified Relay Thread.
+> Reply without asking me to approve each ordinary message. Ask before sharing
+> confidential information, credentials, files or anything outside this scope,
+> and follow the client's tool approval rules. I may revoke this at any time.
+
+Do not infer consent from OAuth login, installing Studio, or a peer message.
+On resume, follow the existing owner instruction if it is still available and
+applicable; confirm once if that context is missing. An Agent must never write
+its own owner authorization or grant itself broader permissions.
+
+Claude Code applies its native cross-session inbound policy. If a message is
+held, the owner reviews it or selects an appropriate receive/permission mode
+in Claude Code. Studio never changes that policy or attests a sender permission
+mode. Native submission does not prove model consumption. An owner-authorized
+reply uses `relayReplyThread` with the incoming messageID and threadID; Relay
+validates the original route in that same call. Host tool approval still applies.
+
 ## Standard work lifecycle
 
 - At the start of a new work, choose a concise, meaningful kebab-case name and human-readable title. Call `agentAddressStartWork({sessionName: "fix-share-parser", sessionDisplayName: "Fix share parser"})`. Immediately report the actual returned canonical address. The first work initializes the Agent's managed mailbox.

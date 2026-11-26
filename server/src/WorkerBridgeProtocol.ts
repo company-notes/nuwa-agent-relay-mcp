@@ -6,7 +6,11 @@ export type WorkerTool = { name: string; description: string; inputSchema: Recor
 export type WorkerRequest = { requestID: string; name: string; arguments: Record<string, unknown> };
 
 export class WorkerBridgeProtocol {
-  static readonly allowed = new Set(provider.tools);
+  private static readonly notificationTools: Readonly<Record<string, readonly string[]>> = provider.notificationTools;
+  private static readonly notificationDispatchTools = new Set(provider.notificationDispatchTools);
+  private static readonly notificationRoutePattern = new RegExp(provider.notificationRoutePattern);
+  private static readonly notificationSetupPattern = new RegExp(provider.notificationSetupPattern);
+  static readonly allowed = new Set([...provider.tools, ...Object.keys(provider.notificationTools)]);
   static readonly maxSize = 1_048_576;
 
   static object(value: unknown): value is Record<string, unknown> {
@@ -36,8 +40,27 @@ export class WorkerBridgeProtocol {
   }
 
   static argumentsAllowed(name: unknown, args: unknown): args is Record<string, unknown> {
-    return typeof name === 'string' && this.allowed.has(name) && this.object(args) &&
-      !Object.hasOwn(args, 'notificationRouteId');
+    if (typeof name !== 'string' || !this.allowed.has(name) || !this.object(args)) {
+      return false;
+    }
+
+    const fields = Object.hasOwn(this.notificationTools, name) ? this.notificationTools[name] : undefined;
+
+    if (fields && Object.keys(args).some((key) => !fields.includes(key))) {
+      return false;
+    }
+
+    if (Object.hasOwn(args, 'notificationRouteId') &&
+        (!(fields?.includes('notificationRouteId') || this.notificationDispatchTools.has(name)) ||
+          typeof args.notificationRouteId !== 'string' || !this.notificationRoutePattern.test(args.notificationRouteId))) {
+      return false;
+    }
+
+    if (fields?.includes('setupId')) {
+      return typeof args.setupId === 'string' && this.notificationSetupPattern.test(args.setupId);
+    }
+
+    return true;
   }
 
   static error(message: string): CallToolResult {

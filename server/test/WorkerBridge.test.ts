@@ -9,10 +9,15 @@ class WorkerDeviceScenario {
   private readonly channels = new Map<unknown, WorkerBridgeChannel>();
   private readonly jobs = new Map<string, string[]>();
   private route = '';
-  private readonly tools = ['fleet_status', 'work_list', 'work_start', 'work_status', 'work_continue'].map((name) => ({
+  private readonly notificationRouteID = 'c'.repeat(64);
+  private readonly notificationSetupID = 's'.repeat(32);
+  private readonly tools = ['fleet_status', 'work_list', 'work_start', 'work_status', 'work_continue',
+    'worker_notification_status', 'worker_notification_setup', 'worker_notification_pairing_status',
+    'worker_notification_decline'].map((name) => ({
     name, description: 'Local ' + name,
     inputSchema: { type: 'object', properties: { jobId: { type: 'string' }, task: { type: 'string' },
-      message: { type: 'string' }, requestId: { type: 'string' } } },
+      message: { type: 'string' }, requestId: { type: 'string' },
+      notificationRouteId: { type: 'string' }, setupId: { type: 'string' } } },
   }));
 
   constructor() {
@@ -94,9 +99,24 @@ class WorkerDeviceScenario {
     let data: unknown;
 
     switch (name) {
+      case 'worker_notification_status':
+        data = { enabled: args.notificationRouteId === this.notificationRouteID };
+        break;
+      case 'worker_notification_setup':
+        data = { setupId: this.notificationSetupID,
+          url: 'http://127.0.0.1:3791/notifications/setup/' + this.notificationSetupID };
+        break;
+      case 'worker_notification_pairing_status':
+        assert.equal(args.setupId, this.notificationSetupID);
+        data = { paired: true, notificationRouteId: this.notificationRouteID };
+        break;
+      case 'worker_notification_decline':
+        assert.equal(args.notificationRouteId, this.notificationRouteID);
+        data = { enabled: false, notificationRouteId: this.notificationRouteID };
+        break;
       case 'work_start':
         this.jobs.set('job-a', [args.task]);
-        data = { job: { jobId: 'job-a' }, created: true };
+        data = { job: { jobId: 'job-a' }, created: true, notificationRouteId: args.notificationRouteId };
         break;
       case 'work_continue':
         this.jobs.get(args.jobId)!.push(args.message);
@@ -152,6 +172,46 @@ class WorkerDeviceScenario {
     return JSON.parse(response.result.content[0].text);
   }
 
+  async verifyNotificationFlow() {
+    const status = await this.call('worker_notification_status', {});
+    assert.equal(status.enabled, false);
+
+    const setup = await this.call('worker_notification_setup', {});
+    assert.match(setup.url, /^http:\/\/127\.0\.0\.1:3791\/notifications\/setup\//);
+    const paired = await this.call('worker_notification_pairing_status', { setupId: setup.setupId });
+    assert.equal(paired.paired, true);
+    assert.equal(paired.notificationRouteId, this.notificationRouteID);
+
+    const route = { notificationRouteId: paired.notificationRouteId };
+    const enabled = await this.call('worker_notification_status', route);
+    assert.equal(enabled.enabled, true);
+
+    for (const [name, args] of [
+      ['worker_notification_setup', { secret: 'not accepted through MCP' }],
+      ['worker_notification_pairing_status', { setupId: 'invalid' }],
+      ['work_start', { task: 'Invalid route', notificationRouteId: 'private' }],
+      ['work_continue', { jobId: 'job-a', ...route }],
+    ] as const) {
+      const denied = await this.base.tool(name, args);
+      assert.equal(denied.result.isError, true, name);
+    }
+
+    const other = await this.base.tool('worker_notification_status', route, 'oauth-c');
+    assert.equal(other.result.isError, true, 'Another OAuth grant must not access the paired Worker.');
+
+    const started = await this.call('work_start', {
+      requestId: 'travel-start', task: 'Build a travel planner.', ...route,
+    });
+    assert.equal(started.notificationRouteId, paired.notificationRouteId);
+    const jobID = started.job.jobId;
+    await this.call('work_continue', { requestId: 'travel-continue', jobId: jobID, message: 'Add expense splitting.' });
+    assert.deepEqual((await this.call('work_status', { jobId: jobID })).messages,
+      ['Build a travel planner.', 'Add expense splitting.']);
+
+    const declined = await this.call('worker_notification_decline', route);
+    assert.equal(declined.enabled, false);
+  }
+
   async verifyRevocation() {
     const poll = this.studio('poll', { tools: this.tools });
     await this.waitForOnline();
@@ -184,6 +244,17 @@ test('a paired remote assistant discovers, starts and continues a local job', as
     assert.deepEqual(status.messages, ['Build a marketing tracker.', 'Add monthly ROAS.']);
     assert.deepEqual(await scenario.call('work_list', {}), { jobs: [jobID] });
     await scenario.verifyRevocation();
+  } finally {
+    scenario.close();
+  }
+});
+
+test('a paired assistant configures notification routing and starts and continues work', async () => {
+  const scenario = new WorkerDeviceScenario();
+
+  try {
+    await scenario.pair();
+    await scenario.verifyNotificationFlow();
   } finally {
     scenario.close();
   }

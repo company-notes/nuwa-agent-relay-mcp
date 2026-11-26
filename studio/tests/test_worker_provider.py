@@ -29,6 +29,9 @@ class WorkerScenario:
         self.calls = []
         self.jobs = {}
         self.started = {}
+        self.notificationRouteID = "c" * 64
+        self.notificationSetupID = "s" * 32
+        self.notificationArguments = []
         scenario = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -81,13 +84,26 @@ class WorkerScenario:
             return {"tools": [
                 {"name": name, "description": name, "inputSchema": {"type": "object"}}
                 for name in ("fleet_status", "work_list", "work_start", "work_status",
-                             "work_continue", "worker_notification_setup", "arbitrary_shell")
+                             "work_continue", "worker_notification_setup", "worker_notification_status",
+                             "worker_notification_pairing_status", "worker_notification_decline", "arbitrary_shell")
             ]}
 
         name = request["params"]["name"]
         args = request["params"]["arguments"]
 
-        if name == "work_start":
+        if name.startswith("worker_notification_") or "notificationRouteId" in args:
+            self.notificationArguments.append((name, args))
+
+        if name == "worker_notification_setup":
+            data = {"setupId": self.notificationSetupID,
+                    "url": "http://127.0.0.1:3791/notifications/setup/" + self.notificationSetupID}
+        elif name == "worker_notification_pairing_status":
+            data = {"paired": True, "notificationRouteId": self.notificationRouteID}
+        elif name == "worker_notification_status":
+            data = {"enabled": "notificationRouteId" in args}
+        elif name == "worker_notification_decline":
+            data = {"enabled": False, "notificationRouteId": self.notificationRouteID}
+        elif name == "work_start":
             requestID = args["requestId"]
             created = requestID not in self.started
 
@@ -117,6 +133,8 @@ def test_assistant_discovers_starts_and_continues_one_local_job():
 
         assert {tool["name"] for tool in catalog} == {
             "fleet_status", "work_list", "work_start", "work_status", "work_continue",
+            "worker_notification_setup", "worker_notification_status",
+            "worker_notification_pairing_status", "worker_notification_decline",
         }
         assert provider.call("fleet_status", {})["structuredContent"]["reachable"]
         assert provider.call("work_list", {})["structuredContent"]["jobs"] == []
@@ -137,8 +155,14 @@ def test_assistant_discovers_starts_and_continues_one_local_job():
         with pytest.raises(LocalMCPError, match="approved provider scope"):
             provider.call("arbitrary_shell", {})
 
-        with pytest.raises(LocalMCPError, match="pilot provider scope"):
+        with pytest.raises(LocalMCPError, match="approved provider scope"):
             provider.call("work_start", {"notificationRouteId": "private"})
+
+        with pytest.raises(LocalMCPError, match="approved provider scope"):
+            provider.call("worker_notification_setup", {"secret": "must stay in local browser"})
+
+        with pytest.raises(LocalMCPError, match="approved provider scope"):
+            provider.call("work_continue", {"notificationRouteId": scenario.notificationRouteID})
 
         assert len(scenario.calls) == before
 
@@ -246,6 +270,36 @@ def test_studio_reconnects_without_replaying_an_uncertain_dispatch(tmp_path, mon
 
         service.revoke()
         assert not LocalConfig.workerBridgePath().exists()
+
+
+def test_paired_studio_forwards_notification_setup_and_routed_work(tmp_path, monkeypatch):
+    """The paired assistant uses the existing notification contract over the local MCP transport."""
+    monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path))
+    remote = RemoteWorkerScenario()
+
+    with WorkerScenario() as local:
+        service = WorkerBridgeService(LocalConfig(), remote.client, local.provider)
+        service.pair(remote.CODE)
+
+        requests = [
+            ("worker_notification_status", {}),
+            ("worker_notification_setup", {}),
+            ("worker_notification_pairing_status", {"setupId": local.notificationSetupID}),
+            ("work_start", {"task": "Build a travel planner", "requestId": "travel-notified",
+                            "notificationRouteId": local.notificationRouteID}),
+            ("worker_notification_decline", {"notificationRouteId": local.notificationRouteID}),
+        ]
+
+        for name, arguments in requests:
+            remote.send(name, arguments)
+            service.exchange(service.route())
+            assert not remote.results[-1]["result"].get("isError"), name
+
+        assert local.notificationArguments == requests
+        assert len(local.jobs) == 1
+        assert remote.results[1]["result"]["structuredContent"]["url"].startswith("http://127.0.0.1:")
+        assert remote.results[2]["result"]["structuredContent"]["paired"] is True
+        assert remote.results[-1]["result"]["structuredContent"]["enabled"] is False
 
 
 class PairingCredentials(StaticBearerCredential):

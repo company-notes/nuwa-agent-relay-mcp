@@ -1,6 +1,7 @@
 """Expose only the explicitly approved Worker Gateway tools."""
 
 import json
+import re
 from importlib.resources import files
 from pathlib import Path
 
@@ -18,7 +19,12 @@ class WorkerProvider:
         if not config.is_file():
             config = Path(__file__).resolve().parents[2] / "worker-provider.json"
 
-        self.allowed = frozenset(json.loads(config.read_text(encoding="utf-8"))["tools"])
+        policy = json.loads(config.read_text(encoding="utf-8"))
+        self.notificationTools = policy["notificationTools"]
+        self.notificationDispatchTools = frozenset(policy["notificationDispatchTools"])
+        self.notificationRoutePattern = re.compile(policy["notificationRoutePattern"])
+        self.notificationSetupPattern = re.compile(policy["notificationSetupPattern"])
+        self.allowed = frozenset(policy["tools"]) | self.notificationTools.keys()
 
     def catalog(self) -> list[dict]:
         tools = []
@@ -36,11 +42,32 @@ class WorkerProvider:
 
         return tools
 
+    def _argumentsAllowed(self, name: str, arguments: dict) -> bool:
+        if not isinstance(arguments, dict):
+            return False
+
+        fields = self.notificationTools.get(name)
+        if fields is not None and not arguments.keys() <= set(fields):
+            return False
+
+        if "notificationRouteId" in arguments:
+            routeID = arguments["notificationRouteId"]
+            if (not ((fields is not None and "notificationRouteId" in fields) or
+                     name in self.notificationDispatchTools) or not isinstance(routeID, str) or
+                    not self.notificationRoutePattern.fullmatch(routeID)):
+                return False
+
+        if fields is not None and "setupId" in fields:
+            setupID = arguments.get("setupId")
+            return isinstance(setupID, str) and bool(self.notificationSetupPattern.fullmatch(setupID))
+
+        return True
+
     def call(self, name: str, arguments: dict) -> dict:
         if name not in self.allowed:
             raise LocalMCPError("Worker tool is outside the approved provider scope.")
 
-        if not isinstance(arguments, dict) or "notificationRouteId" in arguments:
-            raise LocalMCPError("Worker arguments are outside the pilot provider scope.")
+        if not self._argumentsAllowed(name, arguments):
+            raise LocalMCPError("Worker arguments are outside the approved provider scope.")
 
         return self.client.call(name, arguments)

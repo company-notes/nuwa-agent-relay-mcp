@@ -68,6 +68,20 @@ function scenarios(skill, onboarding, check) {
         detail.includes('firstContactMode'), 'Bind real coworker identity and routing.');
       check(!/[\u3400-\u9fff]/.test(detail), 'Platform references must be in English.');
     }],
+    ['Optional FFL collaboration keeps long text fallback and original reply routing', () => {
+      const start = skill.indexOf('## Optional FFL file collaboration');
+      check(start >= 0, 'Publish the optional collaboration policy in the core Skill.');
+      const end = skill.indexOf('\n## ', start + 1);
+      const workflow = skill.slice(start, end < 0 ? undefined : end);
+      check(workflow.includes('2,000') && workflow.includes('4 KiB') &&
+        workflow.includes('300–800'), 'Publish the long-message and summary guidance.');
+      check(workflow.includes('fflShareFile') && workflow.includes('fflShareText') &&
+        workflow.includes('fflDownload') && workflow.includes('fflStopSession'),
+        'Use actual FFL tool names and share lifecycle.');
+      check(workflow.includes('complete authorized text') &&
+        workflow.includes('not install') && workflow.includes('original Relay Thread'),
+        'FFL is optional; preserve full text fallback and original routing.');
+    }],
     ['OpenMausBot bidirectional test ends after sender submission', () => {
       const office = new OnboardingScenario(onboarding, 'openmausbot');
 

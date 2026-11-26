@@ -38,6 +38,7 @@ class ScenarioProcess:
     def _read(self):
         line = self.lines.get(timeout=30)
         assert line is not None, "The fixture exited before returning its result."
+
         return json.loads(line)
 
     def __enter__(self):
@@ -165,6 +166,7 @@ class WorkerNotificationFlow:
             if pending.done():
                 pending.result()
                 pytest.fail("Studio poll finished without publishing its catalog.")
+
             time.sleep(0.05)
         else:
             pytest.fail("The paired Studio did not publish its catalog.")
@@ -231,6 +233,7 @@ class WorkerNotificationFlow:
         self._verifyCallbacks(self.gateway.exchange({"jobId": jobID}), jobID, 2)
 
         assert self._exchange("worker_notification_decline", route)["preference"] == "off"
+
         silent = self._exchange("work_start", {
             "task": "Another travel plan", "requestId": "notification-acceptance-silent",
         })

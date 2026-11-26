@@ -47,6 +47,7 @@ class WorkerProvider:
             return False
 
         fields = self.notificationTools.get(name)
+
         if fields is not None and not arguments.keys() <= set(fields):
             return False
 

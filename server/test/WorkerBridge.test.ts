@@ -155,6 +155,7 @@ class WorkerDeviceScenario extends WorkerChannelScenario {
 
     const setup = await this.call('worker_notification_setup', {});
     assert.match(setup.url, /^http:\/\/127\.0\.0\.1:3791\/notifications\/setup\//);
+
     const paired = await this.call('worker_notification_pairing_status', { setupId: setup.setupId });
     assert.equal(paired.paired, true);
     assert.equal(paired.notificationRouteId, this.notificationRouteID);
@@ -180,6 +181,7 @@ class WorkerDeviceScenario extends WorkerChannelScenario {
       requestId: 'travel-start', task: 'Build a travel planner.', ...route,
     });
     assert.deepEqual(this.routedStarts, [paired.notificationRouteId]);
+
     const jobID = started.job.jobId;
     await this.call('work_continue', { requestId: 'travel-continue', jobId: jobID, message: 'Add expense splitting.' });
     assert.deepEqual((await this.call('work_status', { jobId: jobID })).messages,
@@ -200,7 +202,6 @@ class WorkerDeviceScenario extends WorkerChannelScenario {
     assert.ok(!list.result.tools.some((tool: { name: string }) => tool.name === 'work_start'));
     assert.ok(list.result.tools.some((tool: { name: string }) => tool.name === 'sendToAgent'));
   }
-
 }
 
 test('a paired remote assistant discovers, starts and continues a local job', async () => {

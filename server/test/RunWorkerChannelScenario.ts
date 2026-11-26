@@ -55,6 +55,7 @@ class WorkerChannelServer extends WorkerChannelScenario {
 
   async stop() {
     await new Promise<void>((resolve, reject) => this.server.close((error) => error ? reject(error) : resolve()));
+
     this.close();
   }
 }

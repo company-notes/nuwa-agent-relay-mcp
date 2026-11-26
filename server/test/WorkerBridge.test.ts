@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { RemoteMCPScenario } from './BindingScenario';
+import { MESSAGE_ID, RemoteMCPScenario, RUNTIME_SECRET, SESSION_A, THREAD_ID } from './BindingScenario';
 import { WorkerBridgeChannel } from '../src/WorkerBridgeChannel';
 
 class WorkerDeviceScenario {
@@ -175,5 +175,53 @@ test('a paired remote assistant discovers, starts and continues a local job', as
     await scenario.verifyRevocation();
   } finally {
     scenario.close();
+  }
+});
+
+test('existing messaging and tool discovery remain available during a Worker channel outage', async () => {
+  const scenario = new RemoteMCPScenario();
+  let channelLookups = 0;
+  scenario.env.WORKER_BRIDGE = {
+    idFromName: (name) => name,
+    get: () => {
+      channelLookups += 1;
+      throw new Error('Simulated Worker channel outage.');
+    },
+  };
+  scenario.install();
+
+  try {
+    const bound = await scenario.bind();
+    assert.equal(bound.status, 201);
+
+    const catalog = await scenario.toolSchemas();
+    const names = catalog.result.tools.map((tool: { name: string }) => tool.name);
+    assert.ok(names.includes('sendToAgent'));
+    assert.ok(names.includes('relayReplyThread'));
+    assert.ok(!names.includes('work_start'));
+    assert.equal(channelLookups, 1);
+
+    const sent = await scenario.tool('sendToAgent', {
+      to: 'nuwa/author/main', message: 'Please review the change.',
+    });
+    const reply = await scenario.tool('relayReplyThread', {
+      threadID: THREAD_ID, messageID: MESSAGE_ID, body: 'Same Thread reply.',
+    });
+
+    assert.equal(sent.result.isError, undefined);
+    assert.equal(reply.result.isError, undefined);
+    assert.equal(channelLookups, 1, 'Messaging must not depend on the Worker channel.');
+
+    assert.equal(scenario.calls.length, 2);
+    for (const call of scenario.calls) {
+      assert.equal(call.url.searchParams.get('session_id'), SESSION_A);
+      assert.equal(call.headers.get('x-nuwa-runtime-token'), RUNTIME_SECRET);
+    }
+
+    assert.deepEqual(scenario.calls[1].body, { body: 'Same Thread reply.', messageID: MESSAGE_ID });
+    assert.equal(scenario.database.rows.size, 1);
+    assert.equal(scenario.resumeCount, 1);
+  } finally {
+    scenario.restore();
   }
 });

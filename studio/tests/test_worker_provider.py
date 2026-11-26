@@ -308,6 +308,7 @@ def test_owner_authorizes_through_local_page_and_worker_restarts_without_a_termi
             assert startup.started == 0
 
             authorized = browser.submit({"code": remote.CODE, "consent": "yes"})
+
             assert "Studio connection authorized" in authorized.text
             assert remote.CODE not in authorized.text
             assert startup.started == 1
@@ -331,6 +332,7 @@ def test_owner_authorizes_through_local_page_and_worker_restarts_without_a_termi
         assert LocalConfig.workerStopPath().is_file()
         before = len(local.calls)
         resumed.serve()
+
         assert len(local.calls) == before
 
 

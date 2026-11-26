@@ -114,6 +114,7 @@ switch ($env:NUWA_TASK_OPERATION) {
         marker = self.config.workerStopPath()
         marker.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         marker.touch()
+
         deadline = time.monotonic() + 100
 
         while self.status() == WorkerTaskState.RUNNING:

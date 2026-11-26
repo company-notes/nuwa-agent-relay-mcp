@@ -33,11 +33,13 @@ class WorkerDesktop:
         config = LocalConfig.load()
         directory = config.configDir()
         directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+
         logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
                             handlers=[RotatingFileHandler(directory / ("worker-" + args.command + ".log"),
                                                           maxBytes=1_048_576, backupCount=2, encoding="utf-8")])
         # HTTP client URLs and exception details are not part of the operational log.
         logging.getLogger("httpx").setLevel(logging.WARNING)
+
         credentials = OAuthCredentials(config)
         service = WorkerBridgeService(config, WorkerBridgeClient(credentials), WorkerProvider())
 

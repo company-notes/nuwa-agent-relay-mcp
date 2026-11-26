@@ -99,6 +99,7 @@ button{margin-top:16px;padding:12px 20px;border:1px solid #777;border-radius:6px
                             '<meta name="viewport" content="width=device-width,initial-scale=1">'
                             f'<title>{page.TITLE}</title><style>{page.STYLE}</style></head><body>{body}</body></html>')
                 data = document.encode("utf-8")
+
                 self.send_response(status)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(data)))

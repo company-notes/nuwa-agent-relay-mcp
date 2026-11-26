@@ -177,6 +177,7 @@ class TestWindowsSetup:
         workerLog = LocalConfig.configDir() / "worker-serve.log"
         workerLog.unlink()
         manager.start()
+
         self.waitForWorker(manager, workerLog)
 
         asyncio.run(asyncio.wait_for(

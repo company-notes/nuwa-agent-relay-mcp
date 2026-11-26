@@ -232,16 +232,20 @@ class TestNativeWork:
                 submissions = dict(peer.snapshot())
                 assert firstMessage["threadId"] in submissions["codex:" + threadA]
                 assert firstMessage["body"] in submissions["codex:" + threadA]
+                assert firstMessage["id"] in submissions["codex:" + threadA]
+                assert "messageID" in submissions["codex:" + threadA]
                 assert secondMessage["threadId"] in submissions["codex:" + threadB]
                 assert secondMessage["body"] in submissions["codex:" + threadB]
                 assert secondMessage["body"] not in submissions["codex:" + threadA]
 
                 reply = await self.call(client, threadA, "relayReplyThread", {
-                    "threadID": firstMessage["threadId"], "body": "Build reviewed.",
+                    "threadID": firstMessage["threadId"], "messageID": firstMessage["id"],
+                    "body": "Build reviewed.",
                 })
                 assert reply["threadId"] == firstMessage["threadId"]
                 assert service.replies == [(threadA, {
-                    "threadID": firstMessage["threadId"], "body": "Build reviewed.",
+                    "threadID": firstMessage["threadId"], "messageID": firstMessage["id"],
+                    "body": "Build reviewed.",
                 })]
 
                 await self.call(client, threadA, "agentAddressReleaseWork")

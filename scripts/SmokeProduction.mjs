@@ -163,7 +163,19 @@ const invalid = await request('/mcp', {
 assert.equal(invalid.status, 401,
   'An invalid token must be rejected by the live Agent Address authorization service.');
 
+// Both native receive routes must exist and reject unauthenticated access.
+// This detects an old Remote MCP deployment even when ordinary MCP works.
+for (const path of ['/work-inbox/events', '/work-inbox/events/stream']) {
+  const denied = await request(path);
+  assert.equal(denied.status, 401, path + ' must exist and require OAuth.');
+  assert.match(denied.headers.get('www-authenticate') || '', /resource_metadata/);
+}
+
+const workClients = await request('/skills/nuwa-agent-relay/references/work-clients.md');
+assert.equal(workClients.status, 200);
+assert.match(await workClients.text(), /WebSocket/);
+
 const unknown = await request('/missing');
 assert.equal(unknown.status, 404, 'Unrecognized public endpoint should be denied.');
 
-console.log('PASS: public onboarding, official Skill, OAuth discovery, private binding protection and live identity denial.');
+console.log('PASS: public onboarding, official Skill, OAuth discovery, private binding protection, native Inbox routes and live identity denial.');

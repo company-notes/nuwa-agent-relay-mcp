@@ -73,8 +73,8 @@ The remote service reuses the verified host-provided work ID; the local process
 uses an authorized WebSocket for Inbox notifications and submits new messages to that exact native
 work using session-peer. Claude Code uses its stdio Session ID and live host registry; resume with an explicit Session ID. No public callback or separate Python install is
 needed for this path. Saved history remains available through `relayInbox`.
-A submitted queue item is not proof of consumption. First adoption of an
-existing remote work does not replay its historical Inbox automatically.
+A submitted queue item is not proof of consumption. A new local event queue
+starts at cursor zero; a resumed queue continues from its persisted cursor.
 Closing the work stops receiving; resume restores the work binding and
 continues the durable local queue.
 

@@ -4,6 +4,7 @@ import { runInNewContext, Script } from 'node:vm';
 import test from 'node:test';
 
 import { ONBOARDING_HTML } from '../src/OnboardingContent';
+import { SESSION_ROUTER_SKILL_MD } from '../src/SessionRouterSkillDocument';
 import { ONBOARDING_SCRIPT } from '../src/OnboardingInteractions';
 import { ONBOARDING_CSS } from '../src/OnboardingStyle';
 import { RemoteMCPScenario } from './BindingScenario';
@@ -112,6 +113,13 @@ test('real HTTP routes keep Skill and OAuth protected', async () => {
     assert.match(await response.text(), new RegExp(marker));
     assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
   }
+
+  const sessionRouter = await scenario.application.handle(new Request(origin + '/skills/session-router/SKILL.md'));
+  assert.equal(sessionRouter.status, 200, 'The official Skill URL must return the document directly.');
+  assert.match(sessionRouter.headers.get('content-type') || '', /text\/markdown/);
+  assert.equal(await sessionRouter.text(), SESSION_ROUTER_SKILL_MD);
+  assert.match(SESSION_ROUTER_SKILL_MD, /name: session-router/);
+  assert.match(SESSION_ROUTER_SKILL_MD, /work_continue/);
 
   assert.doesNotThrow(() => new Script(ONBOARDING_SCRIPT));
   assert.match(ONBOARDING_SCRIPT, /依最新版 Skill/);

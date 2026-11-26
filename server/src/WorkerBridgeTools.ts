@@ -4,6 +4,7 @@ import { APIError } from './APIClients';
 import { Logger } from './Logger';
 import { MCPToolSet } from './ToolSet';
 import { WorkerBridge } from './WorkerBridge';
+import { WorkerPairingPage } from './WorkerPairingPage';
 import { WorkerBridgeProtocol as Protocol, type WorkerTool } from './WorkerBridgeProtocol';
 
 export class WorkerBridgeTools extends MCPToolSet {
@@ -14,14 +15,17 @@ export class WorkerBridgeTools extends MCPToolSet {
   }
 
   async install(request: Request): Promise<void> {
-    this.register('worker_provider_pair', 'Create a five-minute one-time Studio pairing code. ' +
-      'For a dedicated assistant and Windows test Worker, show the one-time code to the owner. ' +
-      'Use authorized local computer access to open the installed nuwa-studio-worker.exe with argument pair only; ' +
-      'the Windows Start menu also provides Nuwa Studio > Connect Worker. ' +
-      'Use the installed location (default %LOCALAPPDATA%\\Programs\\nuwa-relay-mcp); never pass the code as an argument. ' +
-      'Leave code entry and confirmation to the owner. Studio starts its service automatically after authorization. ' +
+    this.register('worker_provider_pair', 'Create a five-minute one-time Studio pairing code and owner authorization URL. ' +
+      'For a dedicated assistant and Windows test Worker, give the owner authorizationURL as a clickable link and ' +
+      'show pairingCode separately in a copyable code block. The owner opens the link in their own browser, launches ' +
+      'Studio from the page, enters the code and explicitly authorizes access. Do not open a browser, use Computer Use, ' +
+      'run local commands, submit the form or pass the code in a URL or command. The owner may use Windows Start > ' +
+      'Nuwa Studio > Connect Worker if the link cannot launch Studio. Studio starts its service after authorization. ' +
       'Verify worker_provider_status and refresh tool discovery before dispatch.', {},
-      () => this.bridge.prepare());
+      async () => ({
+        ...await this.bridge.prepare(),
+        authorizationURL: WorkerPairingPage.authorizationURL(request.url),
+      }));
     this.register('worker_provider_status', 'Read the paired Studio and its current Worker tool availability.', {},
       async () => {
         const state = await this.bridge.catalog();

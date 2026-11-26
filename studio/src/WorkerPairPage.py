@@ -104,7 +104,7 @@ button{margin-top:16px;padding:12px 20px;border:1px solid #777;border-radius:6px
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(data)))
                 self.send_header("Cache-Control", "no-store")
-                self.send_header("Referrer-Policy", "no-referrer")
+                self.send_header("Referrer-Policy", "same-origin")
                 self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
                 self.end_headers()
                 self.wfile.write(data)

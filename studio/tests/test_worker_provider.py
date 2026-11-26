@@ -10,6 +10,7 @@ from uuid import uuid4
 
 import httpx
 import pytest
+from playwright.sync_api import sync_playwright
 
 from src.Client import StaticBearerCredential
 from src.Config import LocalConfig
@@ -353,3 +354,33 @@ def test_owner_cancels_pairing_without_starting_worker(tmp_path, monkeypatch):
         assert not LocalConfig.workerBridgePath().exists()
         assert startup.started == 0
         assert local.calls == []
+
+
+def test_owner_authorizes_through_real_browser(tmp_path, monkeypatch):
+    """Regression: a real browser rejected the Studio authorization form with HTTP 403."""
+    monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path))
+    remote = RemoteWorkerScenario()
+
+    with WorkerScenario() as local:
+        service = WorkerBridgeService(LocalConfig(), remote.client, local.provider)
+        startup = PairingStartup(service)
+        page = WorkerPairPage(service, PairingCredentials(remote.OAUTH), startup)
+
+        with PairingBrowser(page) as server, sync_playwright() as playwright:
+            browser = playwright.chromium.launch()
+            try:
+                tab = browser.new_page()
+                tab.goto(server.url)
+                tab.locator("#pairing-code").fill(remote.CODE)
+                tab.locator('input[name="consent"]').check()
+
+                with tab.expect_navigation() as navigation:
+                    tab.get_by_role("button", name="Authorize and connect").click()
+
+                assert navigation.value.status == 200, "A real same-origin form submission must not return HTTP 403."
+                assert "Studio connection authorized" in tab.locator("body").inner_text(), "The owner must see a successful authorization."
+            finally:
+                browser.close()
+
+        assert service.route() == remote.ROUTE, "The authorized pairing must be persisted."
+        assert startup.started == 1, "Successful authorization must start the Worker once."

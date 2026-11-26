@@ -20,6 +20,7 @@ SetCompressor /SOLID lzma
 !define APP_NAME "Nuwa Relay MCP"
 !define APP_PUBLISHER "Nuwa Information"
 !define REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\nuwa-relay-mcp"
+!define WORKER_PROTOCOL_KEY "Software\Classes\nuwa-studio-worker"
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "Nuwa Relay MCP Setup"
 !define MUI_WELCOMEPAGE_TEXT "This wizard installs Nuwa Relay MCP and registers its MCP server and official Skill in supported AI clients. Existing registrations and Skills may be updated; mcp-install creates backups."
@@ -96,6 +97,19 @@ Section "Install"
   Pop $0
   StrCmp $0 "0" 0 installFailed
 
+  ; Register a fixed, credential-free protocol command. Never pass the URL to the executable.
+  ClearErrors
+  ReadRegStr $0 HKCU "${WORKER_PROTOCOL_KEY}\shell\open\command" ""
+  StrCmp $0 "" workerProtocolReady
+  StrCmp $0 '$\"$INSTDIR\nuwa-studio-worker.exe$\" pair' workerProtocolReady installFailed
+
+  workerProtocolReady:
+  ClearErrors
+  WriteRegStr HKCU "${WORKER_PROTOCOL_KEY}" "" "URL:Nuwa Studio Worker"
+  WriteRegStr HKCU "${WORKER_PROTOCOL_KEY}" "URL Protocol" ""
+  WriteRegStr HKCU "${WORKER_PROTOCOL_KEY}\shell\open\command" "" '$\"$INSTDIR\nuwa-studio-worker.exe$\" pair'
+  IfErrors installFailed
+
   CreateDirectory "$SMPROGRAMS\Nuwa Studio"
   CreateShortCut "$SMPROGRAMS\Nuwa Studio\Connect Worker.lnk" "$INSTDIR\nuwa-studio-worker.exe" "pair"
   IfErrors installFailed
@@ -134,6 +148,11 @@ Section "Uninstall"
   Pop $0
   StrCmp $0 "0" 0 uninstallFailed
 
+  ReadRegStr $0 HKCU "${WORKER_PROTOCOL_KEY}\shell\open\command" ""
+  StrCmp $0 '$\"$INSTDIR\nuwa-studio-worker.exe$\" pair' 0 workerProtocolRemoved
+  DeleteRegKey HKCU "${WORKER_PROTOCOL_KEY}"
+
+  workerProtocolRemoved:
   ClearErrors
   Delete "$INSTDIR\nuwa-studio-worker.exe"
   IfErrors uninstallFailed

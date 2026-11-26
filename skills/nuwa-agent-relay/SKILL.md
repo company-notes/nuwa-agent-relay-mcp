@@ -157,10 +157,16 @@ permissions, verified addresses and reply routing throughout.
 
 A cloud assistant with an explicitly paired Studio may discover local
 Worker Gateway tools such as work_list, work_start and work_continue
-through the same Nuwa Remote MCP connection. Use the installed Session Router Skill supplied by the Worker administrator
+through the same Nuwa Remote MCP connection. Install the official
+[Session Router Skill](https://mcp.agent-relay.company-notes.com/skills/session-router/SKILL.md)
 for work routing, together with the actual advertised tool schemas. The pilot
 requires a dedicated OAuth connection and isolated Windows Worker; it
 uses manual progress queries rather than webhook completion notifications.
+For initial connection, call worker_provider_pair and give the owner the
+returned authorizationURL as a clickable link and pairingCode separately
+in a copyable code block. The owner opens the link, launches Studio and
+enters the code with explicit consent. Do not use Computer Use, open the
+browser, run local commands or submit the authorization form for the owner.
 Read worker_provider_status when the local tools are missing and refresh
 the MCP catalog after the owner completes pairing. A coworker's address
 authorizes communication only; it does not grant Worker access.

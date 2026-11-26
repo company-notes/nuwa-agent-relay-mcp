@@ -17,7 +17,7 @@ class DummyRelayClient:
         self.calls.append("inbox")
         return {"messages": []}
 
-    def sendMessage(self, to, body, subject=None, artifactLinks=None):
+    def sendMessage(self, to, body, subject=None, artifactLinks=None, submissionID=None):
         self.calls.append(("sendMessage", to, body))
         return {"id": "message-1"}
 

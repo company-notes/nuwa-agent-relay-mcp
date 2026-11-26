@@ -4,7 +4,7 @@ import asyncio
 import os
 import webbrowser
 from contextlib import asynccontextmanager
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import psutil
 from fastmcp.server.middleware import Middleware
@@ -183,9 +183,20 @@ class NativeWorkRouter(Middleware):
             return ToolResult(content="Native work uses its own Inbox; this fixed-Session tool is unavailable.",
                               is_error=True)
 
+        arguments = dict(context.message.arguments or {})
+        submissionID = None
+
+        if canonical in {"sendToAgent", "relayReplyThread"}:
+            submissionID = arguments.get("submissionID") or str(uuid4())
+            arguments["submissionID"] = submissionID
+
         try:
-            result = await self._call(identity, canonical, context.message.arguments or {})
+            result = await self._call(identity, canonical, arguments)
         except Exception:
+            if submissionID:
+                return ToolResult(content=f"Relay submission outcome is uncertain. Submission ID: {submissionID}. "
+                                          "Check relayReceipt; do not resend with a new ID.", is_error=True)
+
             return ToolResult(content="Nuwa work operation could not be confirmed. Check sign-in and work status.",
                               is_error=True)
 

@@ -121,13 +121,13 @@ class RelayClient(HTTPAPIClient):
         return self.call("GET", f"/v2/threads/{quote(threadID, safe='')}")
 
     def sendMessage(self, to: str, body: str, subject: str | None = None,
-                    artifactLinks: list[str] | None = None):
+                    artifactLinks: list[str] | None = None, submissionID: str | None = None):
         payload = {"to": to, "body": body, "artifactLinks": artifactLinks or []}
 
         if subject:
             payload["subject"] = subject
 
-        return self.call("POST", "/v2/messages", body=payload)
+        return self._submit("/v2/messages", payload, submissionID)
 
     def sendHandoff(self, to: str, subject: str, body: str,
                     artifactLinks: list[str] | None = None):
@@ -146,7 +146,8 @@ class RelayClient(HTTPAPIClient):
         )
 
     def replyThread(self, threadID: str, body: str, artifactLinks: list[str] | None = None,
-                    messageID: str | None = None, autonomous: bool | None = None):
+                    messageID: str | None = None, autonomous: bool | None = None,
+                    submissionID: str | None = None):
         payload = {"body": body, "artifactLinks": artifactLinks or []}
 
         if messageID is not None:
@@ -154,9 +155,22 @@ class RelayClient(HTTPAPIClient):
         if autonomous is not None:
             payload["autonomous"] = autonomous
 
-        return self.call(
-            "POST", f"/v2/threads/{quote(threadID, safe='')}/messages", body=payload,
-        )
+        return self._submit(f"/v2/threads/{quote(threadID, safe='')}/messages", payload, submissionID)
+
+    def _submit(self, path: str, payload: dict, submissionID: str | None):
+        if submissionID is None:
+            return self.call("POST", path, body=payload)
+
+        payload["submissionID"] = submissionID
+
+        try:
+            return self.call("POST", path, body=payload)
+        except httpx.HTTPError as error:
+            if isinstance(error, httpx.HTTPStatusError) and error.response.status_code < 500:
+                raise
+
+            raise RuntimeError(f"Relay submission outcome is uncertain. Submission ID: {submissionID}. "
+                               "Check relayReceipt; do not resend with a new ID.") from error
 
     def receipt(self, messageID: str, refreshArchive: bool = False):
         query = {"refresh": "archive"} if refreshArchive else None

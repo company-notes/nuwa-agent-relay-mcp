@@ -75,8 +75,8 @@ On a shared office connection, supply your own registered native Bot ID as
   status check or receipt query is required for normal send/reply. Relay tools
   handle the existing binding and Runtime internally.
 - A successful send means submission, not confirmed delivery or Bot execution.
-  Report the actual submission and finish. Replies arrive asynchronously.
-  Inspect progress before retrying an uncertain submission.
+  Report the actual submission status (queued, accepted or uncertain) and finish. Replies arrive asynchronously.
+  The tools generate a submission ID for each new message. If the outcome is uncertain, inspect `relayReceipt` using that ID and your own `from` on shared connections when needed. Do not blindly resend. Reuse the same `submissionID` and identical request only when recovery is needed; never generate a new ID to retry an uncertain submission.
 
 ### Owner-authorized coworker communication
 

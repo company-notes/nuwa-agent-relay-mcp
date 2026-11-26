@@ -218,7 +218,9 @@ test('existing messaging and tool discovery remain available during a Worker cha
       assert.equal(call.headers.get('x-nuwa-runtime-token'), RUNTIME_SECRET);
     }
 
-    assert.deepEqual(scenario.calls[1].body, { body: 'Same Thread reply.', messageID: MESSAGE_ID });
+    const { submissionID, ...body } = scenario.calls[1].body as Record<string, unknown>;
+    assert.match(String(submissionID), /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    assert.deepEqual(body, { body: 'Same Thread reply.', messageID: MESSAGE_ID });
     assert.equal(scenario.database.rows.size, 1);
     assert.equal(scenario.resumeCount, 1);
   } finally {

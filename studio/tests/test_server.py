@@ -1,5 +1,6 @@
 import asyncio
 import json
+from uuid import UUID
 
 import httpx
 from fastmcp import Client as MCPClient
@@ -92,7 +93,9 @@ def test_studio_send_to_agent_uses_private_runtime_capability(tmp_path, monkeypa
     assert request.headers["authorization"] == "Bearer oauth-sender"
     assert request.headers["x-nuwa-runtime-token"] == "runtime-a"
     assert "runtime-a" not in str(request.url)
-    assert json.loads(request.content) == {
+    body = json.loads(request.content)
+    assert UUID(body.pop("submissionID")).version == 4
+    assert body == {
         "to": "nuwa/reviewer/main",
         "body": "Please review the deployment.",
         "subject": "Review request",

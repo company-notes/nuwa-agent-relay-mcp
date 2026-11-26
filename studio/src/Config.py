@@ -60,6 +60,10 @@ class LocalConfig:
         return cls.configDir() / "worker-bridge.json"
 
     @classmethod
+    def workerStopPath(cls) -> Path:
+        return cls.configDir() / "worker-service.stop"
+
+    @classmethod
     def remoteMCPOrigin(cls, origin: str | None = None) -> str:
         return cls.validateOrigin(origin or os.environ.get("NUWA_MCP_URL", "https://mcp.agent-relay.company-notes.com"))
 

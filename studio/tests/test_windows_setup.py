@@ -90,6 +90,19 @@ class TestWindowsSetup:
         )
 
     @classmethod
+    def waitForWorker(cls, manager, log):
+        deadline = time.monotonic() + 45
+
+        while time.monotonic() < deadline:
+            if manager.status() == WorkerTaskState.RUNNING and log.is_file():
+                if "Worker bridge exchange interrupted" in log.read_text(encoding="utf-8"):
+                    return
+
+            time.sleep(0.5)
+
+        pytest.fail("The registered Worker task did not start and reach its exchange loop")
+
+    @classmethod
     def waitForUninstall(cls, executable, uninstaller):
         deadline = time.monotonic() + 60
 
@@ -158,13 +171,21 @@ class TestWindowsSetup:
         assert (profile.home / ".claude" / "skills" / "nuwa-agent-relay" / "SKILL.md").is_file()
         asyncio.run(asyncio.wait_for(self.verifyMCP(executable, profile), timeout=90))
 
+        # The isolated invalid auth file prevents cloud access. A saved pairing
+        # exercises the real scheduled startup and graceful installer upgrade.
+        LocalConfig.writePrivate(LocalConfig.workerBridgePath(), {"route": "a" * 64})
+        workerLog = LocalConfig.configDir() / "worker-serve.log"
+        workerLog.unlink()
+        manager.start()
+        self.waitForWorker(manager, workerLog)
+
         asyncio.run(asyncio.wait_for(
             self.verifyBlockedUpgrade(setup, destination, executable, profile, identity), timeout=120,
         ))
 
         # Retry the same installer after the running MCP has closed normally.
         profile.run(str(setup), "/S", f"/D={destination}", timeout=300)
-        assert manager.status() == WorkerTaskState.READY
+        self.waitForWorker(manager, workerLog)
         assert self.registration()["DisplayVersion"] == expectedVersion
         assert Path(profile.servers()["nuwa-agent-relay-studio"]["command"]) == executable
         assert (profile.skill / "SKILL.md").is_file()
@@ -176,6 +197,7 @@ class TestWindowsSetup:
         self.waitForUninstall(executable, uninstaller)
         assert not worker.exists()
         assert manager.status() == WorkerTaskState.ABSENT
+        assert LocalConfig.workerBridgePath().is_file()
         assert "nuwa-agent-relay-studio" not in profile.servers()
         assert profile.servers()["other"]["command"] == "other"
         assert not profile.skill.exists()

@@ -1,0 +1,17 @@
+{
+  "tools": [
+    "fleet_status",
+    "fleet_projects",
+    "fleet_models",
+    "work_list",
+    "work_status",
+    "work_messages",
+    "work_feed",
+    "work_start",
+    "work_continue",
+    "worker_workspace_ensure",
+    "worker_task_plan",
+    "worker_task_start",
+    "worker_delivery_open"
+  ]
+}

@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import sys
+import struct
 import time
 from contextlib import asynccontextmanager
 from importlib.metadata import version
@@ -12,6 +13,9 @@ from pathlib import Path
 import pytest
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+
+from src.Config import LocalConfig
+from src.WorkerServiceManager import WindowsWorkerService, WorkerTaskState
 
 
 @pytest.mark.skipif(
@@ -99,13 +103,16 @@ class TestWindowsSetup:
 
         pytest.fail("Windows uninstall did not remove the program and registry entry")
 
-    def testInstallUpgradeAndRemove(self, installerProfile):
+    def testInstallUpgradeAndRemove(self, installerProfile, monkeypatch):
         """Run Setup, verify registered MCP starts, upgrade, and uninstall without losing identity data."""
         profile = installerProfile
         setup = Path(os.environ["NUWA_TEST_WINDOWS_SETUP"]).resolve()
         destination = profile.home / "application"
         executable = destination / "nuwa-relay-mcp.exe"
         uninstaller = destination / "Uninstall.exe"
+        worker = destination / WindowsWorkerService.EXECUTABLE
+        monkeypatch.setenv("NUWA_MCP_HOME", profile.env["NUWA_MCP_HOME"])
+        manager = WindowsWorkerService(LocalConfig(), worker)
         expectedVersion = version("nuwa-relay-mcp")
         assert setup.is_file(), "Windows Setup must exist before running acceptance"
         claude = Path(os.environ["NUWA_TEST_CLAUDE_CLI"]).resolve()
@@ -123,6 +130,17 @@ class TestWindowsSetup:
 
         profile.run(str(setup), "/S", f"/D={destination}", timeout=300)
         assert executable.is_file()
+        assert worker.is_file()
+        assert manager.status() == WorkerTaskState.READY
+
+        # A GUI-subsystem binary starts without allocating a console, and an
+        # unpaired install exits without calling the cloud or local Gateway.
+        data = worker.read_bytes()
+        peOffset = struct.unpack_from("<I", data, 0x3c)[0]
+        assert struct.unpack_from("<H", data, peOffset + 24 + 68)[0] == 2
+        profile.run(str(worker), "serve", "--home", profile.env["NUWA_MCP_HOME"], timeout=90)
+        assert (LocalConfig.configDir() / "worker-serve.log").is_file()
+
         assert profile.run(str(executable), "--version").strip() == expectedVersion
         profile.verifyPeerDiscovery(str(executable))
         assert self.registration() == {
@@ -146,6 +164,7 @@ class TestWindowsSetup:
 
         # Retry the same installer after the running MCP has closed normally.
         profile.run(str(setup), "/S", f"/D={destination}", timeout=300)
+        assert manager.status() == WorkerTaskState.READY
         assert self.registration()["DisplayVersion"] == expectedVersion
         assert Path(profile.servers()["nuwa-agent-relay-studio"]["command"]) == executable
         assert (profile.skill / "SKILL.md").is_file()
@@ -155,6 +174,8 @@ class TestWindowsSetup:
 
         profile.run(str(uninstaller), "/S", timeout=300)
         self.waitForUninstall(executable, uninstaller)
+        assert not worker.exists()
+        assert manager.status() == WorkerTaskState.ABSENT
         assert "nuwa-agent-relay-studio" not in profile.servers()
         assert profile.servers()["other"]["command"] == "other"
         assert not profile.skill.exists()

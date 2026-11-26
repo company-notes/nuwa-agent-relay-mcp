@@ -18,6 +18,7 @@ from src.WorkerBridgeService import WorkerBridgeService
 from src.LocalMCPClient import LocalMCPClient, LocalMCPError
 from src.WorkerCredential import WorkerCredential
 from src.WorkerProvider import WorkerProvider
+from src.WorkerPairPage import WorkerPairPage
 
 
 class WorkerScenario:
@@ -244,3 +245,109 @@ def test_studio_reconnects_without_replaying_an_uncertain_dispatch(tmp_path, mon
 
         service.revoke()
         assert not LocalConfig.workerBridgePath().exists()
+
+
+class PairingCredentials(StaticBearerCredential):
+    def ensureAccessToken(self):
+        return self.accessToken()
+
+
+class PairingStartup:
+    def __init__(self, service):
+        self.service = service
+        self.started = 0
+
+    def start(self):
+        assert self.service.config.workerBridgePath().is_file()
+        self.started += 1
+
+
+class PairingBrowser:
+    def __init__(self, page):
+        self.page = page
+        self.server = page.createServer()
+        self.thread = Thread(target=self.server.serve_forever, daemon=True)
+        self.origin = f"http://127.0.0.1:{self.server.server_port}"
+        self.url = self.origin + page.path
+
+    def __enter__(self):
+        self.thread.start()
+        self.client = httpx.Client(trust_env=False)
+        return self
+
+    def __exit__(self, *args):
+        self.client.close()
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join()
+
+    def submit(self, fields, origin=None):
+        return self.client.post(self.url, data=fields, headers={"Origin": origin or self.origin})
+
+
+def test_owner_authorizes_through_local_page_and_worker_restarts_without_a_terminal(tmp_path, monkeypatch):
+    monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path))
+    remote = RemoteWorkerScenario()
+
+    with WorkerScenario() as local:
+        service = WorkerBridgeService(LocalConfig(), remote.client, local.provider)
+        startup = PairingStartup(service)
+        credentials = PairingCredentials(remote.OAUTH)
+        page = WorkerPairPage(service, credentials, startup)
+
+        with PairingBrowser(page) as browser:
+            form = browser.client.get(browser.url)
+            assert form.status_code == 200
+            assert 'type="password"' in form.text
+            assert remote.CODE not in form.text
+
+            denied = browser.submit({"code": remote.CODE, "consent": "yes"}, "https://untrusted.invalid")
+            assert denied.status_code == 403
+            assert browser.submit({"code": remote.CODE}).status_code == 200
+            assert not LocalConfig.workerBridgePath().exists()
+            assert startup.started == 0
+
+            authorized = browser.submit({"code": remote.CODE, "consent": "yes"})
+            assert "Studio connection authorized" in authorized.text
+            assert remote.CODE not in authorized.text
+            assert startup.started == 1
+            assert service.route() == remote.ROUTE
+
+        resumed = WorkerBridgeService(LocalConfig(), remote.client, local.provider)
+        remote.send("work_start", {
+            "task": "Build a marketing tracker.", "requestId": "desktop-start", "target": {"host": "my-pc"},
+        })
+        originalResult = resumed.bridge.result
+
+        def finishExchange(route, requestID, result):
+            originalResult(route, requestID, result)
+            LocalConfig.workerStopPath().touch()
+
+        monkeypatch.setattr(resumed.bridge, "result", finishExchange)
+        resumed.serve()
+
+        assert len(local.jobs) == 1
+        assert LocalConfig.workerBridgePath().is_file()
+        assert LocalConfig.workerStopPath().is_file()
+        before = len(local.calls)
+        resumed.serve()
+        assert len(local.calls) == before
+
+
+def test_owner_cancels_pairing_without_starting_worker(tmp_path, monkeypatch):
+    monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path))
+    remote = RemoteWorkerScenario()
+
+    with WorkerScenario() as local:
+        service = WorkerBridgeService(LocalConfig(), remote.client, local.provider)
+        startup = PairingStartup(service)
+        page = WorkerPairPage(service, PairingCredentials(remote.OAUTH), startup)
+
+        with PairingBrowser(page) as browser:
+            cancelled = browser.submit({"cancel": "yes"})
+            assert "Authorization cancelled" in cancelled.text
+
+        assert page.finished
+        assert not LocalConfig.workerBridgePath().exists()
+        assert startup.started == 0
+        assert local.calls == []

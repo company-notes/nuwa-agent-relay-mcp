@@ -118,6 +118,7 @@ switch ($env:NUWA_TASK_OPERATION) {
 
         while self.status() == WorkerTaskState.RUNNING:
             if time.monotonic() >= deadline:
+                marker.unlink(missing_ok=True)
                 raise RuntimeError("Worker is finishing an active exchange. Retry Setup after it finishes.")
 
             time.sleep(0.5)

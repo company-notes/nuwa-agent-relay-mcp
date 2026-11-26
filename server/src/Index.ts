@@ -12,6 +12,10 @@ import { SessionBindingController } from './SessionBindingController';
 import { OnboardingPage } from './OnboardingPage';
 import { WorkContext } from './WorkContext';
 import { ManagementBindingCleanup } from './ManagementBindingCleanup';
+import { WorkerBridge } from './WorkerBridge';
+import { WorkerBridgeTools } from './WorkerBridgeTools';
+
+export { WorkerBridgeChannel } from './WorkerBridgeChannel';
 
 export class HTTPMCPApplication {
   private static readonly logger = Logger.forModule('mcp');
@@ -78,7 +82,9 @@ export class HTTPMCPApplication {
 
     const inbox = ['/work-inbox/events', '/work-inbox/events/stream'].includes(url.pathname);
 
-    if (url.pathname !== '/mcp' && url.pathname !== '/session-bindings' && !resetMatch && !inbox) {
+    const studio = WorkerBridge.handles(url.pathname);
+
+    if (url.pathname !== '/mcp' && url.pathname !== '/session-bindings' && !resetMatch && !inbox && !studio) {
       return new Response('Not found', { status: 404 });
     }
 
@@ -97,6 +103,20 @@ export class HTTPMCPApplication {
     }
 
     const address = new AddressAPIClient(this.env, result.authorization, undefined, result.status);
+
+    if (studio) {
+      try {
+        if (!this.env.WORKER_BRIDGE) {
+          throw new APIError(503, 'worker_bridge_disabled', 'Worker bridge is unavailable.');
+        }
+
+        return await new WorkerBridge(this.env.WORKER_BRIDGE, address).handleStudio(request);
+      } catch (error) {
+        HTTPMCPApplication.logger.exception('worker_studio_failed', error);
+
+        return SessionBindingController.error(error);
+      }
+    }
 
     if (resetMatch) {
       try {
@@ -176,6 +196,11 @@ export class HTTPMCPApplication {
       const server = new NuwaMCPServer(
         this.env, result.authorization, address, this.tasks, work,
       ).createServer();
+
+      if (this.env.WORKER_BRIDGE && !work) {
+        await new WorkerBridgeTools(server, new WorkerBridge(this.env.WORKER_BRIDGE, address))
+          .install(request.clone());
+      }
 
       stage = 'connect_transport';
       await server.connect(transport);

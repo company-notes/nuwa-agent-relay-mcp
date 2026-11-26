@@ -18,6 +18,9 @@ from .Server import StudioMCP
 from .SessionPeer import SessionPeer
 from .WakeReceiver import WakeReceiver
 from .WakeSubscription import WakeSubscription
+from .WorkerBridgeClient import WorkerBridgeClient
+from .WorkerBridgeService import WorkerBridgeService
+from .WorkerProvider import WorkerProvider
 
 
 class StudioCLI:
@@ -103,6 +106,11 @@ class StudioCLI:
         mode.add_argument("--peer-target", help="Exact local codex:<thread UUID> or current claude:<Session UUID>.")
         mode.add_argument("--echo", action="store_true", help="Explicit diagnostic Echo mode.")
 
+        worker = commands.add_parser("worker", help="Manage the optional local Worker Provider.")
+        workerCommands = worker.add_subparsers(dest="workerCommand", required=True)
+        for name in ("pair", "serve", "revoke"):
+            workerCommands.add_parser(name)
+
         return parser
 
     @classmethod
@@ -151,6 +159,27 @@ class StudioCLI:
 
         config = LocalConfig.load()
         credentials = OAuthCredentials(config)
+
+        if args.command == "worker":
+            service = WorkerBridgeService(config, WorkerBridgeClient(credentials), WorkerProvider())
+
+            if args.workerCommand == "pair":
+                credentials.ensureAccessToken()
+                print("Authorize the dedicated remote assistant to use all approved tools and visible Jobs of this local Worker.")
+                if input("Authorize this isolated test Worker? [yes/no] ").strip().lower() != "yes":
+                    print("Worker pairing cancelled.")
+                    return
+
+                service.pair(getpass.getpass("One-time Studio pairing code: ").strip())
+                print("Worker Provider paired.")
+            elif args.workerCommand == "revoke":
+                service.revoke()
+                print("Worker Provider revoked.")
+            else:
+                logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+                service.serve()
+
+            return
 
         if args.command == "login":
             credentials.login()

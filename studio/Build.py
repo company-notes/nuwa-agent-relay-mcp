@@ -96,6 +96,7 @@ class BuildApplication:
             "--collect-all", "mcp_install", "--recursive-copy-metadata", "fastmcp",
             "--copy-metadata", self.name, *peerOptions,
             "--add-data", f'{self.root.parent / "install.config.json"}{os.pathsep}src',
+            "--add-data", f'{self.root.parent / "worker-provider.json"}{os.pathsep}src',
             "--add-data", f'{self.root.parent / "skills" / "nuwa-agent-relay"}{os.pathsep}src/skills/nuwa-agent-relay',
             str(self.root / "RunMCP.py"),
         ])

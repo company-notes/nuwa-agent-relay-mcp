@@ -7,8 +7,14 @@
     "mode": "smart"
   },
   "services": [
-    { "binding": "ADDRESS_WORKER", "service": "agent-address" },
-    { "binding": "RELAY_WORKER", "service": "nuwa-agent-relay-api" }
+    {
+      "binding": "ADDRESS_WORKER",
+      "service": "agent-address"
+    },
+    {
+      "binding": "RELAY_WORKER",
+      "service": "nuwa-agent-relay-api"
+    }
   ],
   "d1_databases": [
     {
@@ -34,5 +40,21 @@
       "enabled": true
     },
     "redact_query_string": true
-  }
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "WORKER_BRIDGE",
+        "class_name": "WorkerBridgeChannel"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "worker-bridge-v1",
+      "new_sqlite_classes": [
+        "WorkerBridgeChannel"
+      ]
+    }
+  ]
 }

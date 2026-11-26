@@ -781,13 +781,13 @@ test('bound Session retains message context and replies within one Relay Thread'
       'Previous context');
 
     const reply = await scenario.tool('relayReplyThread', {
-      threadID: THREAD_ID, body: 'Same Thread reply.',
+      threadID: THREAD_ID, messageID: MESSAGE_ID, body: 'Same Thread reply.',
     });
 
     assert.equal(reply.result.isError, undefined);
     assert.equal(scenario.calls.length, 2);
     assert.equal(scenario.calls[0].url.searchParams.get('context_limit'), '8');
-    assert.deepEqual(scenario.calls[1].body, { body: 'Same Thread reply.' });
+    assert.deepEqual(scenario.calls[1].body, { body: 'Same Thread reply.', messageID: MESSAGE_ID });
     assert.equal(scenario.calls[1].url.searchParams.get('session_id'), SESSION_A);
   } finally {
     scenario.restore();

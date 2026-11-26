@@ -145,10 +145,15 @@ class RelayClient(HTTPAPIClient):
             body={"body": body, "artifactLinks": artifactLinks or []},
         )
 
-    def replyThread(self, threadID: str, body: str, artifactLinks: list[str] | None = None):
+    def replyThread(self, threadID: str, body: str, artifactLinks: list[str] | None = None,
+                    messageID: str | None = None):
+        payload = {"body": body, "artifactLinks": artifactLinks or []}
+
+        if messageID is not None:
+            payload["messageID"] = messageID
+
         return self.call(
-            "POST", f"/v2/threads/{quote(threadID, safe='')}/messages",
-            body={"body": body, "artifactLinks": artifactLinks or []},
+            "POST", f"/v2/threads/{quote(threadID, safe='')}/messages", body=payload,
         )
 
     def receipt(self, messageID: str, refreshArchive: bool = False):

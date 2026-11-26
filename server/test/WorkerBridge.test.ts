@@ -166,6 +166,9 @@ class WorkerDeviceScenario extends WorkerChannelScenario {
 
     for (const [name, args] of [
       ['worker_notification_setup', { secret: 'not accepted through MCP' }],
+      ['worker_notification_setup', { notificationSetupToken: 'invalid' }],
+      ['worker_notification_setup', { jobId: 'job-a' }],
+      ['work_continue', { jobId: 'job-a', notificationSetupToken: 'c'.repeat(64) }],
       ['worker_notification_pairing_status', { setupId: 'invalid' }],
       ['work_start', { task: 'Invalid route', notificationRouteId: 'private' }],
       ['work_continue', { jobId: 'job-a', ...route }],

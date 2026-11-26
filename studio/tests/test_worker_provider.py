@@ -162,7 +162,16 @@ def test_assistant_discovers_starts_and_continues_one_local_job():
             provider.call("worker_notification_setup", {"secret": "must stay in local browser"})
 
         with pytest.raises(LocalMCPError, match="approved provider scope"):
+            provider.call("worker_notification_setup", {"notificationSetupToken": "invalid"})
+
+        with pytest.raises(LocalMCPError, match="approved provider scope"):
+            provider.call("worker_notification_setup", {"jobId": jobID})
+
+        with pytest.raises(LocalMCPError, match="approved provider scope"):
             provider.call("work_continue", {"notificationRouteId": scenario.notificationRouteID})
+
+        with pytest.raises(LocalMCPError, match="approved provider scope"):
+            provider.call("work_continue", {"notificationSetupToken": "c" * 64})
 
         assert len(scenario.calls) == before
 

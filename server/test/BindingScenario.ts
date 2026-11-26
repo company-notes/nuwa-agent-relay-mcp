@@ -583,7 +583,7 @@ export class RemoteMCPScenario {
         if (!policy && init?.method === 'PUT') {
           const id = crypto.randomUUID();
           policy = { id, mode: 'unconfigured', revision: 0,
-            settingsURL: 'https://agent-relay.company-notes.com/manage?collaboration=' + id };
+            settingsURL: 'https://agent-relay.company-notes.com/manage/session?section=session-replies&collaboration=' + id };
           this.collaborationPolicies.set(key, policy);
         }
 

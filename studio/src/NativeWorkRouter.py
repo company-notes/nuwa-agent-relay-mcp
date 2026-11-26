@@ -92,7 +92,7 @@ class NativeWorkRouter(Middleware):
         if not isinstance(policyID, str) or str(UUID(policyID)) != policyID:
             raise ValueError("Invalid collaboration policy identity.")
 
-        expected = self.config.apiURL.rstrip("/") + "/manage?collaboration=" + policyID
+        expected = self.config.apiURL.rstrip("/") + "/manage/session?section=session-replies&collaboration=" + policyID
         if url != expected:
             raise ValueError("Invalid collaboration policy settings URL.")
 
@@ -150,10 +150,16 @@ class NativeWorkRouter(Middleware):
 
                 return result
 
-        return await asyncio.to_thread(
+        result = await asyncio.to_thread(
             self.remote.call, identity.nativeID, name, arguments,
             name == "agentAddressGetStatus", mode=identity.mode,
         )
+
+        if name == "agentAddressGetStatus" and not result.is_error:
+            async with self.lock:
+                await self._offerCollaboration(RemoteWorkClient.value(result))
+
+        return result
 
     async def on_call_tool(self, context, call_next):
         name = context.message.name

@@ -82,6 +82,21 @@ function scenarios(skill, onboarding, check) {
         workflow.includes('not install') && workflow.includes('original Relay Thread'),
         'FFL is optional; preserve full text fallback and original routing.');
     }],
+    ['Rakazo Worker notifications preserve consent and the independent Wake receiver', () => {
+      const start = skill.indexOf('## Optional local Worker delegation');
+      const end = skill.indexOf('\n## ', start + 1);
+      const workflow = skill.slice(start, end);
+      const guide = readFileSync(new URL('../skills/nuwa-agent-relay/references/rakazo.md', import.meta.url), 'utf8');
+      const notification = guide.slice(guide.indexOf('## Optional Worker completion notifications'));
+
+      check(workflow.includes('first new assignment after notification capability becomes available') &&
+        workflow.includes('make no promise of automatic notification'), 'Ask when capability becomes available; do not promise absent notifications.');
+      check(notification.includes('schedule_list') && notification.includes('on: { webhook: true }') &&
+        notification.includes('Preserve any existing Nuwa Wake receiver'), 'The completion receiver is a separate webhook-only Routine.');
+      check(notification.includes('never ask for') && notification.includes('paired:true') &&
+        notification.includes('work.turn_finished') && notification.includes('work_status / work_messages'),
+        'Verify consent, test receipt and real work before reporting completion.');
+    }],
     ['OpenMausBot bidirectional test ends after sender submission', () => {
       const office = new OnboardingScenario(onboarding, 'openmausbot');
 

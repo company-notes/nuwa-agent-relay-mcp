@@ -13,5 +13,23 @@
     "worker_task_plan",
     "worker_task_start",
     "worker_delivery_open"
-  ]
+  ],
+  "notificationTools": {
+    "worker_notification_status": [
+      "notificationRouteId"
+    ],
+    "worker_notification_setup": [],
+    "worker_notification_pairing_status": [
+      "setupId"
+    ],
+    "worker_notification_decline": [
+      "notificationRouteId"
+    ]
+  },
+  "notificationDispatchTools": [
+    "work_start",
+    "worker_task_start"
+  ],
+  "notificationRoutePattern": "^[a-f0-9]{64}$",
+  "notificationSetupPattern": "^[A-Za-z0-9_-]{32}$"
 }

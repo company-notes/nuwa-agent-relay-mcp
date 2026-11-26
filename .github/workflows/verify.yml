@@ -45,6 +45,17 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: company-notes/ai-worker-gateway
+          ref: d7924d0289bcc107146c7a8a58bc57a278b89968
+          path: .test-deps/ai-worker-gateway
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --no-audit --no-fund
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -54,7 +65,9 @@ jobs:
         run: ruff check studio/src studio/tests --select E4,E7,E9,F
       - name: Install Chromium for browser acceptance
         run: python -m playwright install --with-deps chromium
-      - name: Python Studio tests
+      - name: Python Studio tests and actual Gateway notification chain
+        env:
+          NUWA_TEST_GATEWAY_ROOT: ${{ github.workspace }}/.test-deps/ai-worker-gateway
         run: pytest -q studio/tests
       - name: Preview mcp_install desktop registration
         run: nuwa-relay-mcp install --print

@@ -2,43 +2,22 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { MESSAGE_ID, RemoteMCPScenario, RUNTIME_SECRET, SESSION_A, THREAD_ID } from './BindingScenario';
-import { WorkerBridgeChannel } from '../src/WorkerBridgeChannel';
+import { WorkerChannelScenario } from './WorkerChannelScenario';
 
-class WorkerDeviceScenario {
-  readonly base = new RemoteMCPScenario();
-  private readonly channels = new Map<unknown, WorkerBridgeChannel>();
+class WorkerDeviceScenario extends WorkerChannelScenario {
   private readonly jobs = new Map<string, string[]>();
   private route = '';
-  private readonly tools = ['fleet_status', 'work_list', 'work_start', 'work_status', 'work_continue'].map((name) => ({
+  private readonly routedStarts: string[] = [];
+  private readonly notificationRouteID = 'c'.repeat(64);
+  private readonly notificationSetupID = 's'.repeat(32);
+  private readonly tools = ['fleet_status', 'work_list', 'work_start', 'work_status', 'work_continue',
+    'worker_notification_status', 'worker_notification_setup', 'worker_notification_pairing_status',
+    'worker_notification_decline'].map((name) => ({
     name, description: 'Local ' + name,
     inputSchema: { type: 'object', properties: { jobId: { type: 'string' }, task: { type: 'string' },
-      message: { type: 'string' }, requestId: { type: 'string' } } },
+      message: { type: 'string' }, requestId: { type: 'string' },
+      notificationRouteId: { type: 'string' }, setupId: { type: 'string' } } },
   }));
-
-  constructor() {
-    this.base.env.WORKER_BRIDGE = {
-      idFromName: (name) => name,
-      get: (id) => {
-        let channel = this.channels.get(id);
-
-        if (!channel) {
-          const storage = new Map<string, unknown>();
-          const transaction = {
-            get: async <T>(key: string) => storage.get(key) as T | undefined,
-            put: async <T>(key: string, value: T) => { storage.set(key, value); },
-            delete: async (key: string) => storage.delete(key),
-          };
-          channel = new WorkerBridgeChannel({ storage: {
-            ...transaction, transaction: (operation) => operation(transaction),
-          } });
-          this.channels.set(id, channel);
-        }
-
-        return channel;
-      },
-    };
-    this.base.install();
-  }
 
   private studio(operation: string, body: Record<string, unknown> = {}, token = 'oauth-b') {
     return this.base.application.handle(new Request('https://mcp.agent-relay.company-notes.com/worker-bridge/' + operation, {
@@ -94,8 +73,26 @@ class WorkerDeviceScenario {
     let data: unknown;
 
     switch (name) {
+      case 'worker_notification_status':
+        data = { enabled: args.notificationRouteId === this.notificationRouteID };
+        break;
+      case 'worker_notification_setup':
+        data = { setupId: this.notificationSetupID,
+          url: 'http://127.0.0.1:3791/notifications/setup/' + this.notificationSetupID };
+        break;
+      case 'worker_notification_pairing_status':
+        assert.equal(args.setupId, this.notificationSetupID);
+        data = { paired: true, notificationRouteId: this.notificationRouteID };
+        break;
+      case 'worker_notification_decline':
+        assert.equal(args.notificationRouteId, this.notificationRouteID);
+        data = { enabled: false, notificationRouteId: this.notificationRouteID };
+        break;
       case 'work_start':
         this.jobs.set('job-a', [args.task]);
+        if (args.notificationRouteId) {
+          this.routedStarts.push(args.notificationRouteId);
+        }
         data = { job: { jobId: 'job-a' }, created: true };
         break;
       case 'work_continue':
@@ -152,6 +149,48 @@ class WorkerDeviceScenario {
     return JSON.parse(response.result.content[0].text);
   }
 
+  async verifyNotificationFlow() {
+    const status = await this.call('worker_notification_status', {});
+    assert.equal(status.enabled, false);
+
+    const setup = await this.call('worker_notification_setup', {});
+    assert.match(setup.url, /^http:\/\/127\.0\.0\.1:3791\/notifications\/setup\//);
+
+    const paired = await this.call('worker_notification_pairing_status', { setupId: setup.setupId });
+    assert.equal(paired.paired, true);
+    assert.equal(paired.notificationRouteId, this.notificationRouteID);
+
+    const route = { notificationRouteId: paired.notificationRouteId };
+    const enabled = await this.call('worker_notification_status', route);
+    assert.equal(enabled.enabled, true);
+
+    for (const [name, args] of [
+      ['worker_notification_setup', { secret: 'not accepted through MCP' }],
+      ['worker_notification_pairing_status', { setupId: 'invalid' }],
+      ['work_start', { task: 'Invalid route', notificationRouteId: 'private' }],
+      ['work_continue', { jobId: 'job-a', ...route }],
+    ] as const) {
+      const denied = await this.base.tool(name, args);
+      assert.equal(denied.result.isError, true, name);
+    }
+
+    const other = await this.base.tool('worker_notification_status', route, 'oauth-c');
+    assert.equal(other.result.isError, true, 'Another OAuth grant must not access the paired Worker.');
+
+    const started = await this.call('work_start', {
+      requestId: 'travel-start', task: 'Build a travel planner.', ...route,
+    });
+    assert.deepEqual(this.routedStarts, [paired.notificationRouteId]);
+
+    const jobID = started.job.jobId;
+    await this.call('work_continue', { requestId: 'travel-continue', jobId: jobID, message: 'Add expense splitting.' });
+    assert.deepEqual((await this.call('work_status', { jobId: jobID })).messages,
+      ['Build a travel planner.', 'Add expense splitting.']);
+
+    const declined = await this.call('worker_notification_decline', route);
+    assert.equal(declined.enabled, false);
+  }
+
   async verifyRevocation() {
     const poll = this.studio('poll', { tools: this.tools });
     await this.waitForOnline();
@@ -162,10 +201,6 @@ class WorkerDeviceScenario {
     const list = await this.base.toolSchemas();
     assert.ok(!list.result.tools.some((tool: { name: string }) => tool.name === 'work_start'));
     assert.ok(list.result.tools.some((tool: { name: string }) => tool.name === 'sendToAgent'));
-  }
-
-  close() {
-    this.base.restore();
   }
 }
 
@@ -184,6 +219,17 @@ test('a paired remote assistant discovers, starts and continues a local job', as
     assert.deepEqual(status.messages, ['Build a marketing tracker.', 'Add monthly ROAS.']);
     assert.deepEqual(await scenario.call('work_list', {}), { jobs: [jobID] });
     await scenario.verifyRevocation();
+  } finally {
+    scenario.close();
+  }
+});
+
+test('a paired assistant configures notification routing and starts and continues work', async () => {
+  const scenario = new WorkerDeviceScenario();
+
+  try {
+    await scenario.pair();
+    await scenario.verifyNotificationFlow();
   } finally {
     scenario.close();
   }

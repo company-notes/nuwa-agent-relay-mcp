@@ -161,7 +161,14 @@ through the same Nuwa Remote MCP connection. Install the official
 [Session Router Skill](https://mcp.agent-relay.company-notes.com/skills/session-router/SKILL.md)
 for work routing, together with the actual advertised tool schemas. The pilot
 requires a dedicated OAuth connection and isolated Windows Worker; it
-uses manual progress queries rather than webhook completion notifications.
+supports the Gateway's existing completion notifications when the live
+catalog advertises all four worker_notification_* tools. Follow the installed
+Session Router Skill to check notification status and ask once before the
+first new assignment after notification capability becomes available. For
+Rakazo's dedicated webhook Routine, use the [Rakazo guide](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/rakazo.md).
+Completion notifications and Relay message Wake are independent. When the
+user declines or notifications are unavailable, use manual progress queries
+and make no promise of automatic notification.
 For initial connection, call worker_provider_pair and give the owner the
 returned authorizationURL as a clickable link and pairingCode separately
 in a copyable code block. The owner opens the link, launches Studio and

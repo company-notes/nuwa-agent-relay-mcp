@@ -88,6 +88,7 @@ class WorkerScenario:
         if name == "work_start":
             requestID = args["requestId"]
             created = requestID not in self.started
+
             if created:
                 jobID = "job-" + str(len(self.jobs) + 1)
                 self.started[requestID] = jobID
@@ -111,6 +112,7 @@ def test_assistant_discovers_starts_and_continues_one_local_job():
     with WorkerScenario() as scenario:
         provider = scenario.provider
         catalog = provider.catalog()
+
         assert {tool["name"] for tool in catalog} == {
             "fleet_status", "work_list", "work_start", "work_status", "work_continue",
         }
@@ -217,6 +219,7 @@ def test_studio_reconnects_without_replaying_an_uncertain_dispatch(tmp_path, mon
 
         remote.send("work_start", args)
         remote.rejectResult = True
+
         with pytest.raises(WorkerBridgeRejected, match="503"):
             service.exchange(service.route())
 

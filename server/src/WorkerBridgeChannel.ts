@@ -56,6 +56,7 @@ export class WorkerBridgeChannel {
 
     return this.state.storage.transaction(async (storage) => {
       const binding = await storage.get<PairState>('binding');
+
       if (WorkerBridgeChannel.paired(binding)) {
         return WorkerBridgeChannel.failure('A device is already paired. Revoke it before pairing another.', 409);
       }
@@ -244,6 +245,7 @@ export class WorkerBridgeChannel {
       const body = await request.json() as Record<string, unknown>;
       const principal = body.principal as WorkerPrincipal;
       const operation = new URL(request.url).pathname;
+
       if (operation === '/prepare') {
         return await this.prepare(principal);
       }

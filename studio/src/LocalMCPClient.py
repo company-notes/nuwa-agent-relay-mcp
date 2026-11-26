@@ -70,6 +70,7 @@ class LocalMCPClient:
             result = self._request(client, "tools/list", {}, version)
 
         tools = result.get("tools")
+
         if not isinstance(tools, list) or result.get("nextCursor"):
             raise LocalMCPError("Local MCP returned an unsupported tool catalog.")
 

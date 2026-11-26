@@ -95,6 +95,7 @@ export class WorkerBridge {
     }
 
     const body: unknown = JSON.parse(raw);
+
     if (!Protocol.object(body) || typeof body.route !== 'string' || !/^[a-f0-9]{64}$/.test(body.route)) {
       throw new APIError(400, 'worker_route_invalid', 'Invalid Studio pairing route.');
     }

@@ -49,6 +49,7 @@ class WorkerDeviceScenario {
 
   async pair() {
     const response = await this.base.tool('worker_provider_pair', {});
+
     assert.equal(response.result.isError, undefined);
     const { pairingCode } = JSON.parse(response.result.content[0].text);
     const [route, secret] = pairingCode.split('.');
@@ -162,11 +163,13 @@ test('a paired remote assistant discovers, starts and continues a local job', as
 
   try {
     await scenario.pair();
+
     assert.deepEqual(await scenario.call('work_list', {}, true), { jobs: [] });
     const started = await scenario.callBetweenPolls('work_start', { requestId: 'marketing-start', task: 'Build a marketing tracker.' });
     const jobID = started.job.jobId;
     await scenario.call('work_continue', { requestId: 'marketing-continue', jobId: jobID, message: 'Add monthly ROAS.' });
     const status = await scenario.call('work_status', { jobId: jobID });
+
     assert.deepEqual(status.messages, ['Build a marketing tracker.', 'Add monthly ROAS.']);
     assert.deepEqual(await scenario.call('work_list', {}), { jobs: [jobID] });
     await scenario.verifyRevocation();

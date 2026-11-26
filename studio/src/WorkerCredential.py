@@ -54,6 +54,7 @@ class WorkerCredential:
 
         # PowerShell ConvertFrom-SecureString stores the DPAPI blob as ASCII hex.
         encrypted = bytes.fromhex(path.read_text(encoding="ascii"))
+
         if not encrypted:
             raise LocalMCPError("Worker Gateway credential file is empty.")
 

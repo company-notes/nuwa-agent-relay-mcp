@@ -18,7 +18,9 @@
     "worker_notification_status": [
       "notificationRouteId"
     ],
-    "worker_notification_setup": [],
+    "worker_notification_setup": [
+      "notificationSetupToken"
+    ],
     "worker_notification_pairing_status": [
       "setupId"
     ],

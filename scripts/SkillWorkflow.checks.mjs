@@ -89,8 +89,10 @@ function scenarios(skill, onboarding, check) {
       const guide = readFileSync(new URL('../skills/nuwa-agent-relay/references/rakazo.md', import.meta.url), 'utf8');
       const notification = guide.slice(guide.indexOf('## Optional Worker completion notifications'));
 
-      check(workflow.includes('first new assignment after notification capability becomes available') &&
-        workflow.includes('make no promise of automatic notification'), 'Ask when capability becomes available; do not promise absent notifications.');
+      check(workflow.includes('Dispatch the first Job before') &&
+        workflow.includes('make no promise of automatic notification'), 'Dispatch before asking; do not promise absent notifications.');
+      check(workflow.includes('Do not dispatch work, ask about notifications') &&
+        workflow.includes('Only after') && workflow.includes('create and verify'), 'Separate onboarding from consent and receiver creation.');
       check(notification.includes('schedule_list') && notification.includes('on: { webhook: true }') &&
         notification.includes('Preserve any existing Nuwa Wake receiver'), 'The completion receiver is a separate webhook-only Routine.');
       check(notification.includes('never ask for') && notification.includes('paired:true') &&

@@ -188,7 +188,7 @@ class WorkerNotificationFlow:
             try:
                 page = browser.new_page()
                 page.goto(url)
-                page.locator('[name="name"]').fill("Rakazo test assistant")
+                assert page.locator('[name="name"]').count() == 0
                 page.locator('[name="url"]').fill(self.gateway.info["webhookURL"])
                 page.locator('[name="secret"]').fill(self.RECEIVER_KEY)
 
@@ -212,18 +212,24 @@ class WorkerNotificationFlow:
 
     def run(self):
         assert self._discover()["preference"] == "unset"
-        setup = self._exchange("worker_notification_setup", {})
+        started = self._exchange("work_start", {
+            "task": "Build a reading list", "requestId": "notification-acceptance-start",
+        })
+        jobID = started["job"]["jobId"]
+        token = started["notificationSetupToken"]
+        beforeConsent = self.gateway.exchange({})
+        assert len(beforeConsent["dispatches"]) == 1
+        assert beforeConsent["callbacks"] == []
+
+        setup = self._exchange("worker_notification_setup", {"notificationSetupToken": token})
         self._authorize(setup["url"])
 
         paired = self._exchange("worker_notification_pairing_status", {"setupId": setup["setupId"]})
         assert paired["paired"] is True
+        assert paired["jobId"] == jobID
         route = {"notificationRouteId": paired["notificationRouteId"]}
         assert self._exchange("worker_notification_status", route)["enabled"] is True
 
-        started = self._exchange("work_start", {
-            "task": "Build a travel planner", "requestId": "notification-acceptance-start", **route,
-        })
-        jobID = started["job"]["jobId"]
         self._verifyCallbacks(self.gateway.exchange({"jobId": jobID}), jobID, 1)
 
         continued = self._exchange("work_continue", {

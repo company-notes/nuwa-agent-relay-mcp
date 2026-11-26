@@ -155,28 +155,44 @@ permissions, verified addresses and reply routing throughout.
 
 ## Optional local Worker delegation (isolated pilot)
 
-A cloud assistant with an explicitly paired Studio may discover local
-Worker Gateway tools such as work_list, work_start and work_continue
-through the same Nuwa Remote MCP connection. Install the official
-[Session Router Skill](https://mcp.agent-relay.company-notes.com/skills/session-router/SKILL.md)
-for work routing, together with the actual advertised tool schemas. The pilot
-requires a dedicated OAuth connection and isolated Windows Worker; it
-supports the Gateway's existing completion notifications when the live
-catalog advertises all four worker_notification_* tools. Follow the installed
-Session Router Skill to check notification status and ask once before the
-first new assignment after notification capability becomes available. For
-Rakazo's dedicated webhook Routine, use the [Rakazo guide](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/rakazo.md).
-Completion notifications and Relay message Wake are independent. When the
-user declines or notifications are unavailable, use manual progress queries
-and make no promise of automatic notification.
-For initial connection, call worker_provider_pair and give the owner the
-returned authorizationURL as a clickable link and pairingCode separately
-in a copyable code block. The owner opens the link, launches Studio and
-enters the code with explicit consent. Do not use Computer Use, open the
-browser, run local commands or submit the authorization form for the owner.
-Read worker_provider_status when the local tools are missing and refresh
-the MCP catalog after the owner completes pairing. A coworker's address
-authorizes communication only; it does not grant Worker access.
+A cloud assistant uses the ordinary Nuwa Remote MCP connection and the
+official [Session Router Skill](https://mcp.agent-relay.company-notes.com/skills/session-router/SKILL.md).
+The dedicated OAuth pilot requires an isolated Windows Worker.
+
+### Connect the Worker (installation and verification only)
+
+When the owner asks to connect the local Worker or verify its initial
+installation, read worker_provider_status first. If unpaired, call
+worker_provider_pair and give the owner the returned authorizationURL
+as a clickable link and pairingCode separately in a copyable code block.
+The owner opens the link, launches Studio and enters the code with explicit
+consent. Do not use Computer Use, open the browser, run local commands or
+submit the form for the owner. If paired, preserve the existing pairing;
+if temporarily offline or busy, report that condition and retry status
+when appropriate, never re-pair just because a tool is temporarily unavailable.
+After the owner completes pairing, verify paired and online and refresh
+the MCP catalog. A cached tool list alone does not prove reachability.
+Do not dispatch work, ask about notifications, create a Routine or open
+a notification setup page during Skill installation or Worker authorization.
+
+### Dispatch first; offer completion notifications afterward
+
+Follow Session Router for actual user work. Dispatch the first Job before
+asking about completion notifications; after successful first dispatch
+retain the private notificationSetupToken, and ask once if the preference
+is unset and the live notification tools support that token. Only after
+the owner says yes, create and verify the assistant's native webhook
+receiver before calling worker_notification_setup with that token. For
+Rakazo, follow the [Rakazo guide](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/rakazo.md).
+Give the owner the setup link only when the receiver exists and its
+endpoint and key location are known. The owner enters only the URL,
+header and key; the Gateway binds the same first Job and returns its
+private route handle. Preserve verified existing routes and declined
+preferences. Completion notifications and Relay message Wake are
+independent. If notifications are unavailable, use manual progress
+queries and make no promise of automatic notification.
+A coworker's address authorizes communication only; it does not grant
+Worker access.
 
 ## Installation
 

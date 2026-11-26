@@ -27,8 +27,8 @@ export class WorkerBridgeTools extends MCPToolSet {
         authorizationURL: WorkerPairingPage.authorizationURL(request.url),
       }));
     this.register('worker_provider_status', 'Read the paired Studio and its current Worker tool availability. ' +
-      'When all four worker_notification tools are available, check the notification preference before the next new job. ' +
-      'Follow the Session Router Skill; only promise automatic completion notifications after owner consent, verified receiver and Job routing.', {},
+      'During installation or connection only check Worker pairing and availability. After a successful first new Job, ask once about notifications; do not set them up during onboarding. ' +
+      'Follow the Session Router Skill: establish a real native webhook receiver after consent, then obtain the notification form with the private dispatch token.', {},
       async () => {
         const state = await this.bridge.catalog();
 

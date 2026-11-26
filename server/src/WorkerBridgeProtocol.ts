@@ -56,6 +56,12 @@ export class WorkerBridgeProtocol {
       return false;
     }
 
+    if (Object.hasOwn(args, 'notificationSetupToken') &&
+        (!fields?.includes('notificationSetupToken') || typeof args.notificationSetupToken !== 'string' ||
+          !this.notificationRoutePattern.test(args.notificationSetupToken))) {
+      return false;
+    }
+
     if (fields?.includes('setupId')) {
       return typeof args.setupId === 'string' && this.notificationSetupPattern.test(args.setupId);
     }

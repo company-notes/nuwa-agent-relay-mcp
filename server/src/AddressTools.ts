@@ -38,7 +38,7 @@ export class AddressTools extends MCPToolSet {
       this.register('agentAddressStartWork',
         'At the beginning of a native work Session, choose a meaningful kebab-case sessionName ' +
         'and human-readable sessionDisplayName. On native resume call with no arguments. ' +
-        'Report the returned canonical address to the user immediately. Reuse the same work identity.',
+        'Report the returned canonical address immediately. Reuse the same work identity. Follow the returned collaborationPolicy; the owner chooses it in the browser.',
         {
           sessionName: z.string().trim().min(1).max(63).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
           sessionDisplayName: z.string().trim().min(1).max(120).optional(),
@@ -61,7 +61,7 @@ export class AddressTools extends MCPToolSet {
     }
 
     this.register('agentAddressGetStatus',
-      'Read the signed-in Account, Organization and current Session canonical address without changing its identity.',
+      'Read the signed-in Account, Organization, current Session address and (for active native work) collaborationPolicy without replacing its identity.',
       {},
       () => this.getStatus());
 

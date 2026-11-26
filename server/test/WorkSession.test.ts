@@ -87,7 +87,7 @@ test('native work Sessions preserve addresses, isolate traffic and share Agent m
       threadID: '11111111-1111-4111-8111-111111111111', messageID: '22222222-2222-4222-8222-222222222222',
       body: 'Routine reply', autonomous: true,
     }));
-    assert.equal(scenario.calls.at(-1)?.body.autonomous, true);
+    assert.equal((scenario.calls.at(-1)?.body as { autonomous?: boolean }).autonomous, true);
 
     sqlite.database.prepare('UPDATE remote_work_session_bindings SET expires_at = ? WHERE session_id = ?')
       .run(new Date(0).toISOString(), first.sessionID);

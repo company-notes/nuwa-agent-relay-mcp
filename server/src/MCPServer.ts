@@ -6,6 +6,7 @@ import { AddressTools } from './AddressTools';
 import { GatewayTools } from './GatewayTools';
 import { RelayTools } from './RelayTools';
 import { SessionBindings } from './SessionBindings';
+import { WorkCollaboration } from './WorkCollaboration';
 import type { WorkContext } from './WorkContext';
 
 export class NuwaMCPServer {
@@ -31,7 +32,7 @@ export class NuwaMCPServer {
           'with the original full address. Use the full canonical address to reach a particular work Session. ' +
           'After initialization, sendToAgent and relayReplyThread directly without from. Use relayInbox ' +
           'for this work Session. A managed Agent mailbox is shared; native Wake requires a supported adapter. ' +
-          'Runtime and Resume credentials remain private. '
+          WorkCollaboration.instructions + ' Runtime and Resume credentials remain private. '
         : 'Nuwa connects Organization/Agent/Session identities through asynchronous ' +
           'messages and work Handoffs. Agent Address owns Session identity and exclusive Runtime ' +
           'leases. For first installation call agentAddressEnsureIdentity; the server ' +
@@ -78,11 +79,21 @@ export class NuwaMCPServer {
       new RelayAPIClient(this.env, this.authorization, async () => session, this.tasks)
         .call('PUT', '/v2/agent-mailboxes');
 
+    const collaboration = this.work ? new WorkCollaboration(relay) : undefined;
+
     new AddressTools(server, this.address,
       (persona) => bindings.ensure(persona),
-      (address) => bindings.selectSession(address, this.work ? prepareMailbox : undefined),
-      () => bindings.getStatus(), this.work,
-      this.work ? (input) => bindings.startWork(input, prepareMailbox) : undefined,
+      async (address) => {
+        const selected = await bindings.selectSession(address, this.work ? prepareMailbox : undefined);
+
+        return collaboration ? collaboration.initialize(selected) : selected;
+      },
+      async () => {
+        const status = await bindings.getStatus();
+
+        return collaboration ? collaboration.status(status) : status;
+      }, this.work,
+      collaboration ? async (input) => collaboration.initialize(await bindings.startWork(input, prepareMailbox)) : undefined,
       this.work ? () => bindings.releaseWork() : undefined).install();
 
     new RelayTools(server, relay, this.work).install();

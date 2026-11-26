@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import webbrowser
 from contextlib import asynccontextmanager
 from uuid import UUID
 
@@ -39,6 +40,7 @@ class NativeWorkRouter(Middleware):
         self.openCodePeer = peer or OpenCodePeer()
         self.reconnectDelay = reconnectDelay
         self.receivers = {}
+        self.offeredPolicies = set()
         self.lock = asyncio.Lock()
 
     @classmethod
@@ -79,6 +81,26 @@ class NativeWorkRouter(Middleware):
                                    for receiver in self.receivers.values()))
             self.receivers.clear()
 
+    async def _offerCollaboration(self, data: dict) -> None:
+        policy = data.get("collaborationPolicy")
+
+        if not isinstance(policy, dict) or policy.get("mode") != "unconfigured":
+            return
+
+        policyID = policy.get("id")
+        url = policy.get("settingsURL")
+        if not isinstance(policyID, str) or str(UUID(policyID)) != policyID:
+            raise ValueError("Invalid collaboration policy identity.")
+
+        expected = self.config.apiURL.rstrip("/") + "/manage?collaboration=" + policyID
+        if url != expected:
+            raise ValueError("Invalid collaboration policy settings URL.")
+
+        if policyID not in self.offeredPolicies:
+            opened = await asyncio.to_thread(webbrowser.open, expected)
+            if opened:
+                self.offeredPolicies.add(policyID)
+
     async def _start(self, identity: NativeWorkIdentity, result) -> None:
         data = RemoteWorkClient.value(result)
         sessionID = data.get("sessionID")
@@ -86,6 +108,8 @@ class NativeWorkRouter(Middleware):
         if (data.get("bound") is not True or not isinstance(sessionID, str) or
                 str(UUID(sessionID)) != sessionID or not data.get("canonical")):
             raise ValueError("Remote MCP did not establish a work Session.")
+
+        await self._offerCollaboration(data)
 
         # Grok's work identity and manual Inbox are supported; a native
         # submission endpoint must be verified before enabling a receiver.

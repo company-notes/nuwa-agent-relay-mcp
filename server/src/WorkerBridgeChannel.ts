@@ -5,10 +5,14 @@ type PendingPair = { organizationID: string; remoteGrant: string; digest: string
 type PairedDevice = { organizationID: string; remoteGrant: string; studioGrant: string };
 type PairState = PendingPair | PairedDevice;
 
-interface ChannelStorage {
+interface ChannelTransaction {
   get<T>(key: string): Promise<T | undefined>;
   put<T>(key: string, value: T): Promise<void>;
   delete(key: string): Promise<boolean>;
+}
+
+interface ChannelStorage extends ChannelTransaction {
+  transaction<T>(operation: (storage: ChannelTransaction) => Promise<T>): Promise<T>;
 }
 
 type WaitingStudio = { finish: (response: Response) => void; timer: ReturnType<typeof setTimeout> };
@@ -40,32 +44,46 @@ export class WorkerBridgeChannel {
       (studio ? binding.studioGrant : binding.remoteGrant) === principal.grant;
   }
 
-  private async prepare(binding: PairState | undefined, principal: WorkerPrincipal): Promise<Response> {
-    if (WorkerBridgeChannel.paired(binding)) {
-      return WorkerBridgeChannel.failure('A device is already paired. Revoke it before pairing another.', 409);
-    }
-
+  private async prepare(principal: WorkerPrincipal): Promise<Response> {
     const secret = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
-    await this.state.storage.put<PairState>('binding', {
-      organizationID: principal.organizationID, remoteGrant: principal.grant,
-      digest: await Protocol.digest(secret), expiresAt: Date.now() + 300_000,
-    });
+    const digest = await Protocol.digest(secret);
 
-    return WorkerBridgeChannel.response({ secret });
+    return this.state.storage.transaction(async (storage) => {
+      const binding = await storage.get<PairState>('binding');
+      if (WorkerBridgeChannel.paired(binding)) {
+        return WorkerBridgeChannel.failure('A device is already paired. Revoke it before pairing another.', 409);
+      }
+
+      await storage.put<PairState>('binding', {
+        organizationID: principal.organizationID, remoteGrant: principal.grant,
+        digest, expiresAt: Date.now() + 300_000,
+      });
+
+      return WorkerBridgeChannel.response({ secret });
+    });
   }
 
-  private async pair(binding: PairState | undefined, principal: WorkerPrincipal, secret: unknown): Promise<Response> {
-    if (!binding || WorkerBridgeChannel.paired(binding) || binding.expiresAt <= Date.now() ||
-        binding.organizationID !== principal.organizationID || typeof secret !== 'string' ||
-        binding.digest !== await Protocol.digest(secret)) {
-      return WorkerBridgeChannel.failure('Pairing is invalid, expired or belongs to another Organization.', 403);
+  private async pair(principal: WorkerPrincipal, secret: unknown): Promise<Response> {
+    if (typeof secret !== 'string' || !/^[a-f0-9]{64}$/.test(secret)) {
+      return WorkerBridgeChannel.failure('Invalid pairing code.', 403);
     }
 
-    await this.state.storage.put<PairState>('binding', {
-      organizationID: binding.organizationID, remoteGrant: binding.remoteGrant, studioGrant: principal.grant,
-    });
+    const digest = await Protocol.digest(secret);
 
-    return WorkerBridgeChannel.response({ paired: true });
+    return this.state.storage.transaction(async (storage) => {
+      const binding = await storage.get<PairState>('binding');
+
+      if (!binding || WorkerBridgeChannel.paired(binding) || binding.expiresAt <= Date.now() ||
+          binding.organizationID !== principal.organizationID || binding.digest !== digest) {
+        return WorkerBridgeChannel.failure('Pairing is invalid, expired or belongs to another Organization.', 403);
+      }
+
+      await storage.put<PairState>('binding', {
+        organizationID: binding.organizationID, remoteGrant: binding.remoteGrant, studioGrant: principal.grant,
+      });
+
+      return WorkerBridgeChannel.response({ paired: true });
+    });
   }
 
   private poll(body: Record<string, unknown>): Promise<Response> | Response {
@@ -135,8 +153,27 @@ export class WorkerBridgeChannel {
     return WorkerBridgeChannel.response({ accepted: true });
   }
 
-  private async revoke(): Promise<Response> {
-    await this.state.storage.delete('binding');
+  private async revoke(principal: WorkerPrincipal, studio: boolean): Promise<Response> {
+    const revoked = await this.state.storage.transaction(async (storage) => {
+      const binding = await storage.get<PairState>('binding');
+
+      if (!binding) {
+        return true;
+      }
+
+      if (studio ? !WorkerBridgeChannel.authorized(binding, principal, true) :
+          binding.organizationID !== principal.organizationID || binding.remoteGrant !== principal.grant) {
+        return false;
+      }
+
+      await storage.delete('binding');
+
+      return true;
+    });
+
+    if (!revoked) {
+      return WorkerBridgeChannel.failure('Worker device is not paired with this authorization.', 403);
+    }
 
     if (this.waiting) {
       clearTimeout(this.waiting.timer);
@@ -160,17 +197,21 @@ export class WorkerBridgeChannel {
       const body = await request.json() as Record<string, unknown>;
       const principal = body.principal as WorkerPrincipal;
       const operation = new URL(request.url).pathname;
-      const binding = await this.state.storage.get<PairState>('binding');
-
       if (operation === '/prepare') {
-        return this.prepare(binding, principal);
+        return await this.prepare(principal);
       }
 
       if (operation === '/pair') {
-        return this.pair(binding, principal, body.secret);
+        return await this.pair(principal, body.secret);
       }
 
       const studio = ['/poll', '/result', '/studio-revoke'].includes(operation);
+
+      if (operation === '/revoke' || operation === '/studio-revoke') {
+        return await this.revoke(principal, studio);
+      }
+
+      const binding = await this.state.storage.get<PairState>('binding');
       const authorized = WorkerBridgeChannel.authorized(binding, principal, studio);
 
       if (operation === '/catalog' && !studio) {
@@ -188,8 +229,6 @@ export class WorkerBridgeChannel {
         case '/poll': return this.poll(body);
         case '/call': return this.call(body);
         case '/result': return this.result(body);
-        case '/revoke':
-        case '/studio-revoke': return this.revoke();
         default: return WorkerBridgeChannel.failure('Unknown Worker channel operation.', 404);
       }
     } catch (error) {

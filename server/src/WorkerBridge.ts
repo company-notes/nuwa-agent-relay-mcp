@@ -30,8 +30,14 @@ export class WorkerBridge {
     const principal = await this.identity();
     const channel = this.channels.get(this.channels.idFromName(route));
 
+    const payload = JSON.stringify({ ...body, principal });
+
+    if (payload.length > Protocol.maxSize) {
+      throw new APIError(413, 'worker_request_too_large', 'Worker exchange exceeds the supported size.');
+    }
+
     return channel.fetch(new Request('https://worker-channel.internal/' + operation, {
-      method: 'POST', body: JSON.stringify({ ...body, principal }),
+      method: 'POST', body: payload,
     }));
   }
 

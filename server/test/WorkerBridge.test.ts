@@ -23,10 +23,13 @@ class WorkerDeviceScenario {
 
         if (!channel) {
           const storage = new Map<string, unknown>();
-          channel = new WorkerBridgeChannel({ storage: {
+          const transaction = {
             get: async <T>(key: string) => storage.get(key) as T | undefined,
-            put: async (key, value) => { storage.set(key, value); },
-            delete: async (key) => storage.delete(key),
+            put: async <T>(key: string, value: T) => { storage.set(key, value); },
+            delete: async (key: string) => storage.delete(key),
+          };
+          channel = new WorkerBridgeChannel({ storage: {
+            ...transaction, transaction: (operation) => operation(transaction),
           } });
           this.channels.set(id, channel);
         }

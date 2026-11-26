@@ -64,6 +64,9 @@ class WorkService:
         self.polls = {}
         self.pages = {}
         self.sockets = {}
+        policyID = str(uuid4())
+        self.policy = {"id": policyID, "mode": "manual", "revision": 1,
+                       "settingsURL": "https://agent-relay.company-notes.com/manage?collaboration=" + policyID}
 
     def connect(self, url, additional_headers, **options):
         assert url == "wss://mcp-test.example.com/work-inbox/events/stream"
@@ -125,9 +128,9 @@ class WorkService:
                     }
                     self.messages[threadID] = []
 
-                value = dict(self.sessions[threadID], created=created)
+                value = dict(self.sessions[threadID], created=created, collaborationPolicy=dict(self.policy))
             elif name == "agentAddressGetStatus":
-                value = {"session": self.sessions.get(threadID)}
+                value = {"session": self.sessions.get(threadID), "collaborationPolicy": dict(self.policy)}
             elif name == "relayInbox":
                 self.polls[threadID] = self.polls.get(threadID, 0) + 1
                 value = list(self.messages[threadID])
@@ -199,6 +202,9 @@ class TestNativeWork:
     def testTwoWorksReceiveAndReplyWithTheirOwnIdentityAndResume(self, tmp_path, monkeypatch):
         monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path))
         service = WorkService()
+        service.policy["mode"] = "unconfigured"
+        opened = []
+        monkeypatch.setattr("webbrowser.open", lambda url: opened.append(url) or True)
         peer = NativeQueue()
         remote = RemoteWorkClient(WorkCredentials(), "https://mcp-test.example.com",
                                   httpx.MockTransport(service.handle), streamConnector=service.connect)
@@ -224,6 +230,10 @@ class TestNativeWork:
                 assert first["canonical"] == "nuwa/codex/review-build"
                 assert second["canonical"] == "nuwa/codex/fix-parser"
                 assert first["sessionID"] != second["sessionID"]
+                assert opened == [service.policy["settingsURL"]]
+                service.policy["mode"] = "autonomous"
+                status = await self.call(client, threadA, "agentAddressGetStatus")
+                assert status["collaborationPolicy"]["mode"] == "autonomous"
 
                 firstMessage = service.receive(threadA, "Review the build")
                 secondMessage = service.receive(threadB, "Fix the parser")
@@ -240,12 +250,12 @@ class TestNativeWork:
 
                 reply = await self.call(client, threadA, "relayReplyThread", {
                     "threadID": firstMessage["threadId"], "messageID": firstMessage["id"],
-                    "body": "Build reviewed.",
+                    "body": "Build reviewed.", "autonomous": True,
                 })
                 assert reply["threadId"] == firstMessage["threadId"]
                 assert service.replies == [(threadA, {
                     "threadID": firstMessage["threadId"], "messageID": firstMessage["id"],
-                    "body": "Build reviewed.",
+                    "body": "Build reviewed.", "autonomous": True,
                 })]
 
                 await self.call(client, threadA, "agentAddressReleaseWork")
@@ -257,6 +267,8 @@ class TestNativeWork:
                 assert resumed["canonical"] == first["canonical"]
                 assert resumed["sessionID"] == first["sessionID"]
                 assert not resumed["created"]
+                assert resumed["collaborationPolicy"]["mode"] == "autonomous"
+                assert opened == [service.policy["settingsURL"]]
 
                 await self.waitUntil(lambda: len(peer.snapshot()) == 3)
                 assert len(peer.snapshot()) == 3, "An offline reply must reach the resumed native work"

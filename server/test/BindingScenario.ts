@@ -167,6 +167,17 @@ export class RemoteMCPScenario {
     this.agentHandles.set(sessionID, handle);
   }
 
+  private readonly collaborationPolicies = new Map<string, {
+    id: string; mode: string; revision: number; settingsURL: string;
+  }>();
+
+  approveCollaboration(id: string): void {
+    const policy = [...this.collaborationPolicies.values()].find((item) => item.id === id);
+    assert.ok(policy);
+    policy.mode = 'autonomous';
+    policy.revision += 1;
+  }
+
   readonly workSessions = new Map<string, { id: string; canonical: string; agentId: string; resumeToken: string }>();
 
   private canonical(sessionID: string): string {
@@ -564,6 +575,20 @@ export class RemoteMCPScenario {
       }
 
       this.calls.push({ url, method: init?.method, headers, body });
+
+      if (url.pathname === '/v2/collaboration-policy') {
+        const key = RemoteMCPScenario.principal(headers.get('authorization')) + ':' + this.workSessions.get(sessionID)?.agentId;
+        let policy = this.collaborationPolicies.get(key);
+
+        if (!policy && init?.method === 'PUT') {
+          const id = crypto.randomUUID();
+          policy = { id, mode: 'unconfigured', revision: 0,
+            settingsURL: 'https://agent-relay.company-notes.com/manage?collaboration=' + id };
+          this.collaborationPolicies.set(key, policy);
+        }
+
+        return Response.json({ ok: true, data: policy ?? { mode: 'unconfigured' } });
+      }
 
       return Response.json({ ok: true, data: {
         id: MESSAGE_ID, threadId: THREAD_ID,

@@ -58,6 +58,9 @@ test('native work Sessions preserve addresses, isolate traffic and share Agent m
 
     const first = payload(await call('work-a', 'agentAddressStartWork', name));
     const second = payload(await call('work-b', 'agentAddressStartWork', name));
+    assert.equal(first.collaborationPolicy.mode, 'unconfigured');
+    assert.equal(first.collaborationPolicy.id, second.collaborationPolicy.id);
+    scenario.approveCollaboration(first.collaborationPolicy.id);
     assert.equal(first.created, true);
     assert.equal(second.created, true);
     assert.notEqual(first.sessionID, second.sessionID);
@@ -68,6 +71,7 @@ test('native work Sessions preserve addresses, isolate traffic and share Agent m
 
     const status = payload(await call('work-a', 'agentAddressGetStatus'));
     assert.equal(status.session.canonical, first.canonical);
+    assert.equal(status.collaborationPolicy.mode, 'autonomous');
     assert.equal(payload(await call('work-a', 'agentAddressStartWork')).canonical, first.canonical);
     const calls = scenario.calls.length;
     const heartbeats = scenario.heartbeatAttempts;
@@ -79,6 +83,11 @@ test('native work Sessions preserve addresses, isolate traffic and share Agent m
     assert.equal(scenario.heartbeatAttempts, heartbeats);
     assert.equal(scenario.statusLookups - statuses, 2);
     assert.equal(scenario.grantLookups, 0);
+    payload(await call('work-a', 'relayReplyThread', {
+      threadID: '11111111-1111-4111-8111-111111111111', messageID: '22222222-2222-4222-8222-222222222222',
+      body: 'Routine reply', autonomous: true,
+    }));
+    assert.equal(scenario.calls.at(-1)?.body.autonomous, true);
 
     sqlite.database.prepare('UPDATE remote_work_session_bindings SET expires_at = ? WHERE session_id = ?')
       .run(new Date(0).toISOString(), first.sessionID);
@@ -86,6 +95,7 @@ test('native work Sessions preserve addresses, isolate traffic and share Agent m
     const resumed = payload(await call('work-a', 'agentAddressStartWork', {}, 'oauth-a-refresh'));
     assert.equal(resumed.canonical, first.canonical);
     assert.equal(resumed.created, false);
+    assert.equal(resumed.collaborationPolicy.mode, 'autonomous');
 
     const oldAddress = first.canonical;
     const renamedAddress = oldAddress + '-renamed';
@@ -117,6 +127,8 @@ test('native work Sessions preserve addresses, isolate traffic and share Agent m
       address: renamedAddress,
     }, 'oauth-b'));
     assert.equal(selected.sessionID, first.sessionID);
+    assert.notEqual(selected.collaborationPolicy.id, first.collaborationPolicy.id);
+    assert.equal(selected.collaborationPolicy.mode, 'unconfigured');
     assert.equal(selected.canonical, renamedAddress);
     assert.equal(payload(await call('work-a', 'agentAddressGetStatus')).session, null);
     assert.equal((await call('work-a', 'agentAddressStartWork', name)).result.isError, true);

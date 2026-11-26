@@ -20,6 +20,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - name: Verify published Session Router Skill against pinned source
+        run: node scripts/ImportSessionRouterSkill.mjs --check
       - name: Remote MCP TypeScript
         run: npm run check
       - name: Enforce Code Principles for TypeScript and scripts

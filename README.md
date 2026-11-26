@@ -108,4 +108,4 @@ from these manual binding and packaging checks.
 
 ## Optional local Worker Provider pilot
 
-See [Studio Worker Provider](docs/WorkerProvider.md) for the scoped Rakazo-to-local-Gateway integration, authorization and acceptance requirements.
+See [Studio Worker Provider](docs/WorkerProvider.md) for the scoped Rakazo-to-local-Gateway integration, authorization and acceptance requirements. The [official Session Router Skill](https://mcp.agent-relay.company-notes.com/skills/session-router/SKILL.md) is a pinned generated publication of the canonical AI Worker Gateway source; update the source commit in `scripts/ImportSessionRouterSkill.mjs`, regenerate, and verify before release.

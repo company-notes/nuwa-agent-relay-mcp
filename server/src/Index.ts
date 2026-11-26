@@ -3,6 +3,7 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import type { BackgroundTasks, Env } from './Env';
 import { NuwaMCPServer } from './MCPServer';
 import { AGENT_SKILL_MD } from './SkillDocument';
+import { SESSION_ROUTER_SKILL_MD } from './SessionRouterSkillDocument';
 import { AGENT_SKILL_REFERENCES } from './SkillReferences';
 import { OAuthResourceServer, type AuthenticatedRequest } from './OAuthResourceServer';
 import { AddressAPIClient, APIError, RelayAPIClient } from './APIClients';
@@ -42,9 +43,11 @@ export class HTTPMCPApplication {
       return Response.json({ ok: true, data: { service: 'nuwa-agent-relay-mcp' } });
     }
 
-    if (url.pathname === '/skills/nuwa-agent-relay/SKILL.md' &&
-      request.method === 'GET') {
-      return new Response(AGENT_SKILL_MD, {
+    const skill = url.pathname === '/skills/nuwa-agent-relay/SKILL.md' ? AGENT_SKILL_MD
+      : url.pathname === '/skills/session-router/SKILL.md' ? SESSION_ROUTER_SKILL_MD : undefined;
+
+    if (skill && request.method === 'GET') {
+      return new Response(skill, {
         headers: {
           'content-type': 'text/markdown; charset=utf-8',
           'cache-control': 'public, max-age=300',

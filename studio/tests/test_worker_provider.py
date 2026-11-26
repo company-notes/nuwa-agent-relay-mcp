@@ -16,7 +16,8 @@ from src.Config import LocalConfig
 from src.WorkerBridgeClient import WorkerBridgeClient, WorkerBridgeRejected
 from src.WorkerBridgeService import WorkerBridgeService
 from src.LocalMCPClient import LocalMCPClient, LocalMCPError
-from src.WorkerProvider import WorkerCredential, WorkerProvider
+from src.WorkerCredential import WorkerCredential
+from src.WorkerProvider import WorkerProvider
 
 
 class WorkerScenario:
@@ -151,8 +152,10 @@ $file = Join-Path $env:LOCALAPPDATA 'AIWorkerGateway\client-token.dpapi'
 [IO.File]::WriteAllText($file, $cipher, [Text.Encoding]::ASCII)
 """
     encoded = b64encode(script.encode("utf-16-le")).decode("ascii")
-    result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
-                            capture_output=True)
+    environment = {key: value for key, value in os.environ.items() if key.upper() != "PSMODULEPATH"}
+    powershell = os.path.join(os.environ["SystemRoot"], "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
+    result = subprocess.run([powershell, "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+                            capture_output=True, env=environment)
     assert result.returncode == 0, result.stderr.decode("utf-8", errors="replace")
     assert WorkerCredential.read() == WorkerScenario.TOKEN
 

@@ -108,9 +108,8 @@ and owner-authorization procedures.
 
 A cloud assistant with an explicitly paired Studio may discover local
 Worker Gateway tools such as work_list, work_start and work_continue
-through the same Nuwa Remote MCP connection. Use the canonical
-[Session Router Skill](https://github.com/company-notes/ai-worker-gateway/blob/main/.agents/skills/session-router/SKILL.md)
-for work routing, and the actual advertised tool schemas. The pilot
+through the same Nuwa Remote MCP connection. Use the installed Session Router Skill supplied by the Worker administrator
+for work routing, together with the actual advertised tool schemas. The pilot
 requires a dedicated OAuth connection and isolated Windows Worker; it
 uses manual progress queries rather than webhook completion notifications.
 Read worker_provider_status when the local tools are missing and refresh

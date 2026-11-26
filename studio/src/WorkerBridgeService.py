@@ -2,7 +2,6 @@
 
 import json
 import logging
-import subprocess
 import time
 from uuid import UUID
 
@@ -46,7 +45,7 @@ class WorkerBridgeService:
     def _catalog(self) -> list[dict]:
         try:
             return self.provider.catalog()
-        except (LocalMCPError, httpx.HTTPError, OSError, ValueError, subprocess.TimeoutExpired) as error:
+        except (LocalMCPError, httpx.HTTPError, OSError, ValueError) as error:
             logger.warning("Worker Provider unavailable (errorType=%s)", type(error).__name__)
 
             return []
@@ -54,7 +53,7 @@ class WorkerBridgeService:
     def _execute(self, request: dict) -> dict:
         try:
             return self.provider.call(request["name"], request["arguments"])
-        except (LocalMCPError, httpx.HTTPError, OSError, ValueError, subprocess.TimeoutExpired) as error:
+        except (LocalMCPError, httpx.HTTPError, OSError, ValueError) as error:
             logger.warning("Worker tool could not be confirmed (errorType=%s)", type(error).__name__)
 
             return {"isError": True, "content": [{

@@ -10,7 +10,6 @@ from uuid import uuid4
 
 import httpx
 import pytest
-
 from playwright.sync_api import sync_playwright
 
 from src.Client import StaticBearerCredential
@@ -356,6 +355,7 @@ def test_owner_cancels_pairing_without_starting_worker(tmp_path, monkeypatch):
         assert startup.started == 0
         assert local.calls == []
 
+
 def test_owner_authorizes_through_real_browser(tmp_path, monkeypatch):
     """Regression: a real browser rejected the Studio authorization form with HTTP 403."""
     monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path))
@@ -384,4 +384,3 @@ def test_owner_authorizes_through_real_browser(tmp_path, monkeypatch):
 
         assert service.route() == remote.ROUTE, "The authorized pairing must be persisted."
         assert startup.started == 1, "Successful authorization must start the Worker once."
-

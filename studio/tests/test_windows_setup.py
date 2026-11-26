@@ -212,6 +212,7 @@ class TestWindowsSetup:
         assert manager.status() == WorkerTaskState.ABSENT
         with pytest.raises(FileNotFoundError):
             winreg.OpenKey(winreg.HKEY_CURRENT_USER, self.PROTOCOL_KEY)
+
         assert LocalConfig.workerBridgePath().is_file()
         assert "nuwa-agent-relay-studio" not in profile.servers()
         assert profile.servers()["other"]["command"] == "other"

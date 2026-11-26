@@ -62,6 +62,7 @@ class WorkerDeviceScenario {
     assert.ok(!html.includes(pairingCode), 'The public entrypoint must never contain the pairing secret.');
     assert.doesNotMatch(html, /<script|http-equiv="refresh"|<form/i,
       'The owner must initiate Studio explicitly; the public page never submits credentials.');
+
     const [route, secret] = pairingCode.split('.');
     this.route = route;
 

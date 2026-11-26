@@ -27,7 +27,7 @@ export class NuwaMCPServer {
         ? 'Nuwa gives each native work Session its own canonical address under the established Agent. ' +
           'Before beginning any new user work, even without messaging, call agentAddressStartWork with a meaningful kebab-case ' +
           'sessionName and sessionDisplayName, based on the user task. On native resume call it without names. ' +
-          'Report the returned address immediately as Active or Resumed work address. On an address question ' +
+          'Report the returned address immediately as Active or Resumed work address. runtimeLeaseExpiresAt is an internal renewable lease, never a Session address expiration; omit it in ordinary address reports. On an address question ' +
           'use agentAddressGetStatus. On explicit reauthorization recovery use agentAddressSelectSession ' +
           'with the original full address. Use the full canonical address to reach a particular work Session. ' +
           'After initialization, sendToAgent and relayReplyThread directly without from. Use relayInbox ' +

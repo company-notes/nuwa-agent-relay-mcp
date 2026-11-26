@@ -117,7 +117,7 @@ export class SessionBindings {
       created,
       sessionID: row.sessionID,
       canonical: row.canonicalAddress,
-      expiresAt: row.expiresAt,
+      runtimeLeaseExpiresAt: row.expiresAt,
     };
   }
 

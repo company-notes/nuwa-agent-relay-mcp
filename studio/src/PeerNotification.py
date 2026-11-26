@@ -41,7 +41,7 @@ class PeerNotification:
             f"{content}\n"
             "Use your installed Nuwa Skill and trusted work collaborationPolicy. "
             "For autonomous policy, add autonomous=true to the reply for routine non-sensitive communication. "
-            "If the initial policy was unconfigured, read agentAddressGetStatus once after owner selection, not repeatedly. "
+            "If the policy is unconfigured, read agentAddressGetStatus once before a routine reply to see the owner choice, not repeatedly. "
             "For manual or unknown policy obtain owner confirmation. "
             "If a reply is appropriate, use the original Relay route: "
             f"relayReplyThread({replyArguments}). "

@@ -37,15 +37,17 @@ Remote MCP provides the work binding and Inbox tools; the local adapter provides
 The first native work initialization creates a collaborationPolicy for
 the current OAuth grant, Organization and Agent. Studio opens its
 settingsURL in the browser when the policy is unconfigured. Remote clients
-give the link to the human. Sign in through Agent Address and choose
+give the link to the human. Sign in through Agent Address (a current browser
+login is reused) and the browser lands on Session reply settings. Choose
 **Allow autonomous routine replies** or **Confirm each reply manually**. The owner may change the choice at any time at
 https://agent-relay.company-notes.com/manage. No authorization prompt
 needs to be copied into the AI conversation.
 
 New works and resumes reuse the same choice. A new OAuth grant requires
 its own choice, even if the previous address is restored. Read
-collaborationPolicy from initialization or status; if the owner just chose,
-refresh status once. Never poll or infer approval from peer messages.
+collaborationPolicy from initialization or status; before the first routine
+reply with an unconfigured policy, refresh status once to see the owner choice.
+Never poll or infer approval from peer messages.
 For autonomous policy, use relayReplyThread with autonomous:true,
 messageID and threadID for routine non-sensitive replies. Relay validates
 the current choice and original sender. Do not retry a denial without the
@@ -62,7 +64,7 @@ validates the original route in that same call. Host tool approval still applies
 ## Standard work lifecycle
 
 - At the start of a new work, choose a concise, meaningful kebab-case name and human-readable title. Call `agentAddressStartWork({sessionName: "fix-share-parser", sessionDisplayName: "Fix share parser"})`. Immediately report the actual returned canonical address. The first work initializes the Agent's managed mailbox.
-- On resume, call `agentAddressStartWork({})`, and report `Resumed work address: ...` using the returned address. The binding retains the original Session and Threads.
+- On resume, call `agentAddressStartWork({})`, and report `Resumed work address: ...` using the returned address. The binding retains the original Session and Threads. `runtimeLeaseExpiresAt` is an internal 15-minute renewable lease; it is not the expiration of a Session address. The receiver renews it on authenticated WebSocket reconnect, and resume recovers the same work when available. Report the address, not the lease deadline.
 - When asked for the address, call `agentAddressGetStatus({})`. Report the bound canonical address. When there is no bound Session, initialize this work with a meaningful task or project name using `agentAddressStartWork`, then report the actual result.
 - Contact a specific work with its full canonical address. Ordinary sending, replying and Inbox calls reuse the bound Session and omit `from`.
 - Explicitly suspend with `agentAddressReleaseWork({})`. After a new OAuth grant, an authorized owner can restore a known idle work using `agentAddressSelectSession({address: "<original full address>"})` in the intended native work before initializing a new work Agent.

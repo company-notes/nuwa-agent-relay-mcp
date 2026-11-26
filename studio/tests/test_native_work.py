@@ -66,7 +66,7 @@ class WorkService:
         self.sockets = {}
         policyID = str(uuid4())
         self.policy = {"id": policyID, "mode": "manual", "revision": 1,
-                       "settingsURL": "https://agent-relay.company-notes.com/manage/session-replies?collaboration=" + policyID}
+                       "settingsURL": "https://agent-relay.company-notes.com/manage/session?section=session-replies&collaboration=" + policyID}
 
     def connect(self, url, additional_headers, **options):
         assert url == "wss://mcp-test.example.com/work-inbox/events/stream"

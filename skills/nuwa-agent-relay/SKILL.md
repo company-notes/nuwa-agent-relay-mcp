@@ -79,14 +79,17 @@ On a shared office connection, supply your own registered native Bot ID as
 ### Owner-authorized coworker communication
 
 Native work initialization returns a server-owned collaborationPolicy.
-If unconfigured, the human opens settingsURL, signs in, and explicitly
-chooses autonomous or manual. Studio offers the browser page automatically;
-remote native clients give the link to the user. Do not choose for the owner.
+If unconfigured, Studio opens settingsURL automatically; remote native
+clients give the link to the human. The browser goes directly through Agent
+Address sign-in to Session reply settings, reusing a current browser login
+when available. The owner chooses autonomous or manual. Do not choose for
+the owner.
 The choice applies to works under the same OAuth grant, Organization and
 Agent, including resumes. It can be changed in Relay management at any time.
 
 Use the trusted policy from agentAddressStartWork or agentAddressGetStatus.
-After the owner chooses, refresh status once if needed; do not poll.
+Before the first routine reply with an unconfigured policy, refresh status
+once to see the owner's choice; do not poll.
 With autonomous policy, reply directly to routine non-sensitive coworker
 messages in the verified original Relay Thread with autonomous:true,
 messageID and threadID. Relay checks the current policy and original route
@@ -122,7 +125,7 @@ connection alone does not provide background execution.
 
 ### Native work clients — Codex, Claude Code, Grok Build and OpenCode
 
-Read the complete [native work client guide](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/work-clients.md) when setting up a native work. Windows Coding Agents use the local Nuwa Relay MCP Setup for native work identity. Local receiving uses the client-specific adapter described in the guide. Remote Codex and Grok Build connectors use `X-Nuwa-Work-Mode` and, where applicable, `X-Nuwa-Work-ID`. Call `agentAddressStartWork` for a new native work and for resuming the same work. Report the returned canonical address, including `Resumed work address` on resume. Use `agentAddressGetStatus` to check the active address. When the requested work has no bound Session, initialize it with `agentAddressStartWork` and a meaningful task or project name, then report the actual returned address. Full setup and recovery steps live in the linked guide.
+Read the complete [native work client guide](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/work-clients.md) when setting up a native work. Windows Coding Agents use the local Nuwa Relay MCP Setup for native work identity. Local receiving uses the client-specific adapter described in the guide. Remote Codex and Grok Build connectors use `X-Nuwa-Work-Mode` and, where applicable, `X-Nuwa-Work-ID`. Call `agentAddressStartWork` for a new native work and for resuming the same work. Report the returned canonical address, including `Resumed work address` on resume. The address persists; `runtimeLeaseExpiresAt` describes a renewable internal Runtime lease, not address expiration. Omit the lease expiry in normal address reports. Use `agentAddressGetStatus` to check the active address. When the requested work has no bound Session, initialize it with `agentAddressStartWork` and a meaningful task or project name, then report the actual returned address. Full setup and recovery steps live in the linked guide.
 
 
 ### Shared office

@@ -1,7 +1,6 @@
 """Stateless HTTPS adapter for the existing Remote MCP work-session tools."""
 
 import json
-import os
 from uuid import uuid4
 
 import httpx
@@ -16,9 +15,7 @@ class RemoteWorkClient:
 
     def __init__(self, credentials, origin: str | None = None, transport=None, streamConnector=None):
         self.credentials = credentials
-        self.origin = LocalConfig.validateOrigin(
-            origin or os.environ.get("NUWA_MCP_URL", "https://mcp.agent-relay.company-notes.com"),
-        )
+        self.origin = LocalConfig.remoteMCPOrigin(origin)
         self.transport = transport
         self.streamConnector = streamConnector
 

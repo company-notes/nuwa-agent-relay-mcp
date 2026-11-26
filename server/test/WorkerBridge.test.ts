@@ -2,13 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { MESSAGE_ID, RemoteMCPScenario, RUNTIME_SECRET, SESSION_A, THREAD_ID } from './BindingScenario';
-import { WorkerBridgeChannel } from '../src/WorkerBridgeChannel';
+import { WorkerChannelScenario } from './WorkerChannelScenario';
 
-class WorkerDeviceScenario {
-  readonly base = new RemoteMCPScenario();
-  private readonly channels = new Map<unknown, WorkerBridgeChannel>();
+class WorkerDeviceScenario extends WorkerChannelScenario {
   private readonly jobs = new Map<string, string[]>();
   private route = '';
+  private readonly routedStarts: string[] = [];
   private readonly notificationRouteID = 'c'.repeat(64);
   private readonly notificationSetupID = 's'.repeat(32);
   private readonly tools = ['fleet_status', 'work_list', 'work_start', 'work_status', 'work_continue',
@@ -19,31 +18,6 @@ class WorkerDeviceScenario {
       message: { type: 'string' }, requestId: { type: 'string' },
       notificationRouteId: { type: 'string' }, setupId: { type: 'string' } } },
   }));
-
-  constructor() {
-    this.base.env.WORKER_BRIDGE = {
-      idFromName: (name) => name,
-      get: (id) => {
-        let channel = this.channels.get(id);
-
-        if (!channel) {
-          const storage = new Map<string, unknown>();
-          const transaction = {
-            get: async <T>(key: string) => storage.get(key) as T | undefined,
-            put: async <T>(key: string, value: T) => { storage.set(key, value); },
-            delete: async (key: string) => storage.delete(key),
-          };
-          channel = new WorkerBridgeChannel({ storage: {
-            ...transaction, transaction: (operation) => operation(transaction),
-          } });
-          this.channels.set(id, channel);
-        }
-
-        return channel;
-      },
-    };
-    this.base.install();
-  }
 
   private studio(operation: string, body: Record<string, unknown> = {}, token = 'oauth-b') {
     return this.base.application.handle(new Request('https://mcp.agent-relay.company-notes.com/worker-bridge/' + operation, {
@@ -116,7 +90,10 @@ class WorkerDeviceScenario {
         break;
       case 'work_start':
         this.jobs.set('job-a', [args.task]);
-        data = { job: { jobId: 'job-a' }, created: true, notificationRouteId: args.notificationRouteId };
+        if (args.notificationRouteId) {
+          this.routedStarts.push(args.notificationRouteId);
+        }
+        data = { job: { jobId: 'job-a' }, created: true };
         break;
       case 'work_continue':
         this.jobs.get(args.jobId)!.push(args.message);
@@ -202,7 +179,7 @@ class WorkerDeviceScenario {
     const started = await this.call('work_start', {
       requestId: 'travel-start', task: 'Build a travel planner.', ...route,
     });
-    assert.equal(started.notificationRouteId, paired.notificationRouteId);
+    assert.deepEqual(this.routedStarts, [paired.notificationRouteId]);
     const jobID = started.job.jobId;
     await this.call('work_continue', { requestId: 'travel-continue', jobId: jobID, message: 'Add expense splitting.' });
     assert.deepEqual((await this.call('work_status', { jobId: jobID })).messages,
@@ -224,9 +201,6 @@ class WorkerDeviceScenario {
     assert.ok(list.result.tools.some((tool: { name: string }) => tool.name === 'sendToAgent'));
   }
 
-  close() {
-    this.base.restore();
-  }
 }
 
 test('a paired remote assistant discovers, starts and continues a local job', async () => {

@@ -24,7 +24,7 @@ class WorkerProvider:
         self.notificationDispatchTools = frozenset(policy["notificationDispatchTools"])
         self.notificationRoutePattern = re.compile(policy["notificationRoutePattern"])
         self.notificationSetupPattern = re.compile(policy["notificationSetupPattern"])
-        self.allowed = frozenset(policy["tools"]) | self.notificationTools.keys()
+        self.allowed = frozenset(policy["tools"]) | frozenset(self.notificationTools)
 
     def catalog(self) -> list[dict]:
         tools = []

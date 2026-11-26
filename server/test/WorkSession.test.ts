@@ -62,6 +62,8 @@ test('native work Sessions preserve addresses, isolate traffic and share Agent m
     assert.equal(first.collaborationPolicy.id, second.collaborationPolicy.id);
     scenario.approveCollaboration(first.collaborationPolicy.id);
     assert.equal(first.created, true);
+    assert.equal(typeof first.runtimeLeaseExpiresAt, 'string');
+    assert.equal(first.expiresAt, undefined);
     assert.equal(second.created, true);
     assert.notEqual(first.sessionID, second.sessionID);
     assert.equal(first.canonical.split('/')[1], second.canonical.split('/')[1]);
@@ -95,6 +97,8 @@ test('native work Sessions preserve addresses, isolate traffic and share Agent m
     const resumed = payload(await call('work-a', 'agentAddressStartWork', {}, 'oauth-a-refresh'));
     assert.equal(resumed.canonical, first.canonical);
     assert.equal(resumed.created, false);
+    assert.equal(resumed.sessionID, first.sessionID);
+    assert.ok(Date.parse(resumed.runtimeLeaseExpiresAt) > Date.now());
     assert.equal(resumed.collaborationPolicy.mode, 'autonomous');
 
     const oldAddress = first.canonical;

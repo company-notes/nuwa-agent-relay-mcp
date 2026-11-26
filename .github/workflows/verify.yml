@@ -131,9 +131,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: nuwa-relay-mcp-windows-test-build
-          path: |
-            studio/dist/nuwa-relay-mcp.exe
-            studio/dist/nuwa-relay-mcp-setup.exe
+          path: studio/dist/nuwa-relay-mcp-setup.exe
           if-no-files-found: error
 
   deploy:

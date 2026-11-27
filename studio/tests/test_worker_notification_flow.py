@@ -357,6 +357,7 @@ class CombinedWorkerAuthorizationFlow(WorkerNotificationFlow):
 
         assert continued["job"]["jobId"] == jobID
         assert continued["notificationBound"] is True
+
         self._verifyCallbacks(self.gateway.exchange({"jobId": jobID}), jobID, 2)
 
 

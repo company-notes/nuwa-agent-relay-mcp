@@ -103,6 +103,7 @@ class WorkerBridgeService:
             raise ValueError("Invalid remote Worker request.")
 
         result = self._execute(request, route)
+
         self.bridge.result(route, request["requestID"], result)
 
     def serve(self) -> None:

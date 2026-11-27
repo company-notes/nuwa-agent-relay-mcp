@@ -103,6 +103,7 @@ class WorkerProvider:
 
         if name == "worker_notification_status":
             status = self.connectionNotification(connectionID)
+
             data = {"enabled": status["enabled"], "managedByStudio": True,
                     "preference": "on" if status["enabled"] else "unset"}
 

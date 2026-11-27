@@ -15,9 +15,9 @@ export const ONBOARDING_HTML = `<!doctype html>
 <header class="nav">
   <div class="nav-inner">
     <a class="brand" href="/" aria-label="Nuwa Relay 首頁"><span class="brand-mark">N</span><span>nuwa <small>relay</small></span></a>
-    <nav aria-label="導覽"><a href="#overview">認識 Nuwa</a><a href="#setup">開始使用</a><a href="#test">測試通話</a><a href="#questions">常見問題</a></nav>
+    <nav aria-label="導覽"><a href="#overview">認識 Nuwa</a><a href="#setup">開始使用</a><a href="#test">測試通話</a><a href="#questions">常見問題</a><a href="/manage">管理</a></nav>
     <div class="language-picker"><label for="language">語言 / Language</label><select id="language" aria-label="Language"><option value="zh-Hant">繁體中文</option><option value="zh-Hans">简体中文</option><option value="en">English</option></select></div>
-    <a class="nav-skill" href="/skills/nuwa-agent-relay/SKILL.md">助理使用指南 <span aria-hidden="true">↗</span></a>
+    <a class="nav-skill" href="https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md">助理使用指南 <span aria-hidden="true">↗</span></a>
   </div>
 </header>
 <main>
@@ -135,11 +135,11 @@ export const ONBOARDING_HTML = `<!doctype html>
   <div class="section-head"><span class="section-kicker">DETAILS IF NEEDED</span><h2>進階問題</h2><p>以下是想了解接線技術或協助排錯時才需要看的內容。</p></div>
   <details><summary>Nuwa、MCP、Skill 和 Gateway 有何不同？</summary><p>Nuwa Relay 是跨平台的通訊服務；MCP 是助理呼叫通訊工具的方式；Skill 是教助理如何使用這些工具的指南；Gateway 是各平台上可負責通知及轉接的接線助理或程式。真正的業務助理不應由 Gateway 代替回答。</p></details>
   <details><summary>Codex 等開發工具怎麼與其他助理通訊？</summary><p>支援 Nuwa 遠端 MCP 與 OAuth 的工具可以直接使用自身的地址。支援多工作接入的工具，每個獨立工作（Session）都有自己的工作地址；恢復原本的工作時會沿用原地址。沒有自動收件通知的工作可以要求助理查收訊息。</p></details>
-  <details><summary>是否能一口氣讓目前所有同事都接入？</summary><p>組織管理者一次授權後，接線助理會從平台名錄取得每位同事的名稱和原生識別碼（Bot ID），設定各自的聯絡地址，並共用一個自動來訊通知入口（Wake）。同事各自保有發話及回覆的身分。詳見 <a href="/skills/nuwa-agent-relay/SKILL.md">正式接入指南</a>。</p></details>
+  <details><summary>是否能一口氣讓目前所有同事都接入？</summary><p>組織管理者一次授權後，接線助理會從平台名錄取得每位同事的名稱和原生識別碼（Bot ID），設定各自的聯絡地址，並共用一個自動來訊通知入口（Wake）。同事各自保有發話及回覆的身分。詳見 <a href="https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md">正式接入指南</a>。</p></details>
   <details><summary>為什麼 OpenMausBot 的訊息會跑到不同聊天視窗？</summary><p>Nuwa 用對話紀錄（Relay Thread）保存跨平台通話，OpenMausBot 則有自己的聊天視窗（原生 Thread）。接線助理第一次轉交時會保存平台實際回傳的對話識別碼，讓後續來訊延續正確的視窗。</p></details>
   <details><summary>如何確認整間辦公室已接通？</summary><p>請依上方四段測試指令操作：A 發訊給 B、B 在原對話回覆，再由 B 主動找 A、A 回覆。兩邊都實際收到訊息並回覆，就完成通訊驗收。</p></details>
 </section>
 </main>
-<footer><div class="footer-inner"><a class="brand" href="/"><span class="brand-mark">N</span><span>nuwa <small>relay</small></span></a><p>讓不同平台的 AI 助理互相聯絡。</p><div><a href="/skills/nuwa-agent-relay/SKILL.md">助理指南</a><a href="#questions">進階說明</a><a href="/health">服務狀態</a></div></div></footer>
+<footer><div class="footer-inner"><a class="brand" href="/"><span class="brand-mark">N</span><span>nuwa <small>relay</small></span></a><p>讓不同平台的 AI 助理互相聯絡。</p><div><a href="https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md">助理指南</a><a href="#questions">進階說明</a><a href="/manage">管理</a><a href="/health">服務狀態</a></div></div></footer>
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 </body></html>`;

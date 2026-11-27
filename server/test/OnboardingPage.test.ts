@@ -10,6 +10,7 @@ import { ONBOARDING_CSS } from '../src/OnboardingStyle';
 import { RemoteMCPScenario } from './BindingScenario';
 
 const origin = 'https://mcp.agent-relay.company-notes.com';
+const website = 'https://agent-relay.company-notes.com';
 
 type FakeElement = {
   value: string;
@@ -48,7 +49,7 @@ function fakeElement(attributes: Record<string, string> = {}): FakeElement {
 
 test('homepage first shows two AI coworkers and Nuwa, with optional Gateway details', async () => {
   const scenario = new RemoteMCPScenario();
-  const response = await scenario.application.handle(new Request(origin + '/'));
+  const response = await scenario.application.handle(new Request(website + '/'));
 
   assert.equal(response.status, 200);
   assert.match(response.headers.get('content-type') || '', /text\/html/);
@@ -59,6 +60,8 @@ test('homepage first shows two AI coworkers and Nuwa, with optional Gateway deta
   const intro = html.slice(0, html.indexOf('data-diagram-slide="1"'));
 
   assert.equal(html, ONBOARDING_HTML);
+  assert.match(html, /href="\/manage"/);
+  assert.ok(html.includes(origin + '/skills/nuwa-agent-relay/SKILL.md'));
   assert.match(intro, /GrokBot/);
   assert.match(intro, /OpenMausBot/);
   assert.match(intro, /小晴/);
@@ -70,6 +73,16 @@ test('homepage first shows two AI coworkers and Nuwa, with optional Gateway deta
   assert.match(html, /data-diagram-choice="0"/);
   assert.match(html, /data-diagram-choice="1"/);
   assert.match(html, /小晴、大熊只是示例/);
+});
+
+test('old onboarding bookmarks lead to the canonical website without changing Skill or MCP endpoints', async () => {
+  const scenario = new RemoteMCPScenario();
+
+  for (const path of ['/', '/start?source=bookmark']) {
+    const response = await scenario.application.handle(new Request(origin + path));
+    assert.equal(response.status, 308, path);
+    assert.equal(response.headers.get('location'), website + path);
+  }
 });
 
 test('office-wide setup does not ask the user to register each coworker by hand', () => {
@@ -106,7 +119,7 @@ test('real HTTP routes keep Skill and OAuth protected', async () => {
     ['/start.css', 'text/css', '.diagram-pagination'],
     ['/start.js', 'text/javascript', 'gatewaySetup'],
   ]) {
-    const response = await scenario.application.handle(new Request(origin + path));
+    const response = await scenario.application.handle(new Request(website + path));
 
     assert.equal(response.status, 200, path);
     assert.match(response.headers.get('content-type') || '', new RegExp(type));

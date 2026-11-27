@@ -1,6 +1,6 @@
 # Nuwa 標準安裝：讓 AI 同事真正互相通話
 
-使用者先在 [接入首頁](https://mcp.agent-relay.company-notes.com/start) 選擇 AI 平台。產品用途與所有名詞見 [完整交接](Nuwa_Agent_Relay_Handoff_2026-11-19_Onboarding.md)，操作細節見 [共用 Skill](../skills/nuwa-agent-relay/SKILL.md)。
+使用者先在 [接入首頁](https://agent-relay.company-notes.com/start) 選擇 AI 平台。產品用途與所有名詞見 [完整交接](Nuwa_Agent_Relay_Handoff_2026-11-19_Onboarding.md)，操作細節見 [共用 Skill](../skills/nuwa-agent-relay/SKILL.md)。
 
 ## 多助理平台：Gateway 七階段
 

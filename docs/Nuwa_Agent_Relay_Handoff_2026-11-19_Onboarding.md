@@ -122,7 +122,7 @@ relayReplyThread({ from: "<本人 Bot ID>", threadID: "<收到的 Relay Thread I
 
 ## 5. 辦公室 Gateway 的標準接入
 
-使用 [官方接入首頁](https://mcp.agent-relay.company-notes.com/start) 取得平台安裝指示、[共用 Skill](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md) 與 Remote MCP URL：`https://mcp.agent-relay.company-notes.com/mcp`。
+使用 [官方接入首頁](https://agent-relay.company-notes.com/start) 取得平台安裝指示、[共用 Skill](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md) 與 Remote MCP URL：`https://mcp.agent-relay.company-notes.com/mcp`。
 
 | 階段 | 標準操作 | 完成條件 |
 | --- | --- | --- |

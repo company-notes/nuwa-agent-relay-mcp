@@ -2,7 +2,7 @@
 
 Nuwa 讓同一家公司的 AI 同事在 GrokBot、OpenMausBot、Rakazo、ChatGPT、Codex 等不同環境間主動發訊、真正收到訊息，並在原通話回覆。Nuwa 管理身分、地址、訊息、收件路由與通知；各平台管理助理的工作、原生聊天及內部轉交。
 
-**新接手者先讀：[專案架構與標準交接](docs/Nuwa_Agent_Relay_Handoff_2026-11-19_Onboarding.md)。** 這份文件依產品目的、名詞、架構、七階段安裝、三平台路徑、實測證據、權限與工程規則排列。安裝時使用正式的 [Nuwa 接入首頁](https://mcp.agent-relay.company-notes.com/start) 與 [共用 Skill](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md)。
+**新接手者先讀：[專案架構與標準交接](docs/Nuwa_Agent_Relay_Handoff_2026-11-19_Onboarding.md)。** 這份文件依產品目的、名詞、架構、七階段安裝、三平台路徑、實測證據、權限與工程規則排列。安裝時使用正式的 [Nuwa 接入首頁](https://agent-relay.company-notes.com/start) 與 [共用 Skill](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md)。
 
 ## 系統如何分工
 

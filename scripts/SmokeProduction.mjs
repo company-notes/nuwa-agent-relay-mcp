@@ -3,9 +3,10 @@
 import assert from 'node:assert/strict';
 
 const origin = 'https://mcp.agent-relay.company-notes.com';
+const website = 'https://agent-relay.company-notes.com';
 
-async function request(path, options = {}) {
-  const response = await fetch(origin + path, {
+async function request(path, options = {}, targetOrigin = origin) {
+  const response = await fetch(targetOrigin + path, {
     ...options,
     redirect: 'manual',
     signal: AbortSignal.timeout(20_000),
@@ -21,21 +22,29 @@ assert.equal(health.status, 200, 'MCP health should be available.');
 const healthy = await health.json();
 assert.equal(healthy.data?.service, 'nuwa-agent-relay-mcp');
 
-const landing = await request('/');
+for (const path of ['/', '/start']) {
+  const legacy = await request(path);
+  assert.equal(legacy.status, 308, 'Old onboarding bookmarks must redirect.');
+  assert.equal(legacy.headers.get('location'), website + path);
+}
+
+const landing = await request('/', {}, website);
 assert.equal(landing.status, 200, 'Public onboarding homepage must be reachable.');
 const landingPage = await landing.text();
 assert.match(landingPage, /GrokBot/);
 assert.match(landingPage, /OpenMausBot/);
+assert.match(landingPage, /href="\/manage"/);
+assert.ok(landingPage.includes(origin + '/skills/nuwa-agent-relay/SKILL.md'));
 assert.ok(landingPage.includes('src="/start.js"'), 'Onboarding script must be referenced.');
 assert.match(landingPage, /助理 A 的名稱/);
 assert.match(landingPage, /助理 B 的名稱/);
 assert.doesNotMatch(landingPage, /助理 A 的 Nuwa 地址|助理 B 的 Nuwa 地址/);
 assert.match(landing.headers.get('content-security-policy') || '', /script-src 'self'/);
 
-const guide = await request('/start');
+const guide = await request('/start', {}, website);
 assert.equal(guide.status, 200, 'The guide should have a direct shareable URL.');
 
-const prompts = await request('/start.js');
+const prompts = await request('/start.js', {}, website);
 assert.equal(prompts.status, 200, 'Onboarding copyable prompts must load.');
 const promptText = await prompts.text();
 assert.match(promptText, /function gatewaySetup/);
@@ -89,7 +98,7 @@ for (const reference of references) {
   assert.doesNotMatch(content, /[\u3400-\u9fff]/, 'The platform reference must remain English-only.');
 }
 
-const styles = await request('/start.css');
+const styles = await request('/start.css', {}, website);
 assert.equal(styles.status, 200, 'The guide stylesheet must load.');
 
 const workerPairing = await request('/worker-pairing');

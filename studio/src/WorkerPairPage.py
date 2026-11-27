@@ -36,7 +36,11 @@ Confirm the identity and receiver belong to the same assistant before authorizin
 For an Agent Address client without a webhook, leave both webhook fields empty to authorize manual status checks.</p>
 <label for="webhook-url">Webhook URL</label>
 <input id="webhook-url" name="url" type="url" maxlength="2048" autocomplete="off" spellcheck="false">
-<label for="webhook-secret">Webhook key (or complete Authorization: Bearer header)</label>
+<label for="webhook-header">Webhook key header</label>
+<select id="webhook-header" name="header"><option value="Authorization">Authorization: Bearer</option>
+<option value="X-Webhook-Key">X-Webhook-Key</option><option value="X-API-Key">X-API-Key</option>
+<option value="X-Webhook-Secret">X-Webhook-Secret</option></select>
+<label for="webhook-secret">Webhook key (or complete matching header)</label>
 <input id="webhook-secret" name="secret" type="password" maxlength="4096" autocomplete="off" spellcheck="false">
 <label class="consent"><input type="checkbox" name="consent" value="yes" required>
 I confirm this assistant identity and its receiver, and authorize Worker access and the displayed notification mode.</label>
@@ -44,7 +48,7 @@ I confirm this assistant identity and its receiver, and authorize Worker access 
     CANCEL = '<form method="post"><button name="cancel" value="yes">Cancel</button></form>'
     STYLE = """body{font:16px system-ui,sans-serif;max-width:620px;margin:60px auto;padding:24px;color:#222}
 h1{font-size:26px}p{line-height:1.6}label{display:block;margin:18px 0 8px}
-input[type=password],input[type=url],textarea{width:100%;box-sizing:border-box;padding:12px;border:1px solid #777;border-radius:6px}
+input[type=password],input[type=url],textarea,select{width:100%;box-sizing:border-box;padding:12px;border:1px solid #777;border-radius:6px}
 button{margin-top:16px;padding:12px 20px;border:1px solid #777;border-radius:6px;background:#fff;cursor:pointer}
 .notice{padding:12px;border-left:3px solid #777}"""
 
@@ -67,7 +71,7 @@ button{margin-top:16px;padding:12px 20px;border:1px solid #777;border-radius:6px
             return "<h1>Authorization cancelled</h1><p>You can close this page. Unregistered assistants cannot dispatch.</p>"
 
         paired = self.service.config.workerBridgePath().is_file()
-        expected = {"assistantIdentity", "url", "secret", "consent"}
+        expected = {"assistantIdentity", "url", "header", "secret", "consent"}
 
         if not paired:
             expected.add("code")
@@ -82,7 +86,7 @@ button{margin-top:16px;padding:12px 20px;border:1px solid #777;border-radius:6px
         if not isinstance(identity, dict) or bool(url) != bool(secret):
             return '<p class="notice">Enter a valid assistant identity and both webhook fields.</p>' + self._form()
 
-        webhook = {"url": url, "secret": secret, "header": "Authorization"} if url else None
+        webhook = {"url": url, "secret": secret, "header": fields["header"][0]} if url else None
         if webhook is None and identity.get("type") != "agentAddress":
             return '<p class="notice">Bot identities require a webhook URL and key.</p>' + self._form()
 

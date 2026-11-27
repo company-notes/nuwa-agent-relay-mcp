@@ -134,11 +134,17 @@ class WorkerNotificationFlow:
     def __exit__(self, *args):
         return self.stack.__exit__(*args)
 
-    def _rpc(self, method, params):
+    def _rpc(self, method, params, expectError=False):
         response = self.client.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
         assert response.status_code == 200, method
 
-        result = response.json()["result"]
+        message = response.json()
+
+        if expectError:
+            assert "error" in message or message["result"].get("isError") is True, method
+            return message.get("result", message.get("error"))
+
+        result = message["result"]
         assert result.get("isError") is not True, method
 
         return result
@@ -153,6 +159,13 @@ class WorkerNotificationFlow:
         pending.result(timeout=60)
 
         return result
+
+    def _reject(self, name, arguments, reachesStudio=False):
+        pending = self.executor.submit(self.service.exchange, self.service.route()) if reachesStudio else None
+        self._rpc("tools/call", {"name": name, "arguments": arguments}, expectError=True)
+
+        if pending is not None:
+            pending.result(timeout=60)
 
     def _discover(self, identity):
         # A real Studio poll publishes the Gateway catalog. Wait for the cloud
@@ -192,6 +205,16 @@ class CombinedWorkerAuthorizationFlow(WorkerNotificationFlow):
     SECOND = {"type": "bot", "platform": "rakazo", "botId": "bot-b"}
     MANUAL = {"type": "agentAddress", "address": "codex@example.test"}
 
+    def _fillAuthorization(self, tab, identity, key):
+        tab.locator('[name="assistantIdentity"]').fill(json.dumps(identity))
+
+        if key is not None:
+            tab.locator('[name="url"]').fill(self.gateway.info["webhookURL"])
+            tab.locator('[name="header"]').select_option("Authorization")
+            tab.locator('[name="secret"]').fill(key)
+
+        tab.locator('[name="consent"]').check()
+
     def _authorizeAssistant(self, identity, key=None, code=None, retry=False):
         startup = PairingStartup(self.service)
         page = WorkerPairPage(self.service, PairingCredentials("oauth-b"), startup)
@@ -206,15 +229,8 @@ class CombinedWorkerAuthorizationFlow(WorkerNotificationFlow):
                 if code:
                     tab.locator("#pairing-code").fill(code)
 
-                def fill(secret):
-                    tab.locator('[name="assistantIdentity"]').fill(json.dumps(identity))
-                    if secret is not None:
-                        tab.locator('[name="url"]').fill(self.gateway.info["webhookURL"])
-                        tab.locator('[name="secret"]').fill(secret)
-                    tab.locator('[name="consent"]').check()
-
                 if retry:
-                    fill("incorrect-test-key")
+                    self._fillAuthorization(tab, identity, "incorrect-test-key")
 
                     with tab.expect_navigation():
                         tab.get_by_role("button", name="Authorize and connect").click()
@@ -224,7 +240,8 @@ class CombinedWorkerAuthorizationFlow(WorkerNotificationFlow):
                     assert startup.started == 0
                     assert self.gateway.exchange({})["callbacks"] == []
 
-                fill(key)
+                self._fillAuthorization(tab, identity, key)
+
                 with tab.expect_navigation() as navigation:
                     tab.get_by_role("button", name="Authorize and connect").click()
 
@@ -264,6 +281,12 @@ class CombinedWorkerAuthorizationFlow(WorkerNotificationFlow):
         assert status["registered"] is True
         assert status["enabled"] is True
 
+        self._reject("work_start", {"task": "Missing identity", "requestId": "missing"})
+        self._reject("work_start", {"task": "Unregistered assistant", "requestId": "unknown",
+                                   "assistantIdentity": {"type": "bot", "platform": "rakazo", "botId": "unknown"}},
+                     reachesStudio=True)
+        assert self.gateway.exchange({})["dispatches"] == []
+
         jobs = []
         for index, identity in enumerate((self.FIRST, self.SECOND, self.MANUAL)):
             started = self._dispatch(identity, "shared-first-" + str(index))
@@ -271,6 +294,12 @@ class CombinedWorkerAuthorizationFlow(WorkerNotificationFlow):
             jobID = started["job"]["jobId"]
             jobs.append(jobID)
             self.gateway.exchange({"jobId": jobID})
+
+        self._reject("work_continue", {
+            "jobId": jobs[0], "message": "Wrong assistant", "requestId": "wrong-assistant",
+            "assistantIdentity": self.SECOND,
+        }, reachesStudio=True)
+        assert len(self.gateway.exchange({})["dispatches"]) == 3
 
         continued = self._exchange("work_continue", {
             "jobId": jobs[0], "message": "Add weekly goals", "requestId": "shared-continue",

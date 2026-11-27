@@ -409,7 +409,7 @@ def test_owner_authorizes_through_local_page_and_worker_restarts_without_a_termi
 
             authorized = browser.submit({"code": remote.CODE, "consent": "yes",
                                          "url": "https://receiver.invalid/webhook", "secret": "local-test-key",
-                                         "assistantIdentity": json.dumps(local.IDENTITY)})
+                                         "header": "Authorization", "assistantIdentity": json.dumps(local.IDENTITY)})
 
             assert "Studio connection authorized" in authorized.text
             assert remote.CODE not in authorized.text

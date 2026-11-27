@@ -49,7 +49,7 @@ class WorkerProvider:
                 properties["assistantIdentity"] = self.identitySchema
                 required = [key for key in schema.get("required", []) if key not in self.PRIVATE_FIELDS]
                 schema = {**schema, "properties": properties, "required": [*required, "assistantIdentity"]}
-                description += " Supply your own stable assistantIdentity; Studio resolves its locally authorized route."
+                description += " Required: supply your own stable assistantIdentity; Studio resolves its locally authorized route."
 
             tools.append({"name": name, "description": description, "inputSchema": schema})
 

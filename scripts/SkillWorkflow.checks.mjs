@@ -125,7 +125,7 @@ function scenarios(skill, onboarding, check) {
         workflow.includes('make no promise of automatic notification'), 'Dispatch before asking; do not promise absent notifications.');
 
       check(workflow.includes('Do not dispatch work, ask about notifications') &&
-        workflow.includes('Only after') && workflow.includes('create and verify'), 'Separate onboarding from consent and receiver creation.');
+        workflow.includes('When the owner says yes or selects the consent option') && workflow.includes('create\nand verify'), 'Separate onboarding from consent and receiver creation.');
 
       check(notification.includes('schedule_list') && notification.includes('on: { webhook: true }') &&
         notification.includes('Preserve any existing Nuwa Wake receiver'), 'The completion receiver is a separate webhook-only Routine.');
@@ -139,6 +139,11 @@ function scenarios(skill, onboarding, check) {
       check(notification.includes('Persist the returned private') &&
         notification.includes('Do not silently dispatch without a route') &&
         notification.includes('does not itself confirm pairing'), 'Test callback is not final pairing confirmation.');
+
+      check(workflow.includes('required token') && workflow.includes('without asking again') &&
+        workflow.includes('notificationBound=true'), 'Consent must trigger receiver creation and a verified Job binding.');
+      check(notification.includes('Empty\n   setup arguments are rejected') &&
+        notification.includes('notificationBound=true'), 'Do not treat a receiver-only pairing as a Job binding.');
     }],
     ['OpenMausBot bidirectional test ends after sender submission', () => {
       const office = new OnboardingScenario(onboarding, 'openmausbot');

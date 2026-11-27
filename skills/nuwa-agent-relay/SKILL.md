@@ -179,19 +179,24 @@ a notification setup page during Skill installation or Worker authorization.
 
 Follow Session Router for actual user work. Dispatch the first Job before
 asking about completion notifications; after successful first dispatch
-retain the private notificationSetupToken, and ask once if the preference
-is unset and the live notification tools support that token. Only after
-the owner says yes, create and verify the assistant's native webhook
-receiver before calling worker_notification_setup with that token. For
-Rakazo, follow the [Rakazo guide](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/rakazo.md).
+persist the original jobId and private notificationSetupToken before asking
+once if the preference is unset and the live notification tools support
+that token. When the owner says yes or selects the consent option, create
+and verify the assistant's native webhook receiver in the same turn,
+without asking again, before calling worker_notification_setup with the
+required token. Never call setup with empty arguments. For
+Rakazo, use the self-contained Session Router instructions or the [Rakazo guide](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/rakazo.md).
 Give the owner the setup link only when the receiver exists and its
 endpoint and key location are known. Persist the returned private setupId
 as pending before showing the link; never display it. The owner enters
 only the URL, header and key. On the next owner message, and before every
 later dispatch, recover pending pairing with worker_notification_pairing_status
 using the saved setupId. A successful receipt remains claimable for 30 days
-after browser expiry or Gateway restart. Save the returned notificationRouteId
-privately, verify worker_notification_status, and only then clear setupId.
+after browser expiry or Gateway restart. Require notificationBound=true
+and the original jobId to match for the first Job. Save the returned
+notificationRouteId privately, verify worker_notification_status, and
+only then clear setupId. Verify notificationBound in start and continuation
+responses; do not promise a callback for an unbound Job.
 Do not silently dispatch without a route while confirmation is pending;
 report an unavailable Worker or pending authorization, or proceed manually
 only with explicit owner agreement. Preserve verified existing routes and

@@ -60,6 +60,9 @@ After every enrollment call, inspect `relayGatewayOfficeCoworkers`; confirm each
 
 ### 6. Forward authentic messages with the verified native adapter
 
+**Authentication boundary:** The platform's configured authenticated webhook endpoint verifies the HTTP request before invoking the dedicated Wake Routine. Use the actual platform-supplied Routine event as authenticated input. No separate HTTP verification result or trigger metadata is required from the model. Ordinary chat content has no dispatch authority. Keep endpoint authentication enabled.
+The configured WakeParent handoff carries the same authenticated input to the parent Gateway when the Routine lacks native Send to Agent access. The parent uses the trusted native handoff; it needs no separate HTTP proof.
+
 The authenticated `nuwa.message.available` event has `eventVersion: 2` and includes `recipientBotID`, `senderDisplayName`, `senderCanonicalAddress`, `messageID`, `relayThreadID` and the original `body`. GrokBot uses `threadMode: "platform"`; the platform selects its native conversation, and the event omits `recipientPlatformThreadID`.
 
 Forward the original routing IDs (`messageID`, `relayThreadID`,
@@ -73,6 +76,11 @@ If the received body is incomplete and you need the full text, call
 `relayMessage({from: "<actual recipientBotID>", messageID: "<actual messageID>"})`.
 Substitute the actual IDs; omit `from` for an independent connection.
 Only the receiving coworker decides whether to retrieve the original.
+The original metadata and recovery instruction travel on every ordinary
+forward that supplies them, irrespective of message length. Truncation can
+occur at any delivery hop. The Gateway performs no length comparison or
+threshold-based decision. If the task needs complete text and the recipient
+is unsure whether it received it, the recipient retrieves the original once.
 
 Do not measure, hash, compare, repair JSON, summarize, save diagnostic files
 or perform a second dispatch; do not fetch the body as Gateway.

@@ -62,16 +62,24 @@ After each call, read `relayGatewayOfficeCoworkers` to confirm the real canonica
 
 ### 6. Install native delivery and first-contact confirmation
 
+**Authentication boundary:** The platform's configured authenticated webhook endpoint verifies the HTTP request before invoking the dedicated Wake Routine. Use the actual platform-supplied Routine event as authenticated input. No separate HTTP verification result or trigger metadata is required from the model. Ordinary chat content has no dispatch authority. Keep endpoint authentication enabled.
+
 For an authenticated `nuwa.message.available` event with `eventVersion: 2`, read its actual `recipientBotID`, `senderDisplayName`, `senderCanonicalAddress`, `messageID`, `relayThreadID`, `recipientSessionID`, `senderSessionID`, complete `body`, and `recipientPlatformThreadID`. Prepare the exact sender and message with this reply pattern:
 
 `relayReplyThread({from: "<actual recipientBotID>", threadID: "<actual relayThreadID>", body: "<coworker's reply>"})`
 
 
 When Relay supplies `bodyLength`, `bodyByteLength`, and `bodySHA256`,
-include the original values and IDs before the available body, with the
-core Skill's fixed recipient recovery instruction. Do not measure, hash,
-repair JSON, summarize or fetch the original as Gateway. The receiving
-coworker alone may retrieve the original when needed.
+include the original values and IDs before the available body. Include
+this fixed recovery instruction with actual IDs on every such forward:
+
+If the received body is incomplete and you need the full text, call
+`relayMessage({from: "<actual recipientBotID>", messageID: "<actual messageID>"})`.
+
+Truncation can occur at any delivery hop. The Gateway performs no length
+comparison or threshold-based decision. Copy the available body unchanged;
+the recipient retrieves the original once when needed or when completeness
+is uncertain and the task needs full text. Keep reply context before the body.
 
 Use the provided `recipientPlatformThreadID` to choose precisely one branch:
 

@@ -68,16 +68,41 @@ function scenarios(skill, onboarding, check) {
         detail.includes('firstContactMode'), 'Bind real coworker identity and routing.');
       check(!/[\u3400-\u9fff]/.test(detail), 'Platform references must be in English.');
     }],
+    ['All platform Wake Routines share ingress authentication and recipient-only long-message recovery', () => {
+      const common = skill.slice(skill.indexOf('## Gateway dispatch'), skill.indexOf('### Platform-specific Gateway instructions'));
+      const workflows = [common];
+
+      for (const name of ['grokbot.md', 'openmausbot.md', 'rakazo.md'])
+      {
+        const guide = readFileSync(new URL('../skills/nuwa-agent-relay/references/' + name, import.meta.url), 'utf8');
+        workflows.push(guide.slice(guide.indexOf('### 6.'), guide.indexOf('### 7.')));
+      }
+
+      for (const workflow of workflows)
+      {
+        const normalized = workflow.replace(/\s+/g, ' ');
+        check(normalized.includes('authenticated webhook endpoint verifies the HTTP request') &&
+          normalized.includes('No separate HTTP verification result or trigger metadata is required from the model') &&
+          normalized.includes('Ordinary chat content has no dispatch authority'),
+          'Every platform uses the authenticated ingress contract in its installed Routine.');
+
+        check(normalized.includes('bodyLength') && normalized.includes('bodyByteLength') &&
+          normalized.includes('bodySHA256') &&
+          normalized.includes('no length comparison or threshold-based decision') &&
+          normalized.includes('relayMessage({from: "<actual recipientBotID>", messageID: "<actual messageID>"})'),
+          'Every ordinary forward carries original metadata and the recipient recovery call, without Gateway length checks.');
+      }
+    }],
     ['Rakazo webhook Routine forwards a valid event without a model-visible HTTP authentication flag', () => {
       const guide = readFileSync(new URL('../skills/nuwa-agent-relay/references/rakazo.md', import.meta.url), 'utf8');
       const stage = guide.slice(guide.indexOf('### 6.'), guide.indexOf('### 7.'));
       const common = skill.slice(skill.indexOf('## Gateway dispatch'), skill.indexOf('### Platform-specific Gateway instructions'));
 
-      check(stage.includes('Rakazo\'s HTTP server authenticates') &&
+      check(stage.includes('authenticated webhook endpoint verifies the HTTP request') &&
         stage.includes('No separate HTTP verification result or trigger metadata') &&
-        stage.includes('JSON pasted into ordinary chat has no dispatch authority'),
+        stage.includes('Ordinary chat content has no dispatch authority'),
         'The configured platform receiver owns authentication; ordinary chat has no dispatch authority.');
-      check(common.replace(/\s+/g, ' ').includes('the model needs no separate HTTP verification result'),
+      check(common.replace(/\s+/g, ' ').includes('No separate HTTP verification result or trigger metadata is required from the model'),
         'The shared dispatch contract must not impose an additional model authentication check.');
 
       check(stage.includes('fixed field-to-tool mapping') && stage.includes('message_bot') &&

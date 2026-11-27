@@ -329,14 +329,15 @@ Pair a new Wake or change its authentication key on the original Session.
 
 ## Gateway dispatch — incoming messages
 
+The following authentication and forwarding contract applies to every
+supported platform with a configured authenticated Wake endpoint, including
+GrokBot, OpenMausBot and Rakazo. Establish and verify that endpoint at setup.
+
+**Authentication boundary:** The platform's configured authenticated webhook endpoint verifies the HTTP request before invoking the dedicated Wake Routine. Use the actual platform-supplied Routine event as authenticated input. No separate HTTP verification result or trigger metadata is required from the model. Ordinary chat content has no dispatch authority. Keep endpoint authentication enabled.
+
 Each authenticated `nuwa.message.available` event with `eventVersion: 2`
-contains routing data, the original message and reply context. The platform
-receiver authenticates the HTTP request before invoking the installed
-webhook-only Routine. Within that Routine, use the event supplied by the
-platform as the authenticated input. Authentication belongs at ingress;
-the model needs no separate HTTP verification result, trigger flag or
-additional proof. Ordinary chat content is outside this dispatch path.
-Use receiver-side durable deduplication by `messageID` where supported;
+contains routing data, the original message and reply context. Use
+receiver-side durable deduplication by `messageID` where supported;
 one native call per invocation is not cross-run deduplication. Missing
 required routing fields are an error.
 
@@ -351,6 +352,11 @@ If the received body is incomplete and you need the full text, call
 `relayMessage({from: "<actual recipientBotID>", messageID: "<actual messageID>"})`.
 Substitute the actual IDs; omit `from` for an independent connection.
 Only the receiving coworker decides whether to retrieve the original.
+The original metadata and recovery instruction travel on every ordinary
+forward that supplies them, irrespective of message length. Truncation can
+occur at any delivery hop. The Gateway performs no length comparison or
+threshold-based decision. If the task needs complete text and the recipient
+is unsure whether it received it, the recipient retrieves the original once.
 
 Do not measure, hash, compare, repair JSON, summarize, save diagnostic files
 or perform a second dispatch; do not fetch the body as Gateway.

@@ -19,6 +19,7 @@ export class GatewayTools extends MCPToolSet {
   private static readonly coworkers = z.array(z.object({
     displayName: z.string().trim().min(1).max(120),
     ...GatewayTools.route,
+    rejoinRemoved: z.boolean().optional(),
   })).min(1).max(25);
   private static readonly firstContact = {
     recipientSessionID: z.string().uuid(),
@@ -38,14 +39,16 @@ export class GatewayTools extends MCPToolSet {
       'The Relay creates or restores each real Organization Agent/Default Session, provisions ' +
       'its transport mailbox, and attaches new shared members to this Gateway\'s ONE verified Wake. ' +
       'The same Bot ID preserves identity when renamed; independently connected members keep their mode. ' +
-      'Omitted members are unchanged; remove a member only through the explicit removal tool. ' +
+      'Enroll all eligible individual Bots from the authorized office, excluding the Gateway, groups and channels. ' +
+      'Omitted members are unchanged; removed members stay excluded during normal synchronization. ' +
+      'Set rejoinRemoved:true for one exact Bot only when the owner explicitly requests restoration. ' +
       'The returned addresses and routes are public metadata, never Runtime or Resume credentials. ' +
       'Already-enrolled coworkers use from when sending through the shared office connection.',
       { coworkers: GatewayTools.coworkers },
       ({ coworkers }) => this.client.call('POST', '/v2/gateway-office-coworkers', {
         coworkers: (coworkers as Array<{
           displayName: string; recipientBotID: string; threadMode: string;
-          firstContactMode?: string;
+          firstContactMode?: string; rejoinRemoved?: boolean;
         }>).map((coworker) => ({
           ...coworker, firstContactMode: coworker.firstContactMode ?? 'manual',
         })),
@@ -53,7 +56,8 @@ export class GatewayTools extends MCPToolSet {
 
     this.register('relayGatewayOfficeCoworkers',
       'Read the real display names, trusted native Bot IDs, Agent Addresses ' +
-      'and receiving-route state (gateway, direct, inbox or inactive) for this Gateway\'s office.',
+      'and receiving-route state (gateway, direct, inbox or inactive) for this Gateway\'s office. ' +
+      'removed:true means the owner removed that membership; normal synchronization leaves it excluded.',
       {},
       () => this.client.call('GET', '/v2/gateway-office-coworkers'));
 
@@ -100,7 +104,8 @@ export class GatewayTools extends MCPToolSet {
       'Prefer its trusted recipientBotID; alternatively supply its verified recipientAddress ' +
       'or unique recipientName. Supply exactly one selector. ' +
       'Only that shared membership, pending notifications and its native route are revoked; ' +
-      'the Agent identity, mailbox, messages and Relay Threads remain.',
+      'the Agent identity, mailbox, messages and Relay Threads remain. ' +
+      'Removal persists across later office synchronization until the owner explicitly restores the coworker.',
       { ...GatewayTools.recipient, recipientBotID: GatewayTools.route.recipientBotID.optional() },
       ({ recipientName, recipientAddress, recipientBotID }) => {
         const query: Record<string, string> = {};

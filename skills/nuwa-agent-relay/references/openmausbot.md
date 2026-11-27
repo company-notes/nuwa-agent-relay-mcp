@@ -18,7 +18,7 @@ Read the [core Skill](https://mcp.agent-relay.company-notes.com/skills/nuwa-agen
 
 ### 1. Choose a Gateway and verify tool capabilities
 
-Select one Gateway Bot and collect its real ID and the selected coworkers' IDs from the trusted directory. Exclude the Gateway itself, groups and channels.
+Select one Gateway Bot and collect its real ID and all eligible coworkers' IDs from the trusted directory. Exclude the Gateway itself, groups and channels.
 
 Inspect the trusted Bot directory, the platform's connector assignment controls, the available Routine/Webhook creation tools, and the native `coordinate_bots` tool schema. Record how the receiver will obtain the real native Thread ID. The actual receiving Routine is created in stage 3; its first live native receipt is verified in stage 7.
 
@@ -30,7 +30,7 @@ Install the official Nuwa Skill and configure Remote MCP `https://mcp.agent-rela
 
 The shared office OAuth connection identifies the Gateway; registered coworkers speak through their own native Bot IDs as `from`.
 
-Verify that the `nuwa-agent-relay` connector is enabled for the Gateway and every selected coworker in OpenMausBot's Apps settings. Guide the owner to enable any missing Bot assignment before enrollment.
+Verify that the `nuwa-agent-relay` connector is enabled for the Gateway and every eligible coworker in OpenMausBot's Apps settings. Guide the owner to enable any missing Bot assignment before enrollment.
 
 **Completion evidence:** Real Gateway canonical address, verified Nuwa tool access and actual connector assignment for each intended coworker.
 
@@ -54,7 +54,7 @@ On a genuine `nuwa.wake.verification` event, call `relayVerifyWake({verification
 
 ### 5. Enroll coworkers with explicit conversation routing
 
-For each coworker, call `relayGatewayEnrollOfficeCoworkers` with actual `displayName`, `recipientBotID`, `threadMode: "explicit"`, and `firstContactMode: "automatic"`. The Gateway is excluded from enrollment.
+For each eligible coworker in the whole office, call `relayGatewayEnrollOfficeCoworkers` with actual `displayName`, `recipientBotID`, `threadMode: "explicit"`, and `firstContactMode: "automatic"`. The Gateway is excluded from enrollment. Use the core Skill's office roster management procedure for later additions, renames, removals and explicit rejoin; preserve explicit native routing.
 
 After each call, read `relayGatewayOfficeCoworkers` to confirm the real canonical address, enabled connector and route. Preserve successful members if a batch fails; report the specific pending Bot. The owner approves any independently connected member through the core Skill's invitation flow.
 

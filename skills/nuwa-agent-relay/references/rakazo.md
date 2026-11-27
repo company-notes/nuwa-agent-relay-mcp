@@ -21,7 +21,7 @@ Complete each numbered stage, inspect the actual tool response, and record its r
 
 ### 1. Choose one Gateway bot
 
-- Read the trusted Rakazo bot directory. Record the designated Gateway's actual native Bot ID and the intended coworkers' IDs.
+- Read the trusted Rakazo bot directory. Record the designated Gateway's actual native Bot ID and all eligible coworkers' IDs.
 - Keep group or channel identities out of the coworker list.
 - Inspect available Rakazo Routine management tools and the native Bot-to-Bot forwarding tool (such as `message_bot`) in the current setup conversation.
 - Record the forwarding tool's name, input schema and support for targeting a native Bot ID. Check actual webhook-Routine tool access when that Routine runs in later stages.
@@ -32,7 +32,7 @@ Complete each numbered stage, inspect the actual tool response, and record its r
 
 - Install or update the official Nuwa Skill from `https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md`.
 - Add Nuwa's Remote MCP endpoint: `https://mcp.agent-relay.company-notes.com/mcp`.
-- Complete OAuth for the intended Organization. Then ask the human to open Rakazo's **Manage MCP servers**, find **Nuwa Agent Relay**, and grant access to **All bots** or explicitly select the Gateway and each intended coworker. A working MCP connection on one Bot does not automatically prove access for other Bots; the human may need to set these permissions in the Rakazo UI.
+- Complete OAuth for the intended Organization. Then ask the human to open Rakazo's **Manage MCP servers**, find **Nuwa Agent Relay**, and grant access to **All bots**. If the platform only permits individual assignments, enable the Gateway and every eligible coworker. A working MCP connection on one Bot does not automatically prove access for other Bots; the human may need to set these permissions in the Rakazo UI.
 - Have the human confirm the assignments. Verify the Gateway's actual Nuwa tool access here; confirm each coworker's own tool access when performing the conversation test.
 - On a **fresh Gateway connection**, use `agentAddressEnsureIdentity({agentDisplayName: "Rakazo Gateway"})` once to claim the Gateway's own Agent/Session. On a resumed setup, read the existing address and preserve it.
 - The generated canonical address, such as `organization/agent/session`, is authoritative; copy the returned address exactly.
@@ -60,9 +60,9 @@ Complete each numbered stage, inspect the actual tool response, and record its r
 
 **Completion evidence:** Verified active Wake subscription bound to the same Gateway Session, with a successful verification event received by the correct Routine.
 
-### 5. Enroll coworkers one at a time
+### 5. Enroll the whole office and verify routes
 
-Read `relayGatewayOfficeCoworkers` first. If the roster is empty, enroll the selected individual Bots from the trusted Rakazo directory; do not ask for Nuwa addresses that have not yet been created. For each coworker, call:
+Read `relayGatewayOfficeCoworkers` first. Enroll all eligible individual Bots from the trusted Rakazo directory, including new Bots in an existing office; do not ask for Nuwa addresses that have not yet been created. Use the core Skill's office roster management procedure for later additions, renames, removals and explicit rejoin. For each coworker, call:
 
 ```json
 {
@@ -79,7 +79,7 @@ The tool is `relayGatewayEnrollOfficeCoworkers`. Use the actual values, not plac
 
 After **each** call, invoke `relayGatewayOfficeCoworkers` and confirm that coworker's canonical address, route and activation state. If a tool reports an error, read the roster before deciding which members are still pending. The roster is the source of truth.
 
-**Completion evidence:** One individually verified Nuwa address and active receiving route per selected coworker.
+**Completion evidence:** One individually verified Nuwa address and active receiving route per eligible coworker.
 
 ### 6. Install the complete receiver procedure
 

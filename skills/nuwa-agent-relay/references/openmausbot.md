@@ -67,13 +67,11 @@ For an authenticated `nuwa.message.available` event with `eventVersion: 2`, read
 `relayReplyThread({from: "<actual recipientBotID>", threadID: "<actual relayThreadID>", body: "<coworker's reply>"})`
 
 
-Preserve the Relay-provided `bodyLength`, `bodyByteLength`, and
-`bodySHA256` with the original IDs when supplied. Forward the entire body
-without rewriting or summarizing. Verify with deterministic code if the
-platform exposes it; do not invent a hash or claim a model verified it.
-If the body is incomplete, mark that explicitly; the receiving coworker
-may use its own authorized `relayMessage` with the original messageID
-when complete content is needed. No extra query for complete ordinary Wake.
+When Relay supplies `bodyLength`, `bodyByteLength`, and `bodySHA256`,
+include the original values and IDs before the available body, with the
+core Skill's fixed recipient recovery instruction. Do not measure, hash,
+repair JSON, summarize or fetch the original as Gateway. The receiving
+coworker alone may retrieve the original when needed.
 
 Use the provided `recipientPlatformThreadID` to choose precisely one branch:
 

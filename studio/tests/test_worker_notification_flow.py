@@ -223,14 +223,22 @@ class WorkerNotificationFlow:
         assert beforeConsent["callbacks"] == []
 
         setup = self._exchange("worker_notification_setup", {"notificationSetupToken": token})
+        setupID = setup["setupId"]
+
+        assert setupID != setup["url"].rsplit("/", 1)[1]
+        assert self._exchange("worker_notification_pairing_status", {"setupId": setupID})["paired"] is False
+
         self._authorize(setup["url"])
 
-        paired = self._exchange("worker_notification_pairing_status", {"setupId": setup["setupId"]})
+        paired = self._exchange("worker_notification_pairing_status", {"setupId": setupID})
         assert paired["paired"] is True
         assert paired["jobId"] == jobID
 
         route = {"notificationRouteId": paired["notificationRouteId"]}
         assert self._exchange("worker_notification_status", route)["enabled"] is True
+
+        recovered = self._exchange("worker_notification_pairing_status", {"setupId": setupID})
+        assert recovered["notificationRouteId"] == route["notificationRouteId"]
 
         self._verifyCallbacks(self.gateway.exchange({"jobId": jobID}), jobID, 1)
 

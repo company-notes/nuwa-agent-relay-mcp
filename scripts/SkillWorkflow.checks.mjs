@@ -68,6 +68,24 @@ function scenarios(skill, onboarding, check) {
         detail.includes('firstContactMode'), 'Bind real coworker identity and routing.');
       check(!/[\u3400-\u9fff]/.test(detail), 'Platform references must be in English.');
     }],
+    ['GrokBot forwards supplied integrity context once; the receiving coworker alone retrieves missing text', () => {
+      const detail = readFileSync(new URL('../skills/nuwa-agent-relay/references/grokbot.md', import.meta.url), 'utf8');
+      const stage = detail.slice(detail.indexOf('### 6.'), detail.indexOf('### 7.'));
+      const common = skill.slice(skill.indexOf('## Gateway dispatch'), skill.indexOf('### Platform-specific Gateway instructions'));
+
+      for (const workflow of [common, stage]) {
+        check(workflow.includes('bodyLength') && workflow.includes('bodyByteLength') &&
+          workflow.includes('bodySHA256'), 'Forward the supplied original metadata.');
+        check(workflow.includes('Do not measure') && workflow.includes('repair JSON') &&
+          workflow.includes('do not fetch'), 'Keep Gateway work to forwarding; no diagnostic or recovery calls.');
+        check(workflow.includes('If the received body is incomplete and you need the full text') &&
+          workflow.includes('relayMessage({from: "<actual recipientBotID>", messageID: "<actual messageID>"})'),
+          'Give the actual recipient a fixed, authorized recovery instruction before the body.');
+      }
+
+      check(stage.includes('available authenticated event') && stage.includes('WakeParent') &&
+        stage.includes('zero additional Nuwa MCP'), 'Keep the existing one-handoff and one-native-send path.');
+    }],
     ['Optional FFL collaboration keeps long text fallback and original reply routing', () => {
       const start = skill.indexOf('## Optional FFL file collaboration');
       check(start >= 0, 'Publish the optional collaboration policy in the core Skill.');

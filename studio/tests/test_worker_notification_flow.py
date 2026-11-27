@@ -200,6 +200,7 @@ class WorkerNotificationFlow:
 
         return status
 
+
 class CombinedWorkerAuthorizationFlow(WorkerNotificationFlow):
     FIRST = {"type": "bot", "platform": "rakazo", "botId": "bot-a"}
     SECOND = {"type": "bot", "platform": "rakazo", "botId": "bot-b"}
@@ -278,6 +279,7 @@ class CombinedWorkerAuthorizationFlow(WorkerNotificationFlow):
 
         self.service = WorkerBridgeService(self.service.config, self.service.bridge, self.service.provider)
         status = self._discover(self.FIRST)
+
         assert status["registered"] is True
         assert status["enabled"] is True
 
@@ -285,6 +287,7 @@ class CombinedWorkerAuthorizationFlow(WorkerNotificationFlow):
         self._reject("work_start", {"task": "Unregistered assistant", "requestId": "unknown",
                                    "assistantIdentity": {"type": "bot", "platform": "rakazo", "botId": "unknown"}},
                      reachesStudio=True)
+
         assert self.gateway.exchange({})["dispatches"] == []
 
         jobs = []
@@ -299,6 +302,7 @@ class CombinedWorkerAuthorizationFlow(WorkerNotificationFlow):
             "jobId": jobs[0], "message": "Wrong assistant", "requestId": "wrong-assistant",
             "assistantIdentity": self.SECOND,
         }, reachesStudio=True)
+
         assert len(self.gateway.exchange({})["dispatches"]) == 3
 
         continued = self._exchange("work_continue", {
@@ -311,6 +315,7 @@ class CombinedWorkerAuthorizationFlow(WorkerNotificationFlow):
 
         snapshot = self.gateway.exchange({"jobId": jobs[0]})
         completed = [item for item in snapshot["callbacks"] if item["event"]["event"] == "work.turn_finished"]
+
         assert [(item["event"]["jobId"], item["authorization"]) for item in completed] == [
             (jobs[0], "Bearer " + self.RECEIVER_KEY), (jobs[1], "Bearer other-test-key"),
             (jobs[0], "Bearer " + self.RECEIVER_KEY),

@@ -75,6 +75,7 @@ button{margin-top:16px;padding:12px 20px;border:1px solid #777;border-radius:6px
 
         if not paired:
             expected.add("code")
+
         if (set(fields) != expected or fields["consent"] != ["yes"] or
                 any(len(values) != 1 for values in fields.values())):
             return '<p class="notice">Complete the identity and explicitly confirm authorization.</p>' + self._form()
@@ -87,6 +88,7 @@ button{margin-top:16px;padding:12px 20px;border:1px solid #777;border-radius:6px
             return '<p class="notice">Enter a valid assistant identity and both webhook fields.</p>' + self._form()
 
         webhook = {"url": url, "secret": secret, "header": fields["header"][0]} if url else None
+
         if webhook is None and identity.get("type") != "agentAddress":
             return '<p class="notice">Bot identities require a webhook URL and key.</p>' + self._form()
 

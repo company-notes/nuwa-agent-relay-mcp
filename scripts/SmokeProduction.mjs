@@ -151,6 +151,7 @@ const managementLogin = await fetch(relayManagementOrigin + '/manage/session?sec
 });
 console.log('Relay /manage/session: HTTP ' + managementLogin.status);
 assert.equal(managementLogin.status, 302, 'The management login must redirect to Agent Address.');
+
 const authorization = new URL(managementLogin.headers.get('location'));
 assert.equal(authorization.origin, 'https://address.company-notes.com');
 assert.equal(authorization.pathname, '/authorize');
@@ -158,6 +159,7 @@ assert.equal(authorization.searchParams.get('code_challenge_method'), 'S256');
 assert.equal(authorization.searchParams.get('redirect_uri'), relayManagementOrigin + '/manage/callback');
 assert.ok(authorization.searchParams.get('state'), 'The browser authorization must carry state.');
 assert.ok(authorization.searchParams.get('code_challenge'), 'The browser authorization must carry a PKCE challenge.');
+
 assert.ok(managementLogin.headers.get('set-cookie')?.includes('HttpOnly'),
   'The browser login state must remain in its protected cookie.');
 

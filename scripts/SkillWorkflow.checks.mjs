@@ -72,10 +72,13 @@ function scenarios(skill, onboarding, check) {
       const start = skill.indexOf('### Shared office');
       const end = skill.indexOf('### Existing Wake URL relocation', start);
       const workflow = skill.slice(start, end);
+
       check(workflow.includes('all eligible individual Bots') &&
         workflow.includes('no additional enrollment selection'), 'Use the existing office authorization without a new selection step.');
+
       check(workflow.includes('relayGatewayRemoveTeammate') && workflow.includes('rejoinRemoved: true') &&
         workflow.includes('removed: true'), 'Preserve owner removals until an explicit rejoin.');
+
       check(workflow.includes('trusted native sender ID') && workflow.includes('never enroll from a Wake'),
         'Only management or native coworker context can initiate enrollment.');
     }],

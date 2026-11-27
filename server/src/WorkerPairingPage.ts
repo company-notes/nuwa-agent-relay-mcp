@@ -10,9 +10,9 @@ export class WorkerPairingPage {
 <h1>Connect your assistant to this computer</h1>
 <p>Open the installed Nuwa Studio on the Windows computer that will perform the work.</p>
 <p><a href="nuwa-studio-worker:pair">Open Nuwa Studio</a></p>
-<p>Allow your browser to open Nuwa Studio if prompted. Then enter the one-time pairing code supplied by your assistant and the native webhook URL and key together, and authorize Worker access and automatic notifications yourself. If the Worker is already paired, complete only the missing notification authorization.</p>
+<p>Allow your browser to open Nuwa Studio if prompted. Then enter the one-time pairing code (only if the Worker is not paired), your assistant's identity JSON, and its webhook URL and key together. For an Agent Address client without a webhook leave both webhook fields empty.</p>
 <p>If Studio does not open, use Windows Start &gt; Nuwa Studio &gt; Connect Worker, or install the current Studio setup. This page never requests a pairing code or credentials.</p>
-<p>Use an OAuth connection dedicated to this assistant. A shared OAuth grant cannot identify individual assistants. Return to your assistant after authorization to verify the connection and notification receiver.</p>
+<p>Multiple trusted assistants may use the same connection; register each assistant's own identity and receiver. Confirm they belong together. Return to the assistant after authorization to verify its registration.</p>
 </main></body></html>`;
 
   static authorizationURL(requestURL: string): string {

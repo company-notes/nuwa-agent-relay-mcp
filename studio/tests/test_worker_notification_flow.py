@@ -144,6 +144,16 @@ class WorkerNotificationFlow:
 
     def _tool(self, name, arguments):
         result = self._rpc("tools/call", {"name": name, "arguments": arguments})
+
+        if name in {"work_start", "work_continue", "worker_notification_setup",
+                    "worker_notification_status", "worker_notification_pairing_status"}:
+            first = json.loads(result["content"][0]["text"])
+            structured = result["structuredContent"]
+
+            assert all(first.get(key) == value for key, value in structured.items())
+
+            return first
+
         return result.get("structuredContent") or json.loads(result["content"][0]["text"])
 
     def _exchange(self, name, arguments):

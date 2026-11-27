@@ -32,9 +32,41 @@ class WorkerScenario:
         self.notificationRouteID = "c" * 64
         self.notificationSetupID = "s" * 32
         self.notificationArguments = []
+        self.connectionRoutes = {}
         scenario = self
 
         class Handler(BaseHTTPRequestHandler):
+            def _connection(self):
+                if self.headers.get("Authorization") != "Bearer " + scenario.TOKEN:
+                    self.send_error(401)
+                    return
+
+                route = self.path.rsplit("/", 1)[-1]
+
+                if self.command == "PUT":
+                    settings = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                    assert settings["url"] and settings["secret"]
+                    scenario.connectionRoutes[route] = scenario.notificationRouteID
+
+                routeID = scenario.connectionRoutes.get(route)
+                data = {"enabled": routeID is not None}
+
+                if routeID:
+                    data["notificationRouteId"] = routeID
+
+                encoded = json.dumps(data).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(encoded)))
+                self.end_headers()
+                self.wfile.write(encoded)
+
+            def do_GET(self):
+                self._connection()
+
+            def do_PUT(self):
+                self._connection()
+
             def do_POST(self):
                 if self.headers.get("Authorization") != "Bearer " + scenario.TOKEN:
                     self.send_error(401)
@@ -249,7 +281,7 @@ def test_studio_reconnects_without_replaying_an_uncertain_dispatch(tmp_path, mon
 
     with WorkerScenario() as local:
         service = WorkerBridgeService(LocalConfig(), remote.client, local.provider)
-        service.pair(remote.CODE)
+        service.pair(remote.CODE, notificationsRequired=False)
         assert service.route() == remote.ROUTE
 
         remote.send("work_start", args)
@@ -288,7 +320,7 @@ def test_paired_studio_forwards_notification_setup_and_routed_work(tmp_path, mon
 
     with WorkerScenario() as local:
         service = WorkerBridgeService(LocalConfig(), remote.client, local.provider)
-        service.pair(remote.CODE)
+        service.pair(remote.CODE, notificationsRequired=False)
 
         requests = [
             ("worker_notification_status", {}),
@@ -371,7 +403,8 @@ def test_owner_authorizes_through_local_page_and_worker_restarts_without_a_termi
             assert not LocalConfig.workerBridgePath().exists()
             assert startup.started == 0
 
-            authorized = browser.submit({"code": remote.CODE, "consent": "yes"})
+            authorized = browser.submit({"code": remote.CODE, "consent": "yes",
+                                         "url": "https://receiver.invalid/webhook", "secret": "local-test-key"})
 
             assert "Studio connection authorized" in authorized.text
             assert remote.CODE not in authorized.text
@@ -435,6 +468,8 @@ def test_owner_authorizes_through_real_browser(tmp_path, monkeypatch):
                 tab = browser.new_page()
                 tab.goto(server.url)
                 tab.locator("#pairing-code").fill(remote.CODE)
+                tab.locator('[name="url"]').fill("https://receiver.invalid/webhook")
+                tab.locator('[name="secret"]').fill("local-test-key")
                 tab.locator('input[name="consent"]').check()
 
                 with tab.expect_navigation() as navigation:

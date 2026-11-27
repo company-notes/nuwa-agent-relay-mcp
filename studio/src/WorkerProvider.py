@@ -26,7 +26,7 @@ class WorkerProvider:
         self.notificationSetupPattern = re.compile(policy["notificationSetupPattern"])
         self.allowed = frozenset(policy["tools"]) | frozenset(self.notificationTools)
 
-    def catalog(self) -> list[dict]:
+    def catalog(self, managedNotifications: bool = False) -> list[dict]:
         tools = []
 
         for tool in self.client.listTools():
@@ -37,8 +37,31 @@ class WorkerProvider:
             if not isinstance(schema, dict) or schema.get("type") != "object":
                 raise LocalMCPError("Worker tool has an invalid input schema.")
 
-            tools.append({"name": tool["name"], "description": tool.get("description", ""),
-                          "inputSchema": schema})
+            name = tool["name"]
+
+            if managedNotifications and name in self.notificationTools:
+                if name == "worker_notification_status":
+                    tools.append({
+                        "name": name,
+                        "description": "Read this dedicated connection's automatic completion notification status. "
+                                       "The local Studio manages the route; no private arguments are needed.",
+                        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+                    })
+
+                continue
+
+            description = tool.get("description", "")
+
+            if managedNotifications and name in self.notificationDispatchTools | {"work_continue"}:
+                properties = dict(schema.get("properties", {}))
+                properties.pop("notificationRouteId", None)
+                schema = {**schema, "properties": properties}
+                description = ("Start a new authorized Worker Job." if name != "work_continue" else
+                               "Continue an existing Job assigned to this dedicated Worker connection.")
+                description += " Studio automatically binds or verifies the completion notification route. " \
+                               "Follow the Session Router Skill for workspace selection and Job identity."
+
+            tools.append({"name": name, "description": description, "inputSchema": schema})
 
         return tools
 
@@ -70,11 +93,41 @@ class WorkerProvider:
 
         return True
 
-    def call(self, name: str, arguments: dict) -> dict:
+    def connectionNotification(self, connectionID: str, settings: dict | None = None) -> dict:
+        return self.client.connectionNotification(connectionID, settings)
+
+    def _managedCall(self, name: str, arguments: dict, connectionID: str) -> dict:
+        if any(key in arguments for key in ("notificationRouteId", "notificationSetupToken", "setupId")):
+            raise LocalMCPError("Studio manages notification routing for this connection.")
+
+        if name in self.notificationTools and (name != "worker_notification_status" or arguments):
+            raise LocalMCPError("Configure dedicated connection notifications in the local Studio authorization page.")
+
+        if name == "worker_notification_status":
+            status = self.connectionNotification(connectionID)
+            data = {"enabled": status["enabled"], "managedByStudio": True,
+                    "preference": "on" if status["enabled"] else "unset"}
+
+            return {"structuredContent": data, "content": [{"type": "text", "text": json.dumps(data)}]}
+
+        if name in self.notificationDispatchTools | {"work_continue"}:
+            status = self.connectionNotification(connectionID)
+
+            if not status["enabled"]:
+                raise LocalMCPError("Complete Worker and notification authorization in Studio before dispatch.")
+
+            return self.client.call(name, {**arguments, "notificationRouteId": status["notificationRouteId"]})
+
+        return self.client.call(name, arguments)
+
+    def call(self, name: str, arguments: dict, connectionID: str | None = None) -> dict:
         if name not in self.allowed:
             raise LocalMCPError("Worker tool is outside the approved provider scope.")
 
         if not self._argumentsAllowed(name, arguments):
             raise LocalMCPError("Worker arguments are outside the approved provider scope.")
+
+        if connectionID is not None:
+            return self._managedCall(name, arguments, connectionID)
 
         return self.client.call(name, arguments)

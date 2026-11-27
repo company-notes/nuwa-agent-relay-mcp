@@ -127,7 +127,7 @@ class WorkerNotificationFlow:
             self.service = WorkerBridgeService(LocalConfig(), bridge, WorkerProvider(local))
 
             if self.connect:
-                self.service.pair(self._tool("worker_provider_pair", {})["pairingCode"])
+                self.service.pair(self._tool("worker_provider_pair", {})["pairingCode"], notificationsRequired=False)
         except Exception:
             self.stack.close()
             raise
@@ -177,9 +177,16 @@ class WorkerNotificationFlow:
 
         tools = self._rpc("tools/list", {})["tools"]
         names = {tool["name"] for tool in tools}
-        assert {"worker_notification_status", "worker_notification_setup",
-                "worker_notification_pairing_status", "worker_notification_decline",
-                "work_start", "work_continue"} <= names
+        assert {"worker_notification_status", "work_start", "work_continue"} <= names
+
+        manualTools = {"worker_notification_setup", "worker_notification_pairing_status", "worker_notification_decline"}
+
+        if self.service.notificationsRequired():
+            assert not manualTools & names
+            assert all("notificationRouteId" not in tool["inputSchema"].get("properties", {})
+                       for tool in tools if tool["name"] in {"work_start", "work_continue", "worker_task_start"})
+        else:
+            assert manualTools <= names
 
         status = self._tool("worker_notification_status", {})
         pending.result(timeout=60)

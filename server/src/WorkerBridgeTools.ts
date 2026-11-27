@@ -18,21 +18,25 @@ export class WorkerBridgeTools extends MCPToolSet {
     this.register('worker_provider_pair', 'Create a five-minute one-time Studio pairing code and owner authorization URL. ' +
       'For a dedicated assistant and Windows test Worker, give the owner authorizationURL as a clickable link and ' +
       'show pairingCode separately in a copyable code block. The owner opens the link in their own browser, launches ' +
-      'Studio from the page, enters the code and explicitly authorizes access. Do not open a browser, use Computer Use, ' +
+      'Studio from the page, enters the code and the webhook URL/key together, and explicitly authorizes access and notifications. ' +
+      'Before issuing the code, create and verify this dedicated assistant’s native webhook receiver. Do not open a browser, use Computer Use, ' +
       'run local commands, submit the form or pass the code in a URL or command. The owner may use Windows Start > ' +
       'Nuwa Studio > Connect Worker if the link cannot launch Studio. Studio starts its service after authorization. ' +
-      'Verify worker_provider_status and refresh tool discovery before dispatch.', {},
+      'Verify worker_provider_status and worker_notification_status({}) with managedByStudio=true and enabled=true before dispatch. ' +
+      'Do not ask again about notifications after dispatch or retain a private route. The OAuth grant must be dedicated to this assistant.', {},
       async () => ({
         ...await this.bridge.prepare(),
         authorizationURL: WorkerPairingPage.authorizationURL(request.url),
       }));
     this.register('worker_provider_status', 'Read the paired Studio and its current Worker tool availability. ' +
-      'During installation or connection only check Worker pairing and availability. After a successful first new Job, ask once about notifications; do not set them up during onboarding. ' +
-      'Follow the Session Router Skill: establish a real native webhook receiver after consent, then obtain the notification form with the private dispatch token.', {},
+      'During installation only check Worker pairing and availability. On explicit connection, create the native webhook receiver and authorize it together with Worker access before dispatch. ' +
+      'For an existing dedicated connection without managed notifications, open authorizationURL on the Worker computer to finish notifications without re-pairing. ' +
+      'A shared OAuth grant cannot distinguish assistants; do not enable automatic connection routing for a shared grant.', {},
       async () => {
         const state = await this.bridge.catalog();
 
-        return { paired: state.paired, online: state.online, tools: state.tools.map((tool) => tool.name) };
+        return { paired: state.paired, online: state.online, tools: state.tools.map((tool) => tool.name),
+          authorizationURL: WorkerPairingPage.authorizationURL(request.url) };
       });
     this.register('worker_provider_revoke', 'Revoke this OAuth connection\'s paired Studio. Requires owner approval.', {},
       () => this.bridge.revoke());

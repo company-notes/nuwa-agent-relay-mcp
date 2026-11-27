@@ -1,5 +1,6 @@
 """Authenticated local MCP transport; credentials stay in the local process."""
 
+import re
 from uuid import uuid4
 
 import httpx
@@ -63,6 +64,26 @@ class LocalMCPClient:
                                 "Authorization": "Bearer " + self.credential(),
                                 "Accept": "application/json, text/event-stream",
                             })
+
+    def connectionNotification(self, connectionID: str, settings: dict | None = None) -> dict:
+        if not re.fullmatch(r"[a-f0-9]{64}", connectionID):
+            raise LocalMCPError("Invalid local Worker connection identifier.")
+
+        url = self.endpoint.removesuffix("/mcp") + "/notifications/connections/" + connectionID
+
+        with self._client() as client:
+            response = client.get(url) if settings is None else client.put(url, json=settings)
+
+        if response.status_code != 200:
+            raise LocalMCPError(f"Local Gateway notification authorization failed (HTTP {response.status_code}).")
+
+        status = response.json()
+
+        if (not isinstance(status, dict) or not isinstance(status.get("enabled"), bool) or
+                (status["enabled"] and not re.fullmatch(r"[a-f0-9]{64}", str(status.get("notificationRouteId", ""))))):
+            raise LocalMCPError("Local Gateway returned an invalid notification status.")
+
+        return status
 
     def listTools(self) -> list[dict]:
         with self._client() as client:

@@ -48,7 +48,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: company-notes/ai-worker-gateway
-          ref: a1105036ff6ed3ba81b2949dc07cecaa4978ae71
+          ref: d6eb320071a546a1cc4d96de202340ecffb7bbba
           path: .test-deps/ai-worker-gateway
           persist-credentials: false
       - uses: actions/setup-node@v4

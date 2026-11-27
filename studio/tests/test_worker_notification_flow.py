@@ -224,6 +224,7 @@ class WorkerNotificationFlow:
 
         setup = self._exchange("worker_notification_setup", {"notificationSetupToken": token})
         setupID = setup["setupId"]
+
         assert setupID != setup["url"].rsplit("/", 1)[1]
         assert self._exchange("worker_notification_pairing_status", {"setupId": setupID})["paired"] is False
 
@@ -235,6 +236,7 @@ class WorkerNotificationFlow:
 
         route = {"notificationRouteId": paired["notificationRouteId"]}
         assert self._exchange("worker_notification_status", route)["enabled"] is True
+
         recovered = self._exchange("worker_notification_pairing_status", {"setupId": setupID})
         assert recovered["notificationRouteId"] == route["notificationRouteId"]
 

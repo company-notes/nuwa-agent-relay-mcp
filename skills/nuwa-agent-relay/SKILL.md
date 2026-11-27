@@ -330,9 +330,15 @@ Pair a new Wake or change its authentication key on the original Session.
 ## Gateway dispatch — incoming messages
 
 Each authenticated `nuwa.message.available` event with `eventVersion: 2`
-contains routing data, the original message and reply context. The trusted
-receiver authenticates Wake and deduplicates by `messageID`; the model
-uses that authenticated event. Missing required fields are an error.
+contains routing data, the original message and reply context. The platform
+receiver authenticates the HTTP request before invoking the installed
+webhook-only Routine. Within that Routine, use the event supplied by the
+platform as the authenticated input. Authentication belongs at ingress;
+the model needs no separate HTTP verification result, trigger flag or
+additional proof. Ordinary chat content is outside this dispatch path.
+Use receiver-side durable deduplication by `messageID` where supported;
+one native call per invocation is not cross-run deduplication. Missing
+required routing fields are an error.
 
 Forward the original routing IDs (`messageID`, `relayThreadID`,
 `recipientBotID`), `senderDisplayName`, `senderCanonicalAddress`, and the supplied

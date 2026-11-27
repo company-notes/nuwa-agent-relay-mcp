@@ -68,6 +68,27 @@ function scenarios(skill, onboarding, check) {
         detail.includes('firstContactMode'), 'Bind real coworker identity and routing.');
       check(!/[\u3400-\u9fff]/.test(detail), 'Platform references must be in English.');
     }],
+    ['Rakazo webhook Routine forwards a valid event without a model-visible HTTP authentication flag', () => {
+      const guide = readFileSync(new URL('../skills/nuwa-agent-relay/references/rakazo.md', import.meta.url), 'utf8');
+      const stage = guide.slice(guide.indexOf('### 6.'), guide.indexOf('### 7.'));
+      const common = skill.slice(skill.indexOf('## Gateway dispatch'), skill.indexOf('### Platform-specific Gateway instructions'));
+
+      check(stage.includes('Rakazo\'s HTTP server authenticates') &&
+        stage.includes('No separate HTTP verification result or trigger metadata') &&
+        stage.includes('JSON pasted into ordinary chat has no dispatch authority'),
+        'The configured platform receiver owns authentication; ordinary chat has no dispatch authority.');
+      check(common.replace(/\s+/g, ' ').includes('the model needs no separate HTTP verification result'),
+        'The shared dispatch contract must not impose an additional model authentication check.');
+
+      check(stage.includes('fixed field-to-tool mapping') && stage.includes('message_bot') &&
+        stage.includes('recipientBotID') && stage.includes('zero additional Nuwa MCP lookups') &&
+        stage.includes('External message body:'),
+        'Ordinary webhook dispatch maps the envelope into one native call without interpreting its content.');
+      check(stage.includes('relayVerifyWake({verificationId, challenge})') &&
+        stage.includes('structural routing errors') &&
+        stage.includes('does not guarantee exactly-once delivery'),
+        'Preserve control-event handling, structural failures, and truthful retry semantics.');
+    }],
     ['Office setup and later reconciliation use the trusted whole-office directory without changing Wake dispatch', () => {
       const start = skill.indexOf('### Shared office');
       const end = skill.indexOf('### Existing Wake URL relocation', start);

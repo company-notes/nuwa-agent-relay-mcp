@@ -30,13 +30,22 @@ class WorkerBridgeService:
         route = self.bridge.pair(code)
         self.config.writePrivate(path, {"route": route})
 
-    def route(self) -> str:
+    def _pairing(self) -> dict:
         path = self.config.workerBridgePath()
 
         if not path.is_file():
             raise RuntimeError("Pair Studio with the authorized assistant first.")
 
-        return json.loads(path.read_text(encoding="utf-8"))["route"]
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def route(self) -> str:
+        return self._pairing()["route"]
+
+    def authorizeAssistant(self, identity: dict, webhook: dict | None) -> None:
+        status = self.provider.assistantNotification(self.route(), identity, {"webhook": webhook})
+
+        if not status["registered"] or status["enabled"] != (webhook is not None):
+            raise LocalMCPError("Gateway did not confirm the assistant registration.")
 
     def revoke(self) -> None:
         self.bridge.revoke(self.route())
@@ -50,16 +59,26 @@ class WorkerBridgeService:
 
             return []
 
-    def _execute(self, request: dict) -> dict:
+    def _execute(self, request: dict, route: str) -> dict:
         try:
-            return self.provider.call(request["name"], request["arguments"])
-        except (LocalMCPError, httpx.HTTPError, OSError, ValueError) as error:
+            pairing = self._pairing()
+
+            if pairing["route"] != route:
+                raise LocalMCPError("The active Worker authorization changed.")
+
+            return self.provider.call(request["name"], request["arguments"], route)
+        except LocalMCPError as error:
+            logger.warning("Worker tool rejected (errorType=%s)", type(error).__name__)
+
+            return {"isError": True, "content": [{"type": "text", "text": str(error)}]}
+        except (httpx.HTTPError, OSError, ValueError) as error:
             logger.warning("Worker tool could not be confirmed (errorType=%s)", type(error).__name__)
 
             return {"isError": True, "content": [{
                 "type": "text",
                 "text": "Local Worker operation could not be confirmed. Check existing jobs; "
-                        "reuse the original requestId for an uncertain dispatch.",
+                        "reuse the original requestId for an uncertain dispatch. If automatic notifications "
+                        "are not configured, finish authorization on the local Studio page first.",
             }]}
 
     def exchange(self, route: str) -> None:
@@ -73,7 +92,8 @@ class WorkerBridgeService:
                 not isinstance(request.get("name"), str) or not isinstance(request.get("arguments"), dict)):
             raise ValueError("Invalid remote Worker request.")
 
-        result = self._execute(request)
+        result = self._execute(request, route)
+
         self.bridge.result(route, request["requestID"], result)
 
     def serve(self) -> None:

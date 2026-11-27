@@ -24,6 +24,9 @@ from src.WorkerPairPage import WorkerPairPage
 
 class WorkerScenario:
     TOKEN = "local-test-credential"
+    IDENTITY = {"type": "bot", "platform": "rakazo", "botId": "local-test-bot"}
+    SCOPE = "a" * 64
+    WEBHOOK = {"url": "https://receiver.invalid/webhook", "secret": "local-test-key", "header": "Authorization"}
 
     def __init__(self):
         self.calls = []
@@ -32,9 +35,41 @@ class WorkerScenario:
         self.notificationRouteID = "c" * 64
         self.notificationSetupID = "s" * 32
         self.notificationArguments = []
+        self.connectionRoutes = {}
         scenario = self
 
         class Handler(BaseHTTPRequestHandler):
+            def _connection(self):
+                if self.headers.get("Authorization") != "Bearer " + scenario.TOKEN:
+                    self.send_error(401)
+                    return
+
+                route = self.path.rsplit("/", 1)[-1]
+
+                if self.command == "PUT":
+                    settings = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                    assert settings["webhook"]["url"] and settings["webhook"]["secret"]
+                    scenario.connectionRoutes[route] = scenario.notificationRouteID
+
+                routeID = scenario.connectionRoutes.get(route)
+                data = {"registered": routeID is not None, "enabled": routeID is not None}
+
+                if routeID:
+                    data["notificationRouteId"] = routeID
+
+                encoded = json.dumps(data).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(encoded)))
+                self.end_headers()
+                self.wfile.write(encoded)
+
+            def do_GET(self):
+                self._connection()
+
+            def do_PUT(self):
+                self._connection()
+
             def do_POST(self):
                 if self.headers.get("Authorization") != "Bearer " + scenario.TOKEN:
                     self.send_error(401)
@@ -129,49 +164,44 @@ class WorkerScenario:
 def test_assistant_discovers_starts_and_continues_one_local_job():
     with WorkerScenario() as scenario:
         provider = scenario.provider
+        provider.assistantNotification(scenario.SCOPE, scenario.IDENTITY, {"webhook": scenario.WEBHOOK})
         catalog = provider.catalog()
 
         assert {tool["name"] for tool in catalog} == {
-            "fleet_status", "work_list", "work_start", "work_status", "work_continue",
-            "worker_notification_setup", "worker_notification_status",
-            "worker_notification_pairing_status", "worker_notification_decline",
+            "fleet_status", "work_list", "work_start", "work_status", "work_continue", "worker_notification_status",
         }
-        assert provider.call("fleet_status", {})["structuredContent"]["reachable"]
-        assert provider.call("work_list", {})["structuredContent"]["jobs"] == []
+        assert provider.call("fleet_status", {}, scenario.SCOPE)["structuredContent"]["reachable"]
+        assert provider.call("work_list", {}, scenario.SCOPE)["structuredContent"]["jobs"] == []
 
+        identity = {"assistantIdentity": scenario.IDENTITY}
         started = provider.call("work_start", {
-            "task": "Build a marketing tracker.", "requestId": "marketing-start", "target": {"host": "my-pc"},
-        })
+            "task": "Build a marketing tracker.", "requestId": "marketing-start", "target": {"host": "my-pc"}, **identity,
+        }, scenario.SCOPE)
         jobID = started["structuredContent"]["job"]["jobId"]
         provider.call("work_continue", {
-            "jobId": jobID, "message": "Add monthly ROAS.", "requestId": "marketing-continue",
-        })
-        status = provider.call("work_status", {"jobId": jobID})["structuredContent"]
+            "jobId": jobID, "message": "Add monthly ROAS.", "requestId": "marketing-continue", **identity,
+        }, scenario.SCOPE)
+        status = provider.call("work_status", {"jobId": jobID}, scenario.SCOPE)["structuredContent"]
 
         assert status["messages"] == ["Build a marketing tracker.", "Add monthly ROAS."]
         assert list(scenario.jobs) == [jobID]
         before = len(scenario.calls)
 
-        with pytest.raises(LocalMCPError, match="approved provider scope"):
-            provider.call("arbitrary_shell", {})
+        for name, arguments in (
+            ("arbitrary_shell", {}), ("work_start", {"notificationRouteId": "private"}),
+            ("worker_notification_setup", {"secret": "not accepted"}),
+            ("work_continue", {"notificationRouteId": scenario.notificationRouteID}),
+        ):
+            with pytest.raises(LocalMCPError, match="approved provider scope"):
+                provider.call(name, arguments, scenario.SCOPE)
 
-        with pytest.raises(LocalMCPError, match="approved provider scope"):
-            provider.call("work_start", {"notificationRouteId": "private"})
+        with pytest.raises(LocalMCPError, match="assistantIdentity is required"):
+            provider.call("work_start", {"task": "Missing identity"}, scenario.SCOPE)
 
-        with pytest.raises(LocalMCPError, match="approved provider scope"):
-            provider.call("worker_notification_setup", {"secret": "must stay in local browser"})
-
-        with pytest.raises(LocalMCPError, match="approved provider scope"):
-            provider.call("worker_notification_setup", {"notificationSetupToken": "invalid"})
-
-        with pytest.raises(LocalMCPError, match="approved provider scope"):
-            provider.call("worker_notification_setup", {"jobId": jobID})
-
-        with pytest.raises(LocalMCPError, match="approved provider scope"):
-            provider.call("work_continue", {"notificationRouteId": scenario.notificationRouteID})
-
-        with pytest.raises(LocalMCPError, match="approved provider scope"):
-            provider.call("work_continue", {"notificationSetupToken": "c" * 64})
+        with pytest.raises(LocalMCPError, match="not registered"):
+            provider.call("work_start", {"task": "Unknown identity", "assistantIdentity": {
+                "type": "bot", "platform": "rakazo", "botId": "other",
+            }}, scenario.SCOPE)
 
         assert len(scenario.calls) == before
 
@@ -245,11 +275,13 @@ class RemoteWorkerScenario:
 def test_studio_reconnects_without_replaying_an_uncertain_dispatch(tmp_path, monkeypatch):
     monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path))
     remote = RemoteWorkerScenario()
-    args = {"task": "Build a marketing tracker.", "requestId": "marketing-start", "target": {"host": "my-pc"}}
+    args = {"task": "Build a marketing tracker.", "requestId": "marketing-start", "target": {"host": "my-pc"},
+            "assistantIdentity": WorkerScenario.IDENTITY}
 
     with WorkerScenario() as local:
         service = WorkerBridgeService(LocalConfig(), remote.client, local.provider)
         service.pair(remote.CODE)
+        service.authorizeAssistant(local.IDENTITY, local.WEBHOOK)
         assert service.route() == remote.ROUTE
 
         remote.send("work_start", args)
@@ -281,34 +313,38 @@ def test_studio_reconnects_without_replaying_an_uncertain_dispatch(tmp_path, mon
         assert not LocalConfig.workerBridgePath().exists()
 
 
-def test_paired_studio_forwards_notification_setup_and_routed_work(tmp_path, monkeypatch):
-    """The paired assistant uses the existing notification contract over the local MCP transport."""
+def test_paired_studio_routes_only_registered_assistant_work(tmp_path, monkeypatch):
     monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path))
     remote = RemoteWorkerScenario()
 
     with WorkerScenario() as local:
         service = WorkerBridgeService(LocalConfig(), remote.client, local.provider)
         service.pair(remote.CODE)
+        identity = {"assistantIdentity": local.IDENTITY}
 
-        requests = [
-            ("worker_notification_status", {}),
-            ("worker_notification_setup", {}),
-            ("worker_notification_pairing_status", {"setupId": local.notificationSetupID}),
-            ("work_start", {"task": "Build a travel planner", "requestId": "travel-notified",
-                            "notificationRouteId": local.notificationRouteID}),
-            ("worker_notification_decline", {"notificationRouteId": local.notificationRouteID}),
-        ]
+        remote.send("work_start", {"task": "Unregistered assistant", "requestId": "unregistered", **identity})
+        service.exchange(service.route())
 
-        for name, arguments in requests:
-            remote.send(name, arguments)
-            service.exchange(service.route())
-            assert not remote.results[-1]["result"].get("isError"), name
+        assert remote.results[-1]["result"]["isError"] is True
+        assert local.jobs == {}
 
-        assert local.notificationArguments == requests
+        service.authorizeAssistant(local.IDENTITY, local.WEBHOOK)
+        remote.send("worker_notification_status", identity)
+        service.exchange(service.route())
+
+        assert remote.results[-1]["result"]["structuredContent"] == {
+            "registered": True, "enabled": True, "managedByStudio": True,
+        }
+
+        remote.send("work_start", {"task": "Build a travel planner", "requestId": "travel-start", **identity})
+        service.exchange(service.route())
+
+        assert not remote.results[-1]["result"].get("isError")
         assert len(local.jobs) == 1
-        assert remote.results[1]["result"]["structuredContent"]["url"].startswith("http://127.0.0.1:")
-        assert remote.results[2]["result"]["structuredContent"]["paired"] is True
-        assert remote.results[-1]["result"]["structuredContent"]["enabled"] is False
+        assert local.notificationArguments == [("work_start", {
+            "task": "Build a travel planner", "requestId": "travel-start",
+            "notificationRouteId": local.notificationRouteID,
+        })]
 
 
 class PairingCredentials(StaticBearerCredential):
@@ -371,7 +407,9 @@ def test_owner_authorizes_through_local_page_and_worker_restarts_without_a_termi
             assert not LocalConfig.workerBridgePath().exists()
             assert startup.started == 0
 
-            authorized = browser.submit({"code": remote.CODE, "consent": "yes"})
+            authorized = browser.submit({"code": remote.CODE, "consent": "yes",
+                                         "url": "https://receiver.invalid/webhook", "secret": "local-test-key",
+                                         "header": "Authorization", "assistantIdentity": json.dumps(local.IDENTITY)})
 
             assert "Studio connection authorized" in authorized.text
             assert remote.CODE not in authorized.text
@@ -381,6 +419,7 @@ def test_owner_authorizes_through_local_page_and_worker_restarts_without_a_termi
         resumed = WorkerBridgeService(LocalConfig(), remote.client, local.provider)
         remote.send("work_start", {
             "task": "Build a marketing tracker.", "requestId": "desktop-start", "target": {"host": "my-pc"},
+            "assistantIdentity": local.IDENTITY,
         })
         originalResult = resumed.bridge.result
 
@@ -435,6 +474,9 @@ def test_owner_authorizes_through_real_browser(tmp_path, monkeypatch):
                 tab = browser.new_page()
                 tab.goto(server.url)
                 tab.locator("#pairing-code").fill(remote.CODE)
+                tab.locator('[name="assistantIdentity"]').fill(json.dumps(local.IDENTITY))
+                tab.locator('[name="url"]').fill("https://receiver.invalid/webhook")
+                tab.locator('[name="secret"]').fill("local-test-key")
                 tab.locator('input[name="consent"]').check()
 
                 with tab.expect_navigation() as navigation:

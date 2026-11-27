@@ -6,11 +6,9 @@ export type WorkerTool = { name: string; description: string; inputSchema: Recor
 export type WorkerRequest = { requestID: string; name: string; arguments: Record<string, unknown> };
 
 export class WorkerBridgeProtocol {
-  private static readonly notificationTools: Readonly<Record<string, readonly string[]>> = provider.notificationTools;
-  private static readonly notificationDispatchTools = new Set(provider.notificationDispatchTools);
-  private static readonly notificationRoutePattern = new RegExp(provider.notificationRoutePattern);
-  private static readonly notificationSetupPattern = new RegExp(provider.notificationSetupPattern);
-  static readonly allowed = new Set([...provider.tools, ...Object.keys(provider.notificationTools)]);
+  private static readonly identityTools = new Set(provider.identityTools);
+  private static readonly privateFields = ['notificationRouteId', 'notificationSetupToken', 'setupId', 'connectionId'];
+  static readonly allowed = new Set(provider.tools);
   static readonly maxSize = 1_048_576;
 
   static object(value: unknown): value is Record<string, unknown> {
@@ -39,34 +37,33 @@ export class WorkerBridgeProtocol {
     return tools;
   }
 
+  static assistantIdentity(value: unknown): boolean {
+    if (!this.object(value)) {
+      return false;
+    }
+
+    if (value.type === 'bot') {
+      return Object.keys(value).length === 3 && typeof value.platform === 'string' &&
+        /^[a-z][a-z0-9-]{0,63}$/.test(value.platform) && typeof value.botId === 'string' &&
+        /^[A-Za-z0-9._:-]{1,256}$/.test(value.botId);
+    }
+
+    return value.type === 'agentAddress' && Object.keys(value).length === 2 &&
+      typeof value.address === 'string' && /^[^\s\u0000-\u001f\u007f]{1,512}$/u.test(value.address);
+  }
+
   static argumentsAllowed(name: unknown, args: unknown): args is Record<string, unknown> {
-    if (typeof name !== 'string' || !this.allowed.has(name) || !this.object(args)) {
+    if (typeof name !== 'string' || !this.allowed.has(name) || !this.object(args) ||
+        this.privateFields.some((field) => Object.hasOwn(args, field))) {
       return false;
     }
 
-    const fields = Object.hasOwn(this.notificationTools, name) ? this.notificationTools[name] : undefined;
-
-    if (fields && Object.keys(args).some((key) => !fields.includes(key))) {
-      return false;
+    if (this.identityTools.has(name)) {
+      return this.assistantIdentity(args.assistantIdentity) &&
+        (name !== 'worker_notification_status' || Object.keys(args).length === 1);
     }
 
-    if (Object.hasOwn(args, 'notificationRouteId') &&
-        (!(fields?.includes('notificationRouteId') || this.notificationDispatchTools.has(name)) ||
-          typeof args.notificationRouteId !== 'string' || !this.notificationRoutePattern.test(args.notificationRouteId))) {
-      return false;
-    }
-
-    if (Object.hasOwn(args, 'notificationSetupToken') &&
-        (!fields?.includes('notificationSetupToken') || typeof args.notificationSetupToken !== 'string' ||
-          !this.notificationRoutePattern.test(args.notificationSetupToken))) {
-      return false;
-    }
-
-    if (fields?.includes('setupId')) {
-      return typeof args.setupId === 'string' && this.notificationSetupPattern.test(args.setupId);
-    }
-
-    return true;
+    return !Object.hasOwn(args, 'assistantIdentity');
   }
 
   static error(message: string): CallToolResult {

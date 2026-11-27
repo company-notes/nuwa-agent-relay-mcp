@@ -155,56 +155,37 @@ permissions, verified addresses and reply routing throughout.
 
 ## Optional local Worker delegation (isolated pilot)
 
-A cloud assistant uses the ordinary Nuwa Remote MCP connection and the
-official [Session Router Skill](https://mcp.agent-relay.company-notes.com/skills/session-router/SKILL.md).
-The dedicated OAuth pilot requires an isolated Windows Worker.
+Use the official [Session Router Skill](https://mcp.agent-relay.company-notes.com/skills/session-router/SKILL.md)
+for the complete Worker workflow. Skill installation only verifies MCP
+availability. On the owner's first request to connect the Worker, create
+and verify the assistant's native webhook receiver before issuing a
+one-time Worker code. Worker access and automatic completion notifications
+are authorized together on the local Studio page. No separate notification
+preference question is needed. For an already paired dedicated connection,
+finish missing notification authorization without replacing its pairing.
 
-### Connect the Worker (installation and verification only)
+This automatic routing mode requires an OAuth grant dedicated to the
+assistant alone. A shared OAuth grant cannot identify individual Bots;
+do not migrate a shared connection to a single assistant's webhook.
 
-When the owner asks to connect the local Worker or verify its initial
-installation, read worker_provider_status first. If unpaired, call
-worker_provider_pair and give the owner the returned authorizationURL
-as a clickable link and pairingCode separately in a copyable code block.
-The owner opens the link, launches Studio and enters the code with explicit
-consent. Do not use Computer Use, open the browser, run local commands or
-submit the form for the owner. If paired, preserve the existing pairing;
-if temporarily offline or busy, report that condition and retry status
-when appropriate, never re-pair just because a tool is temporarily unavailable.
-After the owner completes pairing, verify paired and online and refresh
-the MCP catalog. A cached tool list alone does not prove reachability.
-Do not dispatch work, ask about notifications, create a Routine or open
-a notification setup page during Skill installation or Worker authorization.
+Give the owner the returned authorizationURL as a clickable link and the
+pairingCode separately when unpaired. The owner opens Studio and enters
+the code, webhook URL and key locally. Do not open a browser, run local
+commands, use Computer Use or submit the form for the owner. After consent,
+verify paired and online using worker_provider_status, then call
+worker_notification_status with empty arguments and verify
+managedByStudio=true and enabled=true. Verify the test event is received.
+Studio supplies private routing automatically for dispatch and continuation;
+the assistant does not store notification credentials or route handles.
+Check notificationBound=true before promising a completion callback.
+Never re-pair an offline or busy Worker just because a tool is unavailable.
+Existing direct Gateway clients may retain their verified private routes;
+never infer assistant identity from a common MCP key.
 
-### Dispatch first; offer completion notifications afterward
-
-Follow Session Router for actual user work. Dispatch the first Job before
-asking about completion notifications; after successful first dispatch
-persist the original jobId and private notificationSetupToken before asking
-once if the preference is unset and the live notification tools support
-that token. When the owner says yes or selects the consent option, create
-and verify the assistant's native webhook receiver in the same turn,
-without asking again, before calling worker_notification_setup with the
-required token. Never call setup with empty arguments. For
-Rakazo, use the self-contained Session Router instructions or the [Rakazo guide](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/rakazo.md).
-Give the owner the setup link only when the receiver exists and its
-endpoint and key location are known. Persist the returned private setupId
-as pending before showing the link; never display it. The owner enters
-only the URL, header and key. On the next owner message, and before every
-later dispatch, recover pending pairing with worker_notification_pairing_status
-using the saved setupId. A successful receipt remains claimable for 30 days
-after browser expiry or Gateway restart. Require notificationBound=true
-and the original jobId to match for the first Job. Save the returned
-notificationRouteId privately, verify worker_notification_status, and
-only then clear setupId. Verify notificationBound in start and continuation
-responses; do not promise a callback for an unbound Job.
-Do not silently dispatch without a route while confirmation is pending;
-report an unavailable Worker or pending authorization, or proceed manually
-only with explicit owner agreement. Preserve verified existing routes and
-declined preferences. Completion notifications and Relay message Wake are
-independent. If notifications are unavailable, use manual progress
-queries and make no promise of automatic notification.
-A coworker's address authorizes communication only; it does not grant
+Completion notifications and Relay message Wake are independent. A
+coworker's address authorizes communication only; it does not grant
 Worker access.
+
 
 ## Installation
 

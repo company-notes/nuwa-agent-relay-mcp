@@ -157,7 +157,7 @@ class WorkerNotificationFlow:
 
         return result
 
-    def _discover(self):
+    def _discover(self, identity=None):
         # A real Studio poll publishes the Gateway catalog. Wait for the cloud
         # to observe it before the first tool call, without dispatching work.
         pending = self.executor.submit(self.service.exchange, self.service.route())
@@ -188,7 +188,7 @@ class WorkerNotificationFlow:
         else:
             assert manualTools <= names
 
-        status = self._tool("worker_notification_status", {})
+        status = self._tool("worker_notification_status", {"assistantIdentity": identity} if identity else {})
         pending.result(timeout=60)
 
         return status
@@ -284,9 +284,11 @@ def test_owner_pairs_and_receives_new_and_continued_job_notifications(tmp_path, 
 
 
 class CombinedWorkerAuthorizationFlow(WorkerNotificationFlow):
-    def _authorizeConnection(self):
-        code = self._tool("worker_provider_pair", {})["pairingCode"]
-        self.gateway.exchange({"receiverAuthorization": "Bearer " + self.RECEIVER_KEY})
+    FIRST = {"type": "bot", "platform": "rakazo", "botId": "bot-a"}
+    SECOND = {"type": "bot", "platform": "rakazo", "botId": "bot-b"}
+    MANUAL = {"type": "agentAddress", "address": "codex@example.test"}
+
+    def _authorizeAssistant(self, identity, key=None, code=None, retry=False):
         startup = PairingStartup(self.service)
         page = WorkerPairPage(self.service, PairingCredentials("oauth-b"), startup)
 
@@ -296,74 +298,96 @@ class CombinedWorkerAuthorizationFlow(WorkerNotificationFlow):
                 tab = browser.new_page()
                 tab.goto(server.url)
 
-                assert tab.locator('[name="url"]').count() == 1, "Worker and webhook must be authorized on one page."
-                assert tab.locator('[name="secret"]').count() == 1
-                tab.locator("#pairing-code").fill(code)
-                tab.locator('[name="url"]').fill(self.gateway.info["webhookURL"])
-                tab.locator('[name="secret"]').fill("incorrect-test-key")
-                tab.locator('[name="consent"]').check()
+                assert tab.locator('[name="assistantIdentity"]').count() == 1, "One shared connection needs per-assistant authorization."
+                if code:
+                    tab.locator("#pairing-code").fill(code)
 
-                with tab.expect_navigation() as rejected:
-                    tab.get_by_role("button", name="Authorize and connect").click()
+                def fill(secret):
+                    tab.locator('[name="assistantIdentity"]').fill(json.dumps(identity))
+                    if secret is not None:
+                        tab.locator('[name="url"]').fill(self.gateway.info["webhookURL"])
+                        tab.locator('[name="secret"]').fill(secret)
+                    tab.locator('[name="consent"]').check()
 
-                assert rejected.value.status == 200
-                assert "Authorization could not be completed" in tab.locator("body").inner_text()
-                assert tab.locator("#pairing-code").count() == 0
-                assert self.service.notificationsReady() is False
-                assert startup.started == 0
-                assert self.gateway.exchange({})["callbacks"] == []
+                if retry:
+                    fill("incorrect-test-key")
 
-                tab.locator('[name="url"]').fill(self.gateway.info["webhookURL"])
-                tab.locator('[name="secret"]').fill("Authorization: Bearer " + self.RECEIVER_KEY)
-                tab.locator('[name="consent"]').check()
+                    with tab.expect_navigation():
+                        tab.get_by_role("button", name="Authorize and connect").click()
 
+                    assert "Authorization could not be completed" in tab.locator("body").inner_text()
+                    assert tab.locator("#pairing-code").count() == 0
+                    assert startup.started == 0
+                    assert self.gateway.exchange({})["callbacks"] == []
+
+                fill(key)
                 with tab.expect_navigation() as navigation:
                     tab.get_by_role("button", name="Authorize and connect").click()
 
                 assert navigation.value.status == 200
                 assert "Studio connection authorized" in tab.locator("body").inner_text()
-                assert self.RECEIVER_KEY not in tab.content()
+                if key:
+                    assert key not in tab.content()
             finally:
                 browser.close()
 
         assert startup.started == 1
 
-    def run(self):
-        self._authorizeConnection()
-        initial = self.gateway.exchange({})
+    def _dispatch(self, identity, requestID):
+        result = self._exchange("work_start", {
+            "task": "Build a walking tracker", "requestId": requestID, "assistantIdentity": identity,
+        })
 
+        assert "notificationSetupToken" not in result
+        assert "notificationRouteId" not in result
+
+        return result
+
+    def run(self):
+        code = self._tool("worker_provider_pair", {})["pairingCode"]
+        self.gateway.exchange({"receiverAuthorization": "Bearer " + self.RECEIVER_KEY})
+        self._authorizeAssistant(self.FIRST, "Authorization: Bearer " + self.RECEIVER_KEY, code, retry=True)
+        self.gateway.exchange({"receiverAuthorization": None})
+        self._authorizeAssistant(self.SECOND, "other-test-key")
+        self._authorizeAssistant(self.MANUAL)
+
+        initial = self.gateway.exchange({})
         assert initial["dispatches"] == []
-        assert [item["event"]["event"] for item in initial["callbacks"]] == ["work.webhook_test"]
+        assert [item["event"]["event"] for item in initial["callbacks"]] == ["work.webhook_test", "work.webhook_test"]
 
         self.service = WorkerBridgeService(self.service.config, self.service.bridge, self.service.provider)
-        status = self._discover()
+        status = self._discover(self.FIRST)
+        assert status["registered"] is True
+        assert status["enabled"] is True
 
-        assert status == {"enabled": True, "managedByStudio": True, "preference": "on"}
-
-        started = self._exchange("work_start", {
-            "task": "Build a walking tracker", "requestId": "combined-first",
-        })
-        jobID = started["job"]["jobId"]
-
-        assert started["notificationBound"] is True
-        assert "notificationSetupToken" not in started
-        assert "notificationRouteId" not in started
-
-        self._verifyCallbacks(self.gateway.exchange({"jobId": jobID}), jobID, 1)
+        jobs = []
+        for index, identity in enumerate((self.FIRST, self.SECOND, self.MANUAL)):
+            started = self._dispatch(identity, "shared-first-" + str(index))
+            assert started["notificationBound"] is (index != 2)
+            jobID = started["job"]["jobId"]
+            jobs.append(jobID)
+            self.gateway.exchange({"jobId": jobID})
 
         continued = self._exchange("work_continue", {
-            "jobId": jobID, "message": "Add weekly goals", "requestId": "combined-continue",
+            "jobId": jobs[0], "message": "Add weekly goals", "requestId": "shared-continue",
+            "assistantIdentity": self.FIRST,
         })
 
-        assert continued["job"]["jobId"] == jobID
+        assert continued["job"]["jobId"] == jobs[0]
         assert continued["notificationBound"] is True
 
-        self._verifyCallbacks(self.gateway.exchange({"jobId": jobID}), jobID, 2)
+        snapshot = self.gateway.exchange({"jobId": jobs[0]})
+        completed = [item for item in snapshot["callbacks"] if item["event"]["event"] == "work.turn_finished"]
+        assert [(item["event"]["jobId"], item["authorization"]) for item in completed] == [
+            (jobs[0], "Bearer " + self.RECEIVER_KEY), (jobs[1], "Bearer other-test-key"),
+            (jobs[0], "Bearer " + self.RECEIVER_KEY),
+        ]
+        assert all(not {"notificationRouteId", "assistantIdentity"} & item["args"].keys() for item in snapshot["dispatches"])
 
 
 @pytest.mark.skipif(not os.environ.get("NUWA_TEST_GATEWAY_ROOT"), reason="Requires pinned Gateway fixture and Node dependencies")
 def test_owner_authorizes_worker_and_notifications_once_before_dispatch(tmp_path, monkeypatch):
-    """A real browser, real HTTPS Worker channel, and real Gateway callback before and after dispatch."""
+    """Shared OAuth, distinct Bot IDs and a non-webhook client through the real browser and HTTPS chain."""
     monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path / "studio"))
 
     with CombinedWorkerAuthorizationFlow(tmp_path, os.environ["NUWA_TEST_GATEWAY_ROOT"], connect=False) as scenario:

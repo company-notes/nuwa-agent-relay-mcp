@@ -29,6 +29,11 @@ export class HTTPMCPApplication {
   async handle(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
+    if (request.method === 'GET' && url.origin === 'https://mcp.agent-relay.company-notes.com' &&
+        (url.pathname === '/' || url.pathname === '/start')) {
+      return Response.redirect('https://agent-relay.company-notes.com' + url.pathname + url.search, 308);
+    }
+
     const onboarding = OnboardingPage.response(url.pathname, request.method);
 
     if (onboarding) {

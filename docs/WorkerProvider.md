@@ -10,19 +10,19 @@ The first transport is a dedicated authenticated HTTPS long-poll request/result 
 
 ## Windows setup and use
 
-1. Install T3 Code and AI Worker Gateway on a Windows test Worker. Install Nuwa Studio 0.2.14 using Windows Setup.
-2. Connect Rakazo to the normal Nuwa Remote MCP with an OAuth grant dedicated to this assistant. Install the canonical [Session Router Skill](https://mcp.agent-relay.company-notes.com/skills/session-router/SKILL.md).
-3. Ask the assistant to connect the local Worker. It creates and verifies its native webhook-only Routine before requesting the one-time Worker code. Open the authorization link on the Worker computer, launch Studio and enter the code, webhook URL and key on the same local page. Authorize Worker access and automatic completion notifications together.
-4. Studio verifies the webhook, persists the dedicated route and starts the background task. If webhook verification fails after pairing, retry notification authorization without another Worker code. For an existing dedicated pairing, use Connect Worker to complete missing notification authorization without replacing the pairing.
-5. Verify worker_provider_status and worker_notification_status (managedByStudio=true and enabled=true), refresh tools and verify the test notification. Only then dispatch a Job. Studio inserts the private routing metadata automatically; confirm notificationBound=true. Continue the same Job and verify the actual receiver receives both completion events.
-6. On restart, the local Gateway recovers the encrypted notification route and Studio resumes the authorized binding. Reuse the original requestId after an uncertain dispatch; inspect existing work instead of automatically replaying.
+1. Install T3 Code, AI Worker Gateway and Nuwa Studio 0.2.14. Install the canonical [Session Router Skill](https://mcp.agent-relay.company-notes.com/skills/session-router/SKILL.md).
+2. Connect the assistants to the ordinary Nuwa Remote MCP. Trusted assistants can share the same OAuth grant and Windows Worker. Retrieve each assistant's stable Bot ID (platform-qualified) or canonical Agent Address.
+3. Ask the assistant to connect the local Worker. It creates and verifies its native webhook receiver if supported. Open the authorization link on the Worker computer and enter the one-time code (only if unpaired), assistantIdentity JSON, webhook URL and key in the same local page. Agent Address clients without a webhook leave both webhook fields empty and authorize manual status checks.
+4. Studio verifies the receiver and registers this assistant in the encrypted Gateway registry. Retry a bad webhook key without another Worker code. For another assistant on a paired Worker, open the same local authorization page and register its own identity and receiver; do not replace the existing pairing.
+5. Verify worker_provider_status and worker_notification_status({assistantIdentity}) with registered=true, and enabled=true for webhook clients, plus actual test receipt. Every work_start, worker_task_start and work_continue requires assistantIdentity. Studio resolves the private route; Gateway binds the Job or checks its existing route before forwarding. Verify notificationBound and actual callback delivery.
+6. After restart, Gateway recovers the registry and Studio resumes the pairing. The assistant retrieves its own identity again without needing notification tokens. Reuse requestId after an uncertain dispatch; inspect existing work instead of automatically replaying.
 7. Revoke remotely with owner approval or locally using worker revoke. Uninstall stops the owned task without deleting existing identities or Jobs. Revocation and disabling previously bound callbacks remain separate operations.
 
 ## Authorization boundary
 
-Automatic routing requires a grant dedicated to exactly one assistant and one Studio profile. The authenticated OAuth grant is not a verified per-Bot identity within a shared connection. Do not authorize a shared grant for a single Bot's receiver. Existing direct/shared clients with explicitly configured private notification routes retain their routes; no automatic migration or retroactive assignment of old Jobs is supported.
+The scope is an authenticated OAuth grant and the assistant identity, not a dedicated grant per Bot. Bot ID or Agent Address is caller-supplied routing metadata, not cryptographic proof of identity. Only trusted assistants may share a grant. A client able to supply another registered identity may use that route; the system cannot establish the true Bot behind a shared authorization. Separate grants are isolated. Per-Job read isolation is not provided.
 
-Webhook credentials are entered only on the loopback Studio page and sent to the authenticated local Gateway configuration endpoint. Gateway verifies the receiver, encrypts the settings, derives a stable per-connection route, binds new Jobs and verifies ownership before continuation. The assistant does not persist setupId, notificationSetupToken or notificationRouteId in managed mode. Completion events require a self-contained native Routine and must be verified separately from test events.
+Webhook credentials are entered only on the loopback Studio page and sent to the authenticated local Gateway registry endpoint. Remote MCP cannot register or overwrite receivers or supply raw route capabilities. Gateway derives a scoped private route, encrypts receiver settings, binds Jobs and checks continuation ownership. Old unbound Jobs are not reassigned automatically. Agent Address manual mode provides identity-based ownership without inventing a notification channel.
 
 ## Platform and acceptance
 
@@ -30,4 +30,4 @@ The Windows service uses a separate GUI-subsystem executable and a current-user 
 
 The current AI Worker Gateway credential contract is Windows DPAPI. macOS and Linux retain their existing Studio messaging support; Worker service installation for those systems requires a supported local Gateway credential contract and verified launchd/systemd user-service integration. No non-Windows service is registered by this release.
 
-The final release gate is the real Rakazo-to-T3 flow, including authorization, start/continue, delivery, combined notification authorization/test/receipt, independent Studio startup, recovery and revocation. The dedicated pilot does not grant per-Job access isolation.
+The final release gate is the real Rakazo-to-T3 flow, including authorization, start/continue, delivery, combined notification authorization/test/receipt, independent Studio startup, recovery and revocation. The shared connection does not grant per-Job read access isolation.

@@ -114,24 +114,25 @@ function scenarios(skill, onboarding, check) {
         workflow.includes('not install') && workflow.includes('original Relay Thread'),
         'FFL is optional; preserve full text fallback and original routing.');
     }],
-    ['Rakazo Worker notifications authorize together with the dedicated Worker connection', () => {
+    ['Shared Worker notifications authorize the assistant identity before dispatch', () => {
       const start = skill.indexOf('## Optional local Worker delegation');
       const end = skill.indexOf('\n## ', start + 1);
       const workflow = skill.slice(start, end);
       const guide = readFileSync(new URL('../skills/nuwa-agent-relay/references/rakazo.md', import.meta.url), 'utf8');
       const notification = guide.slice(guide.indexOf('## Optional Worker delegation with automatic completion notifications'));
 
-      check(workflow.includes('before issuing a') && workflow.includes('authorized together') &&
-        workflow.includes('No separate notification'), 'Create the native receiver before combined authorization.');
-      check(workflow.includes('shared OAuth grant cannot identify individual Bots') &&
-        notification.includes('shared OAuth grant cannot distinguish individual Bots'), 'Do not infer a Bot identity from a common grant.');
+      check(workflow.includes('own stable Bot ID') && workflow.includes('canonical Agent Address') &&
+        workflow.includes('Multiple trusted assistants can share'), 'Use stable per-assistant identity on shared connections.');
+      check(workflow.includes('not authenticated Bot identity') && notification.includes('authenticate individual Bot identities'),
+        'Routing identity is not proof of identity.');
       check(notification.includes('schedule_list') && notification.includes('on: { webhook: true }') &&
         notification.includes('Preserve any existing Nuwa Wake receiver'), 'Use a distinct native webhook-only Routine.');
       check(notification.includes('Never ask for the key in chat') &&
-        notification.includes('managedByStudio=true and enabled=true') &&
+        notification.includes('registered=true and enabled=true') &&
         notification.includes('Do not dispatch before successful authorization'), 'Verify owner authorization before dispatch.');
-      check(notification.includes('work.turn_finished') && notification.includes('work_status / work_messages') &&
-        notification.includes('notificationBound=true'), 'Verify Job completion and native callback delivery.');
+      check(notification.includes('All starts and continuations require assistantIdentity') &&
+        notification.includes('work.turn_finished') && notification.includes('work_status / work_messages') &&
+        notification.includes('notificationBound=true'), 'Require identity and verify actual Job delivery.');
     }],
     ['OpenMausBot bidirectional test ends after sender submission', () => {
       const office = new OnboardingScenario(onboarding, 'openmausbot');

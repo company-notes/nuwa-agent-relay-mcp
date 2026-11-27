@@ -21,6 +21,8 @@ from src.LocalMCPClient import LocalMCPClient
 from src.WorkerBridgeClient import WorkerBridgeClient
 from src.WorkerBridgeService import WorkerBridgeService
 from src.WorkerProvider import WorkerProvider
+from src.WorkerPairPage import WorkerPairPage
+from test_worker_provider import PairingBrowser, PairingCredentials, PairingStartup
 
 
 class ScenarioProcess:
@@ -83,10 +85,11 @@ class WorkerNotificationFlow:
     REPO = Path(__file__).resolve().parents[2]
     RECEIVER_KEY = "disposable-notification-test-key"
 
-    def __init__(self, directory, gatewayRoot):
+    def __init__(self, directory, gatewayRoot, connect=True):
         self.directory = directory
         self.gatewayRoot = Path(gatewayRoot).resolve()
         self.stack = ExitStack()
+        self.connect = connect
 
     def _tlsContext(self):
         key = self.directory / "test-key.pem"
@@ -123,7 +126,8 @@ class WorkerNotificationFlow:
             local = LocalMCPClient(self.gateway.info["address"] + "/mcp", lambda: self.gateway.info["clientToken"])
             self.service = WorkerBridgeService(LocalConfig(), bridge, WorkerProvider(local))
 
-            self.service.pair(self._tool("worker_provider_pair", {})["pairingCode"])
+            if self.connect:
+                self.service.pair(self._tool("worker_provider_pair", {})["pairingCode"])
         except Exception:
             self.stack.close()
             raise
@@ -269,4 +273,73 @@ def test_owner_pairs_and_receives_new_and_continued_job_notifications(tmp_path, 
     monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path / "studio"))
 
     with WorkerNotificationFlow(tmp_path, os.environ["NUWA_TEST_GATEWAY_ROOT"]) as scenario:
+        scenario.run()
+
+
+class CombinedWorkerAuthorizationFlow(WorkerNotificationFlow):
+    def _authorizeConnection(self):
+        code = self._tool("worker_provider_pair", {})["pairingCode"]
+        startup = PairingStartup(self.service)
+        page = WorkerPairPage(self.service, PairingCredentials("oauth-b"), startup)
+
+        with PairingBrowser(page) as server, sync_playwright() as playwright:
+            browser = playwright.chromium.launch()
+            try:
+                tab = browser.new_page()
+                tab.goto(server.url)
+
+                assert tab.locator('[name="url"]').count() == 1, "Worker and webhook must be authorized on one page."
+                assert tab.locator('[name="secret"]').count() == 1
+                tab.locator("#pairing-code").fill(code)
+                tab.locator('[name="url"]').fill(self.gateway.info["webhookURL"])
+                tab.locator('[name="secret"]').fill("Authorization: Bearer " + self.RECEIVER_KEY)
+                tab.locator('[name="consent"]').check()
+
+                with tab.expect_navigation() as navigation:
+                    tab.get_by_role("button", name="Authorize and connect").click()
+
+                assert navigation.value.status == 200
+                assert "Studio connection authorized" in tab.locator("body").inner_text()
+                assert self.RECEIVER_KEY not in tab.content()
+            finally:
+                browser.close()
+
+        assert startup.started == 1
+
+    def run(self):
+        self._authorizeConnection()
+        initial = self.gateway.exchange({})
+
+        assert initial["dispatches"] == []
+        assert [item["event"]["event"] for item in initial["callbacks"]] == ["work.webhook_test"]
+
+        self.service = WorkerBridgeService(self.service.config, self.service.bridge, self.service.provider)
+        assert self._discover()["enabled"] is True
+
+        started = self._exchange("work_start", {
+            "task": "Build a walking tracker", "requestId": "combined-first",
+        })
+        jobID = started["job"]["jobId"]
+
+        assert started["notificationBound"] is True
+        assert "notificationSetupToken" not in started
+        assert "notificationRouteId" not in started
+
+        self._verifyCallbacks(self.gateway.exchange({"jobId": jobID}), jobID, 1)
+
+        continued = self._exchange("work_continue", {
+            "jobId": jobID, "message": "Add weekly goals", "requestId": "combined-continue",
+        })
+
+        assert continued["job"]["jobId"] == jobID
+        assert continued["notificationBound"] is True
+        self._verifyCallbacks(self.gateway.exchange({"jobId": jobID}), jobID, 2)
+
+
+@pytest.mark.skipif(not os.environ.get("NUWA_TEST_GATEWAY_ROOT"), reason="Requires pinned Gateway fixture and Node dependencies")
+def test_owner_authorizes_worker_and_notifications_once_before_dispatch(tmp_path, monkeypatch):
+    """A real browser, real HTTPS Worker channel, and real Gateway callback before and after dispatch."""
+    monkeypatch.setenv("NUWA_MCP_HOME", str(tmp_path / "studio"))
+
+    with CombinedWorkerAuthorizationFlow(tmp_path, os.environ["NUWA_TEST_GATEWAY_ROOT"], connect=False) as scenario:
         scenario.run()

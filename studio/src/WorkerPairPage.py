@@ -24,6 +24,7 @@ This assistant can use the approved Gateway tools and view the Jobs visible to t
 <p>Use an OAuth connection dedicated to this assistant alone. Assistants sharing one OAuth grant cannot be distinguished.
 If your connection is shared, stop here and use a dedicated assistant connection.</p>
 <form method="post" autocomplete="off">"""
+    EXISTING = """<p>This Worker is already paired. This page configures notifications for the existing authorized connection only, not for a different assistant.</p>"""
     CODE = """<p>Enter the one-time pairing code from your assistant yourself. Nuwa may open its normal sign-in page.</p>
 <label for="pairing-code">One-time pairing code</label>
 <input id="pairing-code" name="code" type="password" required maxlength="129" autocomplete="off" spellcheck="false">"""
@@ -63,7 +64,7 @@ button{margin-top:16px;padding:12px 20px;border:1px solid #777;border-radius:6px
             except (LocalMCPError, httpx.HTTPError, OSError, ValueError) as error:
                 logger.warning("Worker notification status unavailable (errorType=%s)", type(error).__name__)
 
-        return self.INTRO + ("" if paired else self.CODE) + self.WEBHOOK + self.CANCEL
+        return self.INTRO + (self.EXISTING if paired else self.CODE) + self.WEBHOOK + self.CANCEL
 
     def _complete(self, fields: dict) -> str:
         if fields == {"cancel": ["yes"]}:

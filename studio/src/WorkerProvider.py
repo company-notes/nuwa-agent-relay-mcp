@@ -56,10 +56,8 @@ class WorkerProvider:
                 properties = dict(schema.get("properties", {}))
                 properties.pop("notificationRouteId", None)
                 schema = {**schema, "properties": properties}
-                description = ("Start a new authorized Worker Job." if name != "work_continue" else
-                               "Continue an existing Job assigned to this dedicated Worker connection.")
-                description += " Studio automatically binds or verifies the completion notification route. " \
-                               "Follow the Session Router Skill for workspace selection and Job identity."
+                description += (" Studio automatically binds or verifies the completion notification route. "
+                                "Follow the Session Router Skill for workspace selection and Job identity.")
 
             tools.append({"name": name, "description": description, "inputSchema": schema})
 

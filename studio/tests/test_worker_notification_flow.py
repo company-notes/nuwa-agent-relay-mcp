@@ -286,6 +286,7 @@ def test_owner_pairs_and_receives_new_and_continued_job_notifications(tmp_path, 
 class CombinedWorkerAuthorizationFlow(WorkerNotificationFlow):
     def _authorizeConnection(self):
         code = self._tool("worker_provider_pair", {})["pairingCode"]
+        self.gateway.exchange({"receiverAuthorization": "Bearer " + self.RECEIVER_KEY})
         startup = PairingStartup(self.service)
         page = WorkerPairPage(self.service, PairingCredentials("oauth-b"), startup)
 
@@ -298,6 +299,20 @@ class CombinedWorkerAuthorizationFlow(WorkerNotificationFlow):
                 assert tab.locator('[name="url"]').count() == 1, "Worker and webhook must be authorized on one page."
                 assert tab.locator('[name="secret"]').count() == 1
                 tab.locator("#pairing-code").fill(code)
+                tab.locator('[name="url"]').fill(self.gateway.info["webhookURL"])
+                tab.locator('[name="secret"]').fill("incorrect-test-key")
+                tab.locator('[name="consent"]').check()
+
+                with tab.expect_navigation() as rejected:
+                    tab.get_by_role("button", name="Authorize and connect").click()
+
+                assert rejected.value.status == 200
+                assert "Authorization could not be completed" in tab.locator("body").inner_text()
+                assert tab.locator("#pairing-code").count() == 0
+                assert self.service.notificationsReady() is False
+                assert startup.started == 0
+                assert self.gateway.exchange({})["callbacks"] == []
+
                 tab.locator('[name="url"]').fill(self.gateway.info["webhookURL"])
                 tab.locator('[name="secret"]').fill("Authorization: Bearer " + self.RECEIVER_KEY)
                 tab.locator('[name="consent"]').check()
@@ -321,7 +336,9 @@ class CombinedWorkerAuthorizationFlow(WorkerNotificationFlow):
         assert [item["event"]["event"] for item in initial["callbacks"]] == ["work.webhook_test"]
 
         self.service = WorkerBridgeService(self.service.config, self.service.bridge, self.service.provider)
-        assert self._discover()["enabled"] is True
+        status = self._discover()
+
+        assert status == {"enabled": True, "managedByStudio": True, "preference": "on"}
 
         started = self._exchange("work_start", {
             "task": "Build a walking tracker", "requestId": "combined-first",

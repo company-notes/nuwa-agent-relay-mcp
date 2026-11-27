@@ -71,9 +71,15 @@ class WorkerBridgeService:
 
             return []
 
-    def _execute(self, request: dict) -> dict:
+    def _execute(self, request: dict, route: str) -> dict:
         try:
-            connectionID = self.route() if self.notificationsRequired() else None
+            pairing = self._pairing()
+
+            if pairing["route"] != route:
+                raise LocalMCPError("The active Worker authorization changed.")
+
+            connectionID = route if pairing.get("notifications_required") is True else None
+
             return self.provider.call(request["name"], request["arguments"], connectionID)
         except (LocalMCPError, httpx.HTTPError, OSError, ValueError) as error:
             logger.warning("Worker tool could not be confirmed (errorType=%s)", type(error).__name__)
@@ -96,7 +102,7 @@ class WorkerBridgeService:
                 not isinstance(request.get("name"), str) or not isinstance(request.get("arguments"), dict)):
             raise ValueError("Invalid remote Worker request.")
 
-        result = self._execute(request)
+        result = self._execute(request, route)
         self.bridge.result(route, request["requestID"], result)
 
     def serve(self) -> None:

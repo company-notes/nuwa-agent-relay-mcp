@@ -114,6 +114,10 @@ assert.match(sessionRouterText, /worker_notification_pairing_status/);
 assert.match(sessionRouterText, /第一次交辦先實際派工/);
 assert.match(sessionRouterText, /有待確認 `setupId` 時，先補領並驗證路由/);
 assert.match(sessionRouterText, /30 天/);
+assert.match(sessionRouterText, /notificationSetupToken` 必填，禁止空參數/);
+assert.match(sessionRouterText, /當輪立即實際呼叫工具建立或確認/);
+assert.match(sessionRouterText, /notificationBound=true/);
+assert.match(sessionRouterText, /不需要另外安裝 Nuwa Agent Relay Skill/);
 
 const skill = await request('/skills/nuwa-agent-relay/SKILL.md');
 assert.equal(skill.status, 200, 'Skill installation entrypoint must remain reachable.');

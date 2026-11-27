@@ -139,6 +139,11 @@ function scenarios(skill, onboarding, check) {
       check(notification.includes('Persist the returned private') &&
         notification.includes('Do not silently dispatch without a route') &&
         notification.includes('does not itself confirm pairing'), 'Test callback is not final pairing confirmation.');
+
+      check(workflow.includes('required token') && workflow.includes('without asking again') &&
+        workflow.includes('notificationBound=true'), 'Consent must trigger receiver creation and a verified Job binding.');
+      check(notification.includes('Empty\n   setup arguments are rejected') &&
+        notification.includes('notificationBound=true'), 'Do not treat a receiver-only pairing as a Job binding.');
     }],
     ['OpenMausBot bidirectional test ends after sender submission', () => {
       const office = new OnboardingScenario(onboarding, 'openmausbot');

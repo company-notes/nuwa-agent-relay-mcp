@@ -127,12 +127,13 @@ There is no need to register a new Agent identity or enroll coworkers.
    unpaired. Do not ask about notifications during Skill installation.
    Check worker_notification_status with the assistant's saved private
    notificationRouteId, if any. For an unset preference, dispatch the
-   first requested Job, retain its private notificationSetupToken and
-   confirm successful dispatch before asking once whether the owner
+   first requested Job, persist its jobId and private notificationSetupToken
+   and confirm successful dispatch before asking once whether the owner
    wants automatic completion notifications. If they decline, use
    worker_notification_decline and save the returned private handle.
-2. After consent, inspect schedule_list and the actual schedule_create
-   schema. Create or reuse one dedicated webhook-only Routine (for example,
+2. The owner's yes or consent selection authorizes receiver creation.
+   In that same turn, inspect schedule_list and the actual schedule_create
+   schema. Do not ask again or merely report a plan. Create or reuse one dedicated webhook-only Routine (for example,
    "AI Worker completion notifications") with on: { webhook: true }.
    Do not set cron or every. Preserve any existing Nuwa Wake receiver.
    Verify the Routine belongs to the intended assistant, has the necessary
@@ -144,7 +145,8 @@ There is no need to register a new Agent identity or enroll coworkers.
    Rakazo's Routine management UI. If creation or verification fails,
    stop and report the blocker; do not call worker_notification_setup.
    Only after verified receiver creation call worker_notification_setup
-   with the retained notificationSetupToken. Persist the returned private
+   with the required notificationSetupToken from the original Job. Empty
+   setup arguments are rejected. Persist the returned private
    setupId as pending before giving the owner its local URL as a clickable
    link; do not display setupId. Give concrete directions to the exact Routine
    where they copy the URL and key. The owner opens the link on the Worker
@@ -166,7 +168,10 @@ There is no need to register a new Agent identity or enroll coworkers.
    if confirmation is unavailable, report the blocker and proceed manually
    only with explicit owner agreement. Include the verified handle with each
    new work_start or worker_task_start.
-   Require the returned jobId to equal the first dispatch's Job ID.
+   Require notificationBound=true and the returned jobId to equal the first
+   dispatch's Job ID. A receiver-only pairing is not proof of a Job binding.
+   Verify notificationBound in each new start or continuation response before
+   promising a callback.
    The first Job is bound by the setup token; no duplicate dispatch is
    needed. Continue it with work_continue without changing its route.
    Arbitrary older Jobs are not retroactively subscribed.

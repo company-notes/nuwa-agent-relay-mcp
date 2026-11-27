@@ -218,6 +218,8 @@ class WorkerNotificationFlow:
         jobID = started["job"]["jobId"]
         token = started["notificationSetupToken"]
 
+        assert started["notificationBound"] is False
+
         beforeConsent = self.gateway.exchange({})
         assert len(beforeConsent["dispatches"]) == 1
         assert beforeConsent["callbacks"] == []
@@ -225,6 +227,7 @@ class WorkerNotificationFlow:
         setup = self._exchange("worker_notification_setup", {"notificationSetupToken": token})
         setupID = setup["setupId"]
 
+        assert setup["jobId"] == jobID
         assert setupID != setup["url"].rsplit("/", 1)[1]
         assert self._exchange("worker_notification_pairing_status", {"setupId": setupID})["paired"] is False
 
@@ -233,6 +236,7 @@ class WorkerNotificationFlow:
         paired = self._exchange("worker_notification_pairing_status", {"setupId": setupID})
         assert paired["paired"] is True
         assert paired["jobId"] == jobID
+        assert paired["notificationBound"] is True
 
         route = {"notificationRouteId": paired["notificationRouteId"]}
         assert self._exchange("worker_notification_status", route)["enabled"] is True
@@ -246,6 +250,7 @@ class WorkerNotificationFlow:
             "jobId": jobID, "message": "Add expense splitting", "requestId": "notification-acceptance-continue",
         })
         assert continued["job"]["jobId"] == jobID
+        assert continued["notificationBound"] is True
 
         self._verifyCallbacks(self.gateway.exchange({"jobId": jobID}), jobID, 2)
 

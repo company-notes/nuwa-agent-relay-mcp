@@ -356,19 +356,20 @@ test('GrokBot and OpenMausBot display names drive everyday bidirectional calls',
   const stageThree = rakazoGuide.split('### 3. Configure the webhook-only Routine')[1]
     .split('### 4. Pair and verify Wake')[0];
   const stageFour = rakazoGuide.split('### 4. Pair and verify Wake')[1]
-    .split('### 5. Enroll coworkers one at a time')[0];
-  const stageFive = rakazoGuide.split('### 5. Enroll coworkers one at a time')[1]
+    .split('### 5. Enroll the whole office and verify routes')[0];
+  const stageFive = rakazoGuide.split('### 5. Enroll the whole office and verify routes')[1]
     .split('### 6. Install the complete receiver procedure')[0];
   const stageSeven = rakazoGuide.split('### 7. Verify a complete conversation')[1]
     .split('## Boundaries and recovery')[0];
   assert.match(stageOne, /message_bot|native Bot-to-Bot forwarding tool/);
   assert.match(stageTwo, /Manage MCP servers/);
   assert.match(stageTwo, /All bots/);
-  assert.match(stageTwo, /each intended coworker/);
+  assert.match(stageTwo, /every eligible coworker/);
   assert.match(stageTwo, /human.*confirm|human.*MCP|human.*open/);
   assert.match(stageFour, /continue with stage 5/);
   assert.match(stageFive, /relayGatewayOfficeCoworkers/);
-  assert.match(stageFive, /If.*empty.*enroll|empty.*enroll/);
+  assert.match(stageFive, /Enroll all eligible individual Bots/);
+  assert.match(stageFive, /including new Bots in an existing office/);
   assert.doesNotMatch(stageOne, /success receipt|stop the installation at this stage/);
   assert.match(stageThree, /Routine name\/ID/);
   assert.match(stageSeven, /actual native forwarding result|native forwarding result/);

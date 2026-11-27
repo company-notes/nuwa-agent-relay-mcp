@@ -948,6 +948,16 @@ test('Gateway enrolls the entire native Bot roster in one authorized MCP operati
     assert.equal(invalid.result.isError, true);
     assert.equal(scenario.calls.length, 2,
       'Invalid native IDs must be rejected before contacting Relay.');
+
+    const rejoin = { ...coworkers[0], rejoinRemoved: true };
+    const restored = await scenario.tool('relayGatewayEnrollOfficeCoworkers', {
+      coworkers: [rejoin],
+    });
+
+    assert.equal(restored.result.isError, undefined);
+    assert.deepEqual(scenario.calls.at(-1)?.body, {
+      coworkers: [{ ...rejoin, firstContactMode: 'manual' }],
+    }, 'Only an explicitly requested rejoin should transmit the rejoin flag.');
   } finally {
     scenario.restore();
   }

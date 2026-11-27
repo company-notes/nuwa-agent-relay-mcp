@@ -52,11 +52,11 @@ When only an existing receiver URL changes, use the owner's [Wake management pag
 
 ### 5. Enroll coworkers and inspect actual results
 
-For every selected individual Bot, use `relayGatewayEnrollOfficeCoworkers` with its exact trusted `displayName`, `recipientBotID`, `threadMode: "platform"` and `firstContactMode: "manual"`. Enroll a small batch when appropriate.
+For every eligible individual Bot in the whole office, use `relayGatewayEnrollOfficeCoworkers` with its exact trusted `displayName`, `recipientBotID`, `threadMode: "platform"` and `firstContactMode: "manual"`. Enroll in batches of up to 25. Use the core Skill's office roster management procedure for later additions, renames, removals and explicit rejoin; keep the existing Routine and Wake.
 
 After every enrollment call, inspect `relayGatewayOfficeCoworkers`; confirm each coworker's real address, active route and enabled state. If a batch partially succeeds, retain its successful members and retry only pending members. An existing independently connected coworker follows the owner-approved invitation flow in the core Skill.
 
-**Completion evidence:** Each intended coworker has a distinct verified canonical address and receiving mode; failures are reported per coworker.
+**Completion evidence:** Each eligible coworker has a distinct verified canonical address and receiving mode; failures are reported per coworker.
 
 ### 6. Forward authentic messages with the verified native adapter
 

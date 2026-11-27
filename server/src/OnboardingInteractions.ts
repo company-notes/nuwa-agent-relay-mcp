@@ -155,8 +155,8 @@ export const ONBOARDING_SCRIPT = `
         'Read both guides in full. Follow the platform procedure, checking actual tool receipts and recording the result before moving to the next stage.'),
       t('', '完成角色设置后继续执行安装步骤；能自行完成的部分直接推进，需要我授权时请明确引导我操作。',
         'After establishing your role, continue the installation steps. Proceed with actions you can complete and guide me when my authorization is needed.'),
-      t('', 'Gateway 自己完成 OAuth 授权并拥有唯一的 Nuwa 身份。同事使用从平台名录获取的真实 Bot ID，通过 relayGatewayEnrollOfficeCoworkers 登记，发消息时使用自己的 from。',
-        'Authorize OAuth for the Gateway identity. Enroll each coworker with its real native Bot ID from the trusted directory using relayGatewayEnrollOfficeCoworkers; coworkers send using their own from.'),
+      t('', 'Gateway 自己完成 OAuth 授权并拥有唯一的 Nuwa 身份。通过 relayGatewayEnrollOfficeCoworkers 登记可信平台名录中全办公室的有效同事，发消息时使用自己的 from。不增加成员选择步骤。',
+        'Authorize OAuth for the Gateway identity. Enroll all eligible individual Bots from the trusted office directory using relayGatewayEnrollOfficeCoworkers; no additional member selection. Coworkers send using their own from.'),
       t('', '先配置平台原生的消息接收 Routine，再使用 relayBeginWakePairing。由用户在安全网页填写完整 Webhook HTTPS 地址和密钥。只有 relayWakeSubscription 确认 enabled 才开始登记同事。',
         'Configure the native receiving Routine first, then call relayBeginWakePairing. The user enters the complete HTTPS webhook URL and secret in the protected browser form. Enroll coworkers only after relayWakeSubscription confirms enabled.'),
       t('', '每完成一个同事的登记，调用 relayGatewayOfficeCoworkers 核对实际地址、路由及激活状态；错误时也先重新读取名录，以免把已完成的操作当作失败。',
@@ -167,8 +167,8 @@ export const ONBOARDING_SCRIPT = `
         : name === 'OpenMausBot'
           ? t('', 'OpenMausBot 使用 explicit/automatic 模式。首次转发后使用可信原生回执调用 relayGatewayConfirmFirstContact；之后沿用原生 Thread。',
             'OpenMausBot uses explicit/automatic mode. After first native forwarding, confirm the actual receipt with relayGatewayConfirmFirstContact; reuse the native Thread thereafter.')
-          : t('', 'GrokBot 使用 platform 模式。受限 Routine 通过 WakeParent 交接一次完整原始事件，上层 Gateway 原生转发一次；普通接收保持零额外 MCP 查询。',
-            'GrokBot uses platform mode. A restricted Routine hands the full trusted event once to WakeParent; the parent performs one native forward. Ordinary dispatch makes zero extra MCP lookups.'),
+          : t('', 'GrokBot 使用 platform 模式。受限 Routine 通过 WakeParent 交接一次平台实际提供的可信事件，上层 Gateway 原生转发一次；普通接收保持零额外 MCP 查询。',
+            'GrokBot uses platform mode. A restricted Routine hands the available trusted event once to WakeParent; the parent performs one native forward. Ordinary dispatch makes zero extra MCP lookups.'),
       t('', '完成后报告 Gateway 地址、已验证的 Wake、每位同事的地址及接收模式。让两位同事实际双向发消息并在原对话回复，才算完成。',
         'Report the Gateway address, verified Wake, coworker addresses and receiving modes. Confirm actual delivery and original-thread replies in both directions before declaring setup complete.')
     ];
@@ -391,7 +391,7 @@ export const ONBOARDING_SCRIPT = `
       '請先讀完共用 Skill 和本平台指南，依照指南的七個階段逐步完成安裝與授權。',
       '完成角色設定後，請接續執行安裝步驟；可自行完成的部分直接往下做，需要我授權時請明確引導我操作。',
       '每一步都檢查真實的工具回傳，確認完成證據後才繼續；失敗時先核對已完成的狀態。',
-      'Gateway 保有自己的身分；同事透過可信名錄中的原生 Bot ID 登記，並以自己的身分發訊及回覆。',
+      'Gateway 保有自己的身分；依可信名錄中的原生 Bot ID 登記整個辦公室的有效同事，不另要求選擇成員。每位同事以自己的身分發訊及回覆。',
       '完成後回報 Gateway 地址、驗證成功的 Wake、每位同事的正式地址及收件方式。',
       '最後讓兩位同事雙向發訊並在原對話回覆，收到並實際回覆後才表示接通。'
     ].join('\\n');

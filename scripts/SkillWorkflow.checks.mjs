@@ -132,6 +132,13 @@ function scenarios(skill, onboarding, check) {
       check(notification.includes('never ask for') && notification.includes('paired:true') &&
         notification.includes('work.turn_finished') && notification.includes('work_status / work_messages'),
         'Verify consent, test receipt and real work before reporting completion.');
+
+      check(workflow.includes('Persist the returned private setupId') &&
+        workflow.includes('before every') && workflow.includes('30 days') &&
+        workflow.includes('only then clear setupId'), 'Recover pending pairing before dispatch, even after link expiry.');
+      check(notification.includes('Persist the returned private') &&
+        notification.includes('Do not silently dispatch without a route') &&
+        notification.includes('does not itself confirm pairing'), 'Test callback is not final pairing confirmation.');
     }],
     ['OpenMausBot bidirectional test ends after sender submission', () => {
       const office = new OnboardingScenario(onboarding, 'openmausbot');

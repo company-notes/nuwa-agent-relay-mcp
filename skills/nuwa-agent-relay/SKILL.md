@@ -185,10 +185,17 @@ the owner says yes, create and verify the assistant's native webhook
 receiver before calling worker_notification_setup with that token. For
 Rakazo, follow the [Rakazo guide](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/rakazo.md).
 Give the owner the setup link only when the receiver exists and its
-endpoint and key location are known. The owner enters only the URL,
-header and key; the Gateway binds the same first Job and returns its
-private route handle. Preserve verified existing routes and declined
-preferences. Completion notifications and Relay message Wake are
+endpoint and key location are known. Persist the returned private setupId
+as pending before showing the link; never display it. The owner enters
+only the URL, header and key. On the next owner message, and before every
+later dispatch, recover pending pairing with worker_notification_pairing_status
+using the saved setupId. A successful receipt remains claimable for 30 days
+after browser expiry or Gateway restart. Save the returned notificationRouteId
+privately, verify worker_notification_status, and only then clear setupId.
+Do not silently dispatch without a route while confirmation is pending;
+report an unavailable Worker or pending authorization, or proceed manually
+only with explicit owner agreement. Preserve verified existing routes and
+declined preferences. Completion notifications and Relay message Wake are
 independent. If notifications are unavailable, use manual progress
 queries and make no promise of automatic notification.
 A coworker's address authorizes communication only; it does not grant

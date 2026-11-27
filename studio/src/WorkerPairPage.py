@@ -1,5 +1,6 @@
 """Short-lived loopback browser page for explicit local owner authorization."""
 
+import json
 import logging
 import secrets
 import time
@@ -21,29 +22,29 @@ class WorkerPairPage:
     INTRO = """<h1>Connect your assistant to this computer</h1>
 <p>Authorize Worker access and automatic work completion notifications together.
 This assistant can use the approved Gateway tools and view the Jobs visible to this Windows Worker.</p>
-<p>Use an OAuth connection dedicated to this assistant alone. Assistants sharing one OAuth grant cannot be distinguished.
-If your connection is shared, stop here and use a dedicated assistant connection.</p>
+<p>Each assistant uses its own Bot ID or Agent Address. A shared OAuth connection may serve multiple assistants.
+Confirm the identity and receiver belong to the same assistant before authorizing.</p>
 <form method="post" autocomplete="off">"""
-    EXISTING = """<p>This Worker is already paired. This page configures notifications for the existing authorized connection only, not for a different assistant.</p>"""
+    EXISTING = """<p>This Worker is already paired. Register another assistant on the existing connection without entering a new Worker code.</p>"""
     CODE = """<p>Enter the one-time pairing code from your assistant yourself. Nuwa may open its normal sign-in page.</p>
 <label for="pairing-code">One-time pairing code</label>
 <input id="pairing-code" name="code" type="password" required maxlength="129" autocomplete="off" spellcheck="false">"""
-    WEBHOOK = """<h2>Automatic completion notifications</h2>
-<p>Copy the URL and key from the webhook receiver your assistant created. The key is sent only to the local Gateway.</p>
+    WEBHOOK = """<h2>Assistant identity and completion notifications</h2>
+<label for="assistant-identity">Assistant identity (copy from your assistant)</label>
+<textarea id="assistant-identity" name="assistantIdentity" required maxlength="2048" rows="3" spellcheck="false"></textarea>
+<p>Copy the URL and key from the webhook receiver your assistant created. The key is sent only to the local Gateway.
+For an Agent Address client without a webhook, leave both webhook fields empty to authorize manual status checks.</p>
 <label for="webhook-url">Webhook URL</label>
-<input id="webhook-url" name="url" type="url" required maxlength="2048" autocomplete="off" spellcheck="false">
+<input id="webhook-url" name="url" type="url" maxlength="2048" autocomplete="off" spellcheck="false">
 <label for="webhook-secret">Webhook key (or complete Authorization: Bearer header)</label>
-<input id="webhook-secret" name="secret" type="password" required maxlength="4096" autocomplete="off" spellcheck="false">
+<input id="webhook-secret" name="secret" type="password" maxlength="4096" autocomplete="off" spellcheck="false">
 <label class="consent"><input type="checkbox" name="consent" value="yes" required>
-I confirm this OAuth connection is dedicated to this assistant, and authorize Worker access and automatic notifications.</label>
+I confirm this assistant identity and its receiver, and authorize Worker access and the displayed notification mode.</label>
 <button type="submit">Authorize and connect</button></form>"""
     CANCEL = '<form method="post"><button name="cancel" value="yes">Cancel</button></form>'
-    PAIRED = """<h1>This Studio already has an authorized Worker and notification receiver</h1>
-<p>Reconnect this dedicated assistant. Its notification settings are retained locally.</p>
-<form method="post"><button name="resume" value="yes">Reconnect authorized Worker</button></form>"""
     STYLE = """body{font:16px system-ui,sans-serif;max-width:620px;margin:60px auto;padding:24px;color:#222}
 h1{font-size:26px}p{line-height:1.6}label{display:block;margin:18px 0 8px}
-input[type=password],input[type=url]{width:100%;box-sizing:border-box;padding:12px;border:1px solid #777;border-radius:6px}
+input[type=password],input[type=url],textarea{width:100%;box-sizing:border-box;padding:12px;border:1px solid #777;border-radius:6px}
 button{margin-top:16px;padding:12px 20px;border:1px solid #777;border-radius:6px;background:#fff;cursor:pointer}
 .notice{padding:12px;border-left:3px solid #777}"""
 
@@ -57,40 +58,33 @@ button{margin-top:16px;padding:12px 20px;border:1px solid #777;border-radius:6px
     def _form(self) -> str:
         paired = self.service.config.workerBridgePath().is_file()
 
-        if paired:
-            try:
-                if self.service.notificationsReady():
-                    return self.PAIRED + self.CANCEL
-            except (LocalMCPError, httpx.HTTPError, OSError, ValueError) as error:
-                logger.warning("Worker notification status unavailable (errorType=%s)", type(error).__name__)
-
         return self.INTRO + (self.EXISTING if paired else self.CODE) + self.WEBHOOK + self.CANCEL
 
     def _complete(self, fields: dict) -> str:
         if fields == {"cancel": ["yes"]}:
             self.finished = True
 
-            return "<h1>Authorization cancelled</h1><p>You can close this page. Unfinished notification authorization does not allow new dispatch.</p>"
+            return "<h1>Authorization cancelled</h1><p>You can close this page. Unregistered assistants cannot dispatch.</p>"
 
         paired = self.service.config.workerBridgePath().is_file()
+        expected = {"assistantIdentity", "url", "secret", "consent"}
 
-        if fields == {"resume": ["yes"]} and paired and self.service.notificationsReady():
-            self.manager.start()
-            self.finished = True
-
-            return self._success()
-
-        expected = {"url", "secret", "consent"} if paired else {"code", "url", "secret", "consent"}
-
+        if not paired:
+            expected.add("code")
         if (set(fields) != expected or fields["consent"] != ["yes"] or
                 any(len(values) != 1 for values in fields.values())):
-            return '<p class="notice">Complete all fields and explicitly confirm authorization.</p>' + self._form()
+            return '<p class="notice">Complete the identity and explicitly confirm authorization.</p>' + self._form()
 
-        settings = {"url": fields["url"][0].strip(), "secret": fields["secret"][0].strip(),
-                    "header": "Authorization"}
+        identity = json.loads(fields["assistantIdentity"][0])
+        url = fields["url"][0].strip()
+        secret = fields["secret"][0].strip()
 
-        if not all(settings.values()):
-            return '<p class="notice">Enter the webhook URL and key.</p>' + self._form()
+        if not isinstance(identity, dict) or bool(url) != bool(secret):
+            return '<p class="notice">Enter a valid assistant identity and both webhook fields.</p>' + self._form()
+
+        webhook = {"url": url, "secret": secret, "header": "Authorization"} if url else None
+        if webhook is None and identity.get("type") != "agentAddress":
+            return '<p class="notice">Bot identities require a webhook URL and key.</p>' + self._form()
 
         if not paired:
             code = fields["code"][0].strip()
@@ -102,17 +96,14 @@ button{margin-top:16px;padding:12px 20px;border:1px solid #777;border-radius:6px
             self.credentials.ensureAccessToken()
             self.service.pair(code)
 
-        self.service.authorizeNotifications(settings)
+        self.service.authorizeAssistant(identity, webhook)
         self.manager.start()
         self.finished = True
 
-        return self._success()
+        mode = "The Gateway verified the webhook receiver." if webhook else "Manual status checks are authorized; no webhook is configured."
 
-    def _success(self) -> str:
-        return ("<h1>Studio connection authorized</h1>"
-                "<p>Worker access and automatic notifications are authorized. "
-                "The Gateway verified the webhook receiver and saved its settings. "
-                "Return to your assistant to verify the live connection. You can close this page.</p>")
+        return ("<h1>Studio connection authorized</h1><p>" + mode +
+                " Return to your assistant to verify its registration. You can close this page.</p>")
 
     def createServer(self) -> HTTPServer:
         page = self
@@ -163,7 +154,7 @@ button{margin-top:16px;padding:12px 20px;border:1px solid #777;border-radius:6px
                 raw = self.rfile.read(int(length))
 
                 try:
-                    fields = parse_qs(raw.decode("utf-8"), strict_parsing=True, max_num_fields=5)
+                    fields = parse_qs(raw.decode("utf-8"), strict_parsing=True, keep_blank_values=True, max_num_fields=6)
                     body = page._complete(fields)
                 except (httpx.HTTPError, RuntimeError, ValueError, OSError) as error:
                     logger.warning("Worker authorization failed (errorType=%s)", type(error).__name__)

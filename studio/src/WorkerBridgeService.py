@@ -21,14 +21,14 @@ class WorkerBridgeService:
         self.bridge = bridge
         self.provider = provider
 
-    def pair(self, code: str, *, notificationsRequired: bool = True) -> None:
+    def pair(self, code: str) -> None:
         path = self.config.workerBridgePath()
 
         if path.exists():
             raise RuntimeError("Revoke the existing local Worker pairing first.")
 
         route = self.bridge.pair(code)
-        self.config.writePrivate(path, {"route": route, "notifications_required": notificationsRequired})
+        self.config.writePrivate(path, {"route": route})
 
     def _pairing(self) -> dict:
         path = self.config.workerBridgePath()
@@ -41,23 +41,11 @@ class WorkerBridgeService:
     def route(self) -> str:
         return self._pairing()["route"]
 
-    def notificationsRequired(self) -> bool:
-        return self._pairing().get("notifications_required") is True
+    def authorizeAssistant(self, identity: dict, webhook: dict | None) -> None:
+        status = self.provider.assistantNotification(self.route(), identity, {"webhook": webhook})
 
-    def notificationsReady(self) -> bool:
-        if not self.config.workerBridgePath().is_file() or not self.notificationsRequired():
-            return False
-
-        return self.provider.connectionNotification(self.route())["enabled"]
-
-    def authorizeNotifications(self, settings: dict) -> None:
-        pairing = self._pairing()
-        status = self.provider.connectionNotification(pairing["route"], settings)
-
-        if not status["enabled"]:
-            raise LocalMCPError("Gateway did not confirm the notification receiver.")
-
-        self.config.writePrivate(self.config.workerBridgePath(), {**pairing, "notifications_required": True})
+        if not status["registered"] or status["enabled"] != (webhook is not None):
+            raise LocalMCPError("Gateway did not confirm the assistant registration.")
 
     def revoke(self) -> None:
         self.bridge.revoke(self.route())
@@ -65,7 +53,7 @@ class WorkerBridgeService:
 
     def _catalog(self) -> list[dict]:
         try:
-            return self.provider.catalog(self.notificationsRequired())
+            return self.provider.catalog()
         except (LocalMCPError, httpx.HTTPError, OSError, ValueError) as error:
             logger.warning("Worker Provider unavailable (errorType=%s)", type(error).__name__)
 
@@ -78,10 +66,12 @@ class WorkerBridgeService:
             if pairing["route"] != route:
                 raise LocalMCPError("The active Worker authorization changed.")
 
-            connectionID = route if pairing.get("notifications_required") is True else None
+            return self.provider.call(request["name"], request["arguments"], route)
+        except LocalMCPError as error:
+            logger.warning("Worker tool rejected (errorType=%s)", type(error).__name__)
 
-            return self.provider.call(request["name"], request["arguments"], connectionID)
-        except (LocalMCPError, httpx.HTTPError, OSError, ValueError) as error:
+            return {"isError": True, "content": [{"type": "text", "text": str(error)}]}
+        except (httpx.HTTPError, OSError, ValueError) as error:
             logger.warning("Worker tool could not be confirmed (errorType=%s)", type(error).__name__)
 
             return {"isError": True, "content": [{

@@ -114,36 +114,24 @@ function scenarios(skill, onboarding, check) {
         workflow.includes('not install') && workflow.includes('original Relay Thread'),
         'FFL is optional; preserve full text fallback and original routing.');
     }],
-    ['Rakazo Worker notifications preserve consent and the independent Wake receiver', () => {
+    ['Rakazo Worker notifications authorize together with the dedicated Worker connection', () => {
       const start = skill.indexOf('## Optional local Worker delegation');
       const end = skill.indexOf('\n## ', start + 1);
       const workflow = skill.slice(start, end);
       const guide = readFileSync(new URL('../skills/nuwa-agent-relay/references/rakazo.md', import.meta.url), 'utf8');
-      const notification = guide.slice(guide.indexOf('## Optional Worker completion notifications'));
+      const notification = guide.slice(guide.indexOf('## Optional Worker delegation with automatic completion notifications'));
 
-      check(workflow.includes('Dispatch the first Job before') &&
-        workflow.includes('make no promise of automatic notification'), 'Dispatch before asking; do not promise absent notifications.');
-
-      check(workflow.includes('Do not dispatch work, ask about notifications') &&
-        workflow.includes('When the owner says yes or selects the consent option') && workflow.includes('create\nand verify'), 'Separate onboarding from consent and receiver creation.');
-
+      check(workflow.includes('before issuing a') && workflow.includes('authorized together') &&
+        workflow.includes('No separate notification'), 'Create the native receiver before combined authorization.');
+      check(workflow.includes('shared OAuth grant cannot identify individual Bots') &&
+        notification.includes('shared OAuth grant cannot distinguish individual Bots'), 'Do not infer a Bot identity from a common grant.');
       check(notification.includes('schedule_list') && notification.includes('on: { webhook: true }') &&
-        notification.includes('Preserve any existing Nuwa Wake receiver'), 'The completion receiver is a separate webhook-only Routine.');
-      check(notification.includes('never ask for') && notification.includes('paired:true') &&
-        notification.includes('work.turn_finished') && notification.includes('work_status / work_messages'),
-        'Verify consent, test receipt and real work before reporting completion.');
-
-      check(workflow.includes('Persist the returned private setupId') &&
-        workflow.includes('before every') && workflow.includes('30 days') &&
-        workflow.includes('only then clear setupId'), 'Recover pending pairing before dispatch, even after link expiry.');
-      check(notification.includes('Persist the returned private') &&
-        notification.includes('Do not silently dispatch without a route') &&
-        notification.includes('does not itself confirm pairing'), 'Test callback is not final pairing confirmation.');
-
-      check(workflow.includes('required token') && workflow.includes('without asking again') &&
-        workflow.includes('notificationBound=true'), 'Consent must trigger receiver creation and a verified Job binding.');
-      check(notification.includes('Empty\n   setup arguments are rejected') &&
-        notification.includes('notificationBound=true'), 'Do not treat a receiver-only pairing as a Job binding.');
+        notification.includes('Preserve any existing Nuwa Wake receiver'), 'Use a distinct native webhook-only Routine.');
+      check(notification.includes('Never ask for the key in chat') &&
+        notification.includes('managedByStudio=true and enabled=true') &&
+        notification.includes('Do not dispatch before successful authorization'), 'Verify owner authorization before dispatch.');
+      check(notification.includes('work.turn_finished') && notification.includes('work_status / work_messages') &&
+        notification.includes('notificationBound=true'), 'Verify Job completion and native callback delivery.');
     }],
     ['OpenMausBot bidirectional test ends after sender submission', () => {
       const office = new OnboardingScenario(onboarding, 'openmausbot');

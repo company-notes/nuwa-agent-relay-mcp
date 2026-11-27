@@ -110,21 +110,17 @@ assert.equal(sessionRouter.status, 200, 'The official Session Router Skill must 
 assert.match(sessionRouter.headers.get('content-type') || '', /text\/markdown/);
 const sessionRouterText = await sessionRouter.text();
 assert.match(sessionRouterText, /name: session-router/);
-assert.match(sessionRouterText, /worker_notification_pairing_status/);
-assert.match(sessionRouterText, /第一次交辦先實際派工/);
-assert.match(sessionRouterText, /有待確認 `setupId` 時，先補領並驗證路由/);
-assert.match(sessionRouterText, /30 天/);
-assert.match(sessionRouterText, /notificationSetupToken` 必填，禁止空參數/);
-assert.match(sessionRouterText, /當輪立即實際呼叫工具建立或確認/);
+assert.match(sessionRouterText, /首次連接 Worker 與自動完成通知一併授權/);
+assert.match(sessionRouterText, /managedByStudio=true/);
 assert.match(sessionRouterText, /notificationBound=true/);
+assert.match(sessionRouterText, /共用同一 OAuth grant 的不同 Bot 無法辨識身分/);
 assert.match(sessionRouterText, /不需要另外安裝 Nuwa Agent Relay Skill/);
 
 const skill = await request('/skills/nuwa-agent-relay/SKILL.md');
 assert.equal(skill.status, 200, 'Skill installation entrypoint must remain reachable.');
 const skillText = await skill.text();
-assert.ok(skillText.includes('notificationSetupToken'));
-assert.match(skillText, /Dispatch the first Job before/);
-assert.match(skillText, /Persist the returned private setupId/);
+assert.match(skillText, /authorized together on the local Studio page/);
+assert.match(skillText, /managedByStudio=true and enabled=true/);
 assert.match(skillText, /agentAddressEnsureIdentity/);
 assert.match(skillText, /Independent client/);
 assert.match(skillText, /WakeParent once with the/);

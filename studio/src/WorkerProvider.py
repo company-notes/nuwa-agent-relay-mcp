@@ -58,6 +58,12 @@ class WorkerProvider:
                     not self.notificationRoutePattern.fullmatch(routeID)):
                 return False
 
+        if "notificationSetupToken" in arguments:
+            token = arguments["notificationSetupToken"]
+            if (fields is None or "notificationSetupToken" not in fields or not isinstance(token, str) or
+                    not self.notificationRoutePattern.fullmatch(token)):
+                return False
+
         if fields is not None and "setupId" in fields:
             setupID = arguments.get("setupId")
             return isinstance(setupID, str) and bool(self.notificationSetupPattern.fullmatch(setupID))

@@ -124,11 +124,15 @@ Worker through Nuwa Studio, configure this independently of office Wake.
 Use the installed Session Router Skill and the actual Worker tool catalog.
 There is no need to register a new Agent identity or enroll coworkers.
 
-1. Check worker_notification_status with the assistant's saved private
-   notificationRouteId, if any. When notification tools and storage are
-   available and consent is unset, ask whether the owner wants automatic
-   completion notifications before dispatching new work. If they decline,
-   use worker_notification_decline and save the returned private handle.
+1. Installation and initial Worker connection are separate. Confirm the
+   Worker is paired and online, using worker_provider_pair only when
+   unpaired. Do not ask about notifications during Skill installation.
+   Check worker_notification_status with the assistant's saved private
+   notificationRouteId, if any. For an unset preference, dispatch the
+   first requested Job, retain its private notificationSetupToken and
+   confirm successful dispatch before asking once whether the owner
+   wants automatic completion notifications. If they decline, use
+   worker_notification_decline and save the returned private handle.
 2. After consent, inspect schedule_list and the actual schedule_create
    schema. Create or reuse one dedicated webhook-only Routine (for example,
    "AI Worker completion notifications") with on: { webhook: true }.
@@ -137,10 +141,15 @@ There is no need to register a new Agent identity or enroll coworkers.
    permissions, and has an actual way to display events to that assistant
    or its user. If the platform cannot deliver to the intended conversation,
    report the real limitation before promising notifications.
-3. Use the complete HTTPS endpoint and Bearer key from the Routine's
-   management UI. Call worker_notification_setup and present its returned
-   local URL as an owner-clickable link. The owner opens it on the Worker PC
-   and enters the actual URL and key in that protected form; never ask for
+3. Read back the created Routine and confirm its ID, webhook-only trigger,
+   full HTTPS endpoint and where the owner obtains the Bearer key in
+   Rakazo's Routine management UI. If creation or verification fails,
+   stop and report the blocker; do not call worker_notification_setup.
+   Only after verified receiver creation call worker_notification_setup
+   with the retained notificationSetupToken and give the owner its local
+   URL as a clickable link, with concrete directions to the exact Routine
+   where they copy the URL and key. The owner opens the link on the Worker
+   PC and enters URL, header and key, with no assistant name; never ask for
    a key in chat or use Computer Use. The Gateway sends an authenticated
    work.webhook_test event before storing encrypted settings.
 4. Observe the actual test Routine execution and user-visible test event.
@@ -149,8 +158,10 @@ There is no need to register a new Agent identity or enroll coworkers.
    persistent configuration, never in ordinary chat or shared instructions.
    If the platform cannot retain it privately, explain that limitation.
    Include the handle with each new work_start or worker_task_start.
-   Continue the original Job with work_continue without changing its route.
-   Existing Jobs started without a route are not retroactively subscribed.
+   Require the returned jobId to equal the first dispatch's Job ID.
+   The first Job is bound by the setup token; no duplicate dispatch is
+   needed. Continue it with work_continue without changing its route.
+   Arbitrary older Jobs are not retroactively subscribed.
 5. Verify a new Job reaches the intended Routine, including its original
    Job ID, and its follow-up reaches the same Routine. A successful HTTP
    response is not proof that the owner saw a notification.

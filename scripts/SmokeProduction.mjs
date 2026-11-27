@@ -102,13 +102,13 @@ assert.match(sessionRouter.headers.get('content-type') || '', /text\/markdown/);
 const sessionRouterText = await sessionRouter.text();
 assert.match(sessionRouterText, /name: session-router/);
 assert.match(sessionRouterText, /worker_notification_pairing_status/);
-assert.match(sessionRouterText, /第一次可用的交辦先問一次/);
+assert.match(sessionRouterText, /第一次交辦先實際派工/);
 
 const skill = await request('/skills/nuwa-agent-relay/SKILL.md');
 assert.equal(skill.status, 200, 'Skill installation entrypoint must remain reachable.');
 const skillText = await skill.text();
-assert.ok(skillText.includes('worker_notification_* tools'));
-assert.match(skillText, /first new assignment after notification capability becomes available/);
+assert.ok(skillText.includes('notificationSetupToken'));
+assert.match(skillText, /Dispatch the first Job before/);
 assert.match(skillText, /agentAddressEnsureIdentity/);
 assert.match(skillText, /Independent client/);
 assert.match(skillText, /WakeParent once with the/);

@@ -125,7 +125,7 @@ function scenarios(skill, onboarding, check) {
         workflow.includes('make no promise of automatic notification'), 'Dispatch before asking; do not promise absent notifications.');
 
       check(workflow.includes('Do not dispatch work, ask about notifications') &&
-        workflow.includes('Only after') && workflow.includes('create and verify'), 'Separate onboarding from consent and receiver creation.');
+        workflow.includes('When the owner says yes or selects the consent option') && workflow.includes('create\nand verify'), 'Separate onboarding from consent and receiver creation.');
 
       check(notification.includes('schedule_list') && notification.includes('on: { webhook: true }') &&
         notification.includes('Preserve any existing Nuwa Wake receiver'), 'The completion receiver is a separate webhook-only Routine.');

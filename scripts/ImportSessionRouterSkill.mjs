@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 
 class SessionRouterPublication {
-  static sourceCommit = '56956eecf2d2b0ea87134573fe492abacbddc64f';
+  static sourceCommit = '1e99f963eb3500fd69bc17cda6251802034ac45b';
   static sourcePath = '.agents/skills/session-router/SKILL.md';
   static destination = new URL('../server/src/SessionRouterSkillDocument.ts', import.meta.url);
 

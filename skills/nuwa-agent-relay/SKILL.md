@@ -153,34 +153,36 @@ send duplicate fragments, or require FFL. When an incoming file link
 cannot be downloaded, ask for a usable alternative. Preserve normal
 permissions, verified addresses and reply routing throughout.
 
-## Optional local Worker delegation (isolated pilot)
+## Optional local Worker delegation
 
 Use the official [Session Router Skill](https://mcp.agent-relay.company-notes.com/skills/session-router/SKILL.md)
-for the complete Worker workflow. Skill installation only verifies MCP
-availability. On the owner's first request to connect the Worker, create
-and verify the assistant's native webhook receiver before issuing a
-one-time Worker code. Worker access and automatic completion notifications
-are authorized together on the local Studio page. No separate notification
-preference question is needed. For an already paired dedicated connection,
-finish missing notification authorization without replacing its pairing.
+for Worker delegation. Installation verifies connectivity only. When the
+owner asks to connect the Worker, retrieve your own stable Bot ID or
+canonical Agent Address. On webhook-capable clients create and verify
+your native receiver before issuing a one-time Worker code. Worker access,
+assistant identity and notification settings are authorized together on
+the local Studio page. No separate notification preference question is
+needed. An already paired Worker can register another assistant without
+a new pairing code.
 
-This automatic routing mode requires an OAuth grant dedicated to the
-assistant alone. A shared OAuth grant cannot identify individual Bots;
-do not migrate a shared connection to a single assistant's webhook.
+Multiple trusted assistants can share the same OAuth grant. A Bot ID or
+Agent Address is routing metadata, not authenticated Bot identity.
+Use your own assistantIdentity: type=bot, platform and botId, or
+type=agentAddress and address when there is no Bot ID. Never guess or
+use another assistant's identity. Different OAuth grants remain isolated.
 
-Give the owner the returned authorizationURL as a clickable link and the
-pairingCode separately when unpaired. The owner opens Studio and enters
-the code, webhook URL and key locally. Do not open a browser, run local
-commands, use Computer Use or submit the form for the owner. After consent,
-verify paired and online using worker_provider_status, then call
-worker_notification_status with empty arguments and verify
-managedByStudio=true and enabled=true. Verify the test event is received.
-Studio supplies private routing automatically for dispatch and continuation;
-the assistant does not store notification credentials or route handles.
-Check notificationBound=true before promising a completion callback.
-Never re-pair an offline or busy Worker just because a tool is unavailable.
-Existing direct Gateway clients may retain their verified private routes;
-never infer assistant identity from a common MCP key.
+Provide the owner authorizationURL, the code when unpaired, and the
+actual assistantIdentity JSON for copying. The owner enters these and the
+webhook URL and key on the local Studio page. Agent Address clients
+without webhooks leave both webhook fields empty and use manual status
+checks. Never ask for a key in chat or submit the form for the owner.
+Verify paired and online with worker_provider_status and call
+worker_notification_status({assistantIdentity}); require registered=true
+and, for a webhook client, enabled=true and actual test receipt.
+All starts and continuations require assistantIdentity. Studio resolves
+the authorized private route; the assistant does not store route handles.
+Check notificationBound=true before promising automatic completion.
+Do not dispatch before registration. Do not re-pair offline Workers.
 
 Completion notifications and Relay message Wake are independent. A
 coworker's address authorizes communication only; it does not grant

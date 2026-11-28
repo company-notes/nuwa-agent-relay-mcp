@@ -270,3 +270,29 @@ test('existing messaging and tool discovery remain available during a Worker cha
     scenario.restore();
   }
 });
+
+test('a new assistant on a paired offline Worker receives a complete owner handoff procedure', async () => {
+  const scenario = new WorkerDeviceScenario();
+
+  try {
+    await scenario.pair();
+    const response = await scenario.base.tool('worker_provider_status', {});
+    const status = JSON.parse(response.result.content[0].text);
+
+    assert.equal(status.paired, true);
+    assert.equal(status.online, false);
+    assert.deepEqual(status.tools, []);
+    assert.equal(status.authorizationURL, 'https://mcp.agent-relay.company-notes.com/worker-pairing');
+    assert.match(status.authorizationInstructions, /Never use Computer Use/);
+    assert.match(status.authorizationInstructions, /Rakazo.*schedule_list.*schedule_create/);
+    assert.match(status.authorizationInstructions, /type, platform, botId/);
+    assert.match(status.authorizationInstructions, /Webhook URL.*key.*chat/i);
+    assert.match(status.authorizationInstructions, /do not request another pairing code/i);
+
+    const list = await scenario.base.toolSchemas();
+    const tool = list.result.tools.find((item: { name: string }) => item.name === 'worker_provider_status');
+    assert.match(tool.description, /^Never use Computer Use/);
+  } finally {
+    scenario.close();
+  }
+});

@@ -339,6 +339,65 @@ test('a shared OAuth coworker cannot rename an already named Gateway Session', a
   }
 });
 
+test('an independently authorized address endpoint preserves the shared office connection', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    const endpoint = '/mcp/nuwa/reviewer-b/main';
+    const origin = 'https://mcp.agent-relay.company-notes.com';
+    const metadata = await scenario.application.handle(new Request(origin + '/.well-known/oauth-protected-resource' + endpoint));
+    assert.equal(metadata.status, 200);
+    assert.equal((await metadata.json() as {resource: string}).resource, origin + endpoint);
+
+    const unauthenticated = await scenario.application.handle(new Request(origin + endpoint, { method: 'POST' }));
+    assert.equal(unauthenticated.status, 401);
+    assert.match(unauthenticated.headers.get('www-authenticate')!, /oauth-protected-resource\/mcp\/nuwa\/reviewer-b\/main/);
+
+    const denied = async (path: string, token: string) => scenario.application.handle(new Request(origin + path, {
+      method: 'POST', headers: { authorization: 'Bearer ' + token },
+    }));
+    assert.equal((await denied(endpoint, 'oauth-a')).status, 401);
+    assert.equal((await denied('/mcp', 'oauth-target')).status, 401);
+    assert.equal((await denied('/mcp/nuwa/reviewer-a/main', 'oauth-target')).status, 401);
+    assert.equal((await denied('/session-bindings', 'oauth-target')).status, 401);
+
+    const gateway = await scenario.tool('agentAddressEnsureIdentity', {});
+    assert.equal(gateway.result.isError, undefined);
+    const rootBefore = scenario.database.rows.get('a'.repeat(64))!;
+    const independent = await scenario.tool('agentAddressEnsureIdentity', {}, 'oauth-target', true, undefined, endpoint);
+    assert.equal(independent.result.isError, undefined);
+    assert.equal(JSON.parse(independent.result.content[0].text).sessionID, SESSION_B);
+    assert.equal(scenario.claimCount, 1, 'Only the original office connection creates a new identity.');
+    assert.equal(scenario.database.rows.size, 2);
+
+    const selectOther = await scenario.tool('agentAddressSelectSession', {
+      address: 'nuwa/reviewer-a/main',
+    }, 'oauth-target', true, undefined, endpoint);
+    assert.equal(selectOther.result.isError, true);
+    const sent = await scenario.tool('sendToAgent', {
+      to: 'nuwa/reviewer-a/main', message: 'An independent message',
+    }, 'oauth-target', true, undefined, endpoint);
+    assert.equal(sent.result.isError, undefined);
+    assert.equal(scenario.calls.at(-1)?.url.searchParams.get('session_id'), SESSION_B);
+    assert.equal(scenario.calls.at(-1)?.headers.get('authorization'), 'Bearer oauth-target');
+
+    const refreshed = await scenario.tool('relayInbox', {}, 'oauth-target-refresh', true, undefined, endpoint);
+    assert.equal(refreshed.result.isError, undefined);
+    assert.equal(scenario.calls.at(-1)?.url.searchParams.get('session_id'), SESSION_B);
+    assert.equal(scenario.database.rows.size, 2);
+
+    const original = await scenario.tool('sendToAgent', {
+      to: 'nuwa/reviewer-b/main', message: 'Original Gateway stays available',
+    });
+    assert.equal(original.result.isError, undefined);
+    assert.equal(scenario.calls.at(-1)?.url.searchParams.get('session_id'), SESSION_A);
+    assert.equal(scenario.database.rows.get('a'.repeat(64))?.encryptedRuntimeToken, rootBefore.encryptedRuntimeToken);
+  } finally {
+    scenario.restore();
+  }
+});
+
 test('keeps the same independent Session after an Organization and Agent rename', async () => {
   const scenario = new RemoteMCPScenario();
   scenario.install();

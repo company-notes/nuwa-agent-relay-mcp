@@ -230,7 +230,8 @@ export class RemoteMCPScenario {
     // A refreshed token of the same OAuth grant maps to the same provider
     // principal. Another grant on the same Account is deliberately isolated.
     const id = token === 'oauth-a-refresh' ? 'a' :
-      token === 'oauth-b' ? 'b' : token === 'oauth-c' ? 'c' : 'a';
+      token === 'oauth-b' ? 'b' : token === 'oauth-c' ? 'c' :
+      token.startsWith('oauth-target') ? 'd' : 'a';
 
     return id.repeat(64);
   }
@@ -269,6 +270,9 @@ export class RemoteMCPScenario {
               account: { email: 'user@example.com' },
               organization: this.organizationExists
                 ? { id: this.organizationID, slug: this.organizationSlug } : null,
+              ...(principal[0] === 'd' ? { relayResource: {
+                resource: 'https://mcp.agent-relay.company-notes.com/mcp/nuwa/reviewer-b/main', sessionID: SESSION_B,
+              } } : {}),
               ...(url.searchParams.get('include_grant') === '1'
                 ? { grantFingerprint: principal } : {}),
             },
@@ -327,6 +331,21 @@ export class RemoteMCPScenario {
           return Response.json({ ok: true, data: {
             session: { id: selectedWork.id, canonical: selectedWork.canonical, agentId: selectedWork.agentId },
             runtimeToken, resumeToken: selectedWork.resumeToken,
+            leaseExpiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+          } });
+        }
+
+        if (ownerLease?.[1] === SESSION_B && principal[0] === 'd' && init?.method === 'PUT') {
+          if (this.activeLeases.has(SESSION_B)) {
+            return Response.json({ ok: false, error: { code: 'session_in_use' } }, { status: 409 });
+          }
+
+          const runtimeToken = RUNTIME_SECRET + '_target';
+          this.activeLeases.set(SESSION_B, runtimeToken);
+
+          return Response.json({ ok: true, data: {
+            session: { id: SESSION_B, canonical: this.canonical(SESSION_B) },
+            runtimeToken, resumeToken: RESUME_SECRET + '_target',
             leaseExpiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
           } });
         }
@@ -637,9 +656,10 @@ export class RemoteMCPScenario {
     name: string, argumentsValue: Record<string, unknown>, token = 'oauth-a',
     waitForBackground = true,
     work?: { mode: 'codex' | 'grok-build' | 'claude-code' | 'opencode'; id?: string },
+    endpoint = '/mcp',
   ): Promise<{ result: { content: Array<{ text: string }>; isError?: boolean } }> {
     const response = await this.application.handle(new Request(
-      'https://mcp.agent-relay.company-notes.com/mcp', {
+      'https://mcp.agent-relay.company-notes.com' + endpoint, {
         method: 'POST',
         headers: {
           authorization: 'Bearer ' + token,

@@ -186,7 +186,8 @@ Use the official Session Router Skill for Worker delegation. Multiple trusted
 Rakazo Bots can share the Worker OAuth grant, but the grant does not
 authenticate individual Bot identities. Retrieve your own stable Bot ID
 using Rakazo's actual native tools. Use assistantIdentity with type=bot,
-platform=rakazo and your actual botId.
+platform=rakazo and your actual botId. All three fields are required.
+Rakazo never uses Agent Address manual mode or blank webhook fields.
 
 When the owner requests Worker access, use schedule_list and schedule_create
 to find or create this assistant's native webhook-only Routine with
@@ -194,10 +195,15 @@ to find or create this assistant's native webhook-only Routine with
 location and native delivery capability. Preserve any existing Nuwa Wake receiver.
 Never ask for the key in chat. Create and verify the receiver before the
 Worker code. If the Worker is already paired, use the existing authorizationURL
-to register this assistant without another pairing code.
+to register this assistant without another pairing code. A paired offline
+Worker still requires native receiver preparation now; the native Routine
+is independent of Worker availability. If offline, registration is unknown.
 
 Give the owner the authorizationURL, pairingCode when unpaired, and
-actual assistantIdentity JSON separately. The owner enters these and the
+actual assistantIdentity JSON separately, plus the complete verified
+webhook URL, header and key location. Never use Computer Use or your own
+browser; the owner opens the clickable link on their Windows computer.
+If Routine creation fails, report the actual blocker, not an incomplete handoff. The owner enters these and the
 webhook URL/key on the local Studio page and authorizes the identity and
 receiver together. Do not dispatch before successful authorization. Check
 worker_provider_status and worker_notification_status({assistantIdentity});

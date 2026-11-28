@@ -14,26 +14,39 @@ export class WorkerBridgeTools extends MCPToolSet {
     super(server);
   }
 
+  private static readonly ownerHandoff = 'Never use Computer Use, your own browser, remote desktop, xdg-open or form submission for Worker authorization. ' +
+    'The owner opens the clickable authorizationURL on their actual Windows Worker computer. ' +
+    'On an explicit connection request, prepare your own stable assistant identity and native receiver before handing off. ' +
+    'Rakazo: use schedule_list and schedule_create (webhook-only, on: { webhook: true }) to create or verify your own Routine even if the Worker is paired but offline. ' +
+    'OpenMausBot and GrokBot likewise use their own native webhook receiver. A Bot identity requires type, platform, botId. Never use Agent Address manual mode for these Bots. ' +
+    'In chat give the owner the clickable authorizationURL, complete actual assistantIdentity JSON, exact Webhook URL and the key header and location in the native management UI; never ask for the key in chat. ' +
+    'If receiver creation is blocked, report the actual blocker instead of giving an incomplete handoff. ' +
+    'Only clients without a Bot ID and without webhook capability use Agent Address manual mode.';
+
   async install(request: Request): Promise<void> {
-    this.register('worker_provider_pair', 'Create a five-minute one-time Studio pairing code and owner authorization URL. ' +
-      'Only when the Worker is not paired: first obtain your own stable Bot ID or canonical Agent Address and create and verify your native webhook receiver if supported. ' +
-      'Give the owner authorizationURL as a clickable link, pairingCode and your actual assistantIdentity JSON separately for copying. ' +
-      'The owner enters them and the webhook URL/key on the local Studio page and confirms authorization. Agent Address clients without a webhook leave both webhook fields empty. ' +
-      'Do not use Computer Use, open a browser, submit the form, or request a key in chat. After authorization, verify worker_provider_status and worker_notification_status({assistantIdentity}). ' +
-      'Shared OAuth connections are supported; every dispatch and continuation must supply your own assistantIdentity.', {},
+    this.register('worker_provider_pair', WorkerBridgeTools.ownerHandoff + ' Only when the Worker is unpaired, create a five-minute code after preparing the receiver. ' +
+      'Give pairingCode separately in chat, not in the URL. Verify Worker online and this assistant registered, and for Bots enabled, after owner authorization.', {},
       async () => ({
         ...await this.bridge.prepare(),
         authorizationURL: WorkerPairingPage.authorizationURL(request.url),
+        authorizationInstructions: WorkerBridgeTools.ownerHandoff + ' Provide pairingCode separately to the owner.',
       }));
-    this.register('worker_provider_status', 'Read the paired Studio and its current Worker tool availability. ' +
-      'During Skill installation check connectivity only. On explicit connection, use worker_notification_status with your own assistantIdentity. ' +
-      'If the Worker is already paired but this assistant is not registered, create its receiver if supported and give the owner authorizationURL and assistantIdentity JSON. ' +
-      'The owner registers this assistant on the same local page, without another Worker code. Never reuse another assistant identity.', {},
+    this.register('worker_provider_status', WorkerBridgeTools.ownerHandoff +
+      ' Read paired Studio and current Worker tools. During Skill installation check connectivity only. On explicit connection, check your own registration if online. ' +
+      'If paired but offline, registration is unknown; prepare the receiver and give the owner the complete handoff without re-pairing. If already known registered, restore the service. ' +
+      'If paired, do not request another pairing code.', {},
       async () => {
         const state = await this.bridge.catalog();
+        const pairingGuidance = state.paired
+          ? ' Worker already paired: do not request another pairing code.'
+          : ' Worker unpaired: after preparing the receiver, call worker_provider_pair.';
+        const onlineGuidance = state.online
+          ? ' Check worker_notification_status({assistantIdentity}) before deciding whether owner authorization is needed.'
+          : ' Worker offline: registration cannot be checked. Native receiver preparation is independent of Worker availability.';
 
         return { paired: state.paired, online: state.online, tools: state.tools.map((tool) => tool.name),
-          authorizationURL: WorkerPairingPage.authorizationURL(request.url) };
+          authorizationURL: WorkerPairingPage.authorizationURL(request.url),
+          authorizationInstructions: WorkerBridgeTools.ownerHandoff + pairingGuidance + onlineGuidance };
       });
     this.register('worker_provider_revoke', 'Revoke this OAuth connection\'s paired Studio. Requires owner approval.', {},
       () => this.bridge.revoke());

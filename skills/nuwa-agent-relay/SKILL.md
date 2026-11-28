@@ -158,14 +158,19 @@ permissions, verified addresses and reply routing throughout.
 ## Optional local Worker delegation
 
 Use the official [Session Router Skill](https://mcp.agent-relay.company-notes.com/skills/session-router/SKILL.md)
-for Worker delegation. Installation verifies connectivity only. When the
+for Worker delegation. Installation verifies connectivity only. Never use
+Computer Use or your own browser for authorization; the owner opens the
+clickable link on their actual Windows Worker. When the
 owner asks to connect the Worker, retrieve your own stable Bot ID or
 canonical Agent Address. On webhook-capable clients create and verify
 your native receiver before issuing a one-time Worker code. Worker access,
 assistant identity and notification settings are authorized together on
 the local Studio page. No separate notification preference question is
 needed. An already paired Worker can register another assistant without
-a new pairing code.
+a new pairing code. Even when a paired Worker is offline, prepare the
+native receiver before the owner handoff; registration is then unknown.
+Rakazo, OpenMausBot and GrokBot must use their own Bot identity and
+webhook, not the Agent Address manual mode.
 
 Multiple trusted assistants can share the same OAuth grant. A Bot ID or
 Agent Address is routing metadata, not authenticated Bot identity.
@@ -174,7 +179,9 @@ type=agentAddress and address when there is no Bot ID. Never guess or
 use another assistant's identity. Different OAuth grants remain isolated.
 
 Provide the owner authorizationURL, the code when unpaired, and the
-actual assistantIdentity JSON for copying. The owner enters these and the
+actual assistantIdentity JSON (type, platform, botId for Bots) for copying,
+plus the actual webhook URL, header and key location. Do not hand off
+incomplete settings; report the real native receiver blocker instead. The owner enters these and the
 webhook URL and key on the local Studio page. Agent Address clients
 without webhooks leave both webhook fields empty and use manual status
 checks. Never ask for a key in chat or submit the form for the owner.

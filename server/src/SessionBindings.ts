@@ -55,6 +55,7 @@ export class SessionBindings {
     private readonly env: Env,
     private readonly address: AddressAPIClient,
     private readonly work?: WorkContext,
+    private readonly targetSessionID?: string,
   ) {
     this.tokenCipher = new RuntimeTokenCipher(env.SESSION_BINDING_KEY);
   }
@@ -88,7 +89,7 @@ export class SessionBindings {
   }
 
   private async row(key: string): Promise<BindingRow | null> {
-    return this.env.BINDINGS_DB.prepare(
+    const row = await this.env.BINDINGS_DB.prepare(
       `SELECT session_id AS sessionID, organization_id AS organizationID,
               canonical_address AS canonicalAddress,
               encrypted_runtime_token AS encryptedRuntimeToken,
@@ -96,6 +97,12 @@ export class SessionBindings {
               expires_at AS expiresAt
          FROM ${this.table} WHERE ${this.keyColumn} = ?`,
     ).bind(key).first<BindingRow>();
+
+    if (row && this.targetSessionID && row.sessionID !== this.targetSessionID) {
+      throw new APIError(403, 'fixed_resource_binding_mismatch', 'The stored binding does not match the authorized Session.');
+    }
+
+    return row;
   }
 
   private static checkLease(
@@ -453,13 +460,28 @@ export class SessionBindings {
         ? await this.renew(client, key, existing, status.organization.slug)
         : existing;
 
-      if (agentDisplayName) {
+      if (agentDisplayName && !this.targetSessionID) {
         // This is the current OAuth grant's own Session, never a Gateway
         // acting on a different colleague's identity.
         await this.updateOwnDisplayName(client, renewed, agentDisplayName);
       }
 
       return { key, row: renewed, created: false };
+    }
+
+    if (this.targetSessionID) {
+      if (!status.organization) {
+        throw new APIError(403, 'organization_required', 'An authorized Organization is required.');
+      }
+
+      const target = await client.getSession(this.targetSessionID) as Session;
+      if (target.id !== this.targetSessionID || target.canonical.split('/')[0] !== status.organization.slug) {
+        throw new APIError(403, 'fixed_resource_binding_mismatch', 'The authorized Session is no longer available.');
+      }
+
+      const row = await this.recoverSelected(client, key, status.organization, target.id, null);
+
+      return { key, row, created: false };
     }
 
     if (this.work && (!start?.sessionName || !start.sessionDisplayName)) {
@@ -600,6 +622,14 @@ export class SessionBindings {
     };
     const existing = await this.row(key);
 
+    if (this.targetSessionID) {
+      if (target.id !== this.targetSessionID) {
+        throw new APIError(403, 'fixed_resource_selection_forbidden', 'This endpoint is authorized only for its original Session.');
+      }
+
+      return this.ensure();
+    }
+
     if (existing && existing.organizationID !== status.organization.id) {
       throw new APIError(403, 'binding_organization_changed',
         'The bound Session Organization is no longer authorized.');
@@ -614,27 +644,36 @@ export class SessionBindings {
         'The requested Session is still in use.');
     }
 
+    const row = await this.recoverSelected(client, key, status.organization, target.id, existing);
+
+    return SessionBindings.publicResult(row, false);
+  }
+
+  private async recoverSelected(
+    client: AddressAPIClient, key: string, organization: { id: string; slug: string },
+    sessionID: string, existing: BindingRow | null,
+  ): Promise<BindingRow> {
     await this.tokenCipher.requireKey();
     const recovered = await client.request('PUT',
-      '/v2/account/sessions/' + encodeURIComponent(target.id) + '/owner-runtime-lease',
+      '/v2/account/sessions/' + encodeURIComponent(sessionID) + '/owner-runtime-lease',
       { body: { runtimeLabel: SessionBindings.RUNTIME_LABEL } },
     ) as ClaimResponse;
 
     try {
-      SessionBindings.checkLease(recovered, target.id, status.organization.slug);
+      SessionBindings.checkLease(recovered, sessionID, organization.slug);
 
       if (existing && !(await this.releaseBinding(client, key, existing))) {
         throw new APIError(409, 'session_binding_changed',
           'The current OAuth grant binding changed during selection.');
       }
 
-      const row = await this.persist(key, status.organization, recovered);
+      const row = await this.persist(key, organization, recovered);
 
-      return SessionBindings.publicResult(row, false);
+      return row;
     } catch (error) {
       if (recovered.runtimeToken && recovered.session?.id) {
         try {
-          await client.release(target.id, recovered.runtimeToken);
+          await client.release(sessionID, recovered.runtimeToken);
         } catch (releaseError) {
           SessionBindings.logger.exception('selection_compensation_failed', releaseError);
         }

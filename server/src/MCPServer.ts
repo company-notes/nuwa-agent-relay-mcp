@@ -16,6 +16,7 @@ export class NuwaMCPServer {
     private readonly address: AddressAPIClient,
     private readonly tasks: BackgroundTasks,
     private readonly work?: WorkContext,
+    private readonly targetSessionID?: string,
   ) {}
 
   createServer(): McpServer {
@@ -23,7 +24,13 @@ export class NuwaMCPServer {
       name: 'nuwa-agent-relay',
       version: '0.2.0',
     }, {
-      instructions: this.work
+      instructions: this.targetSessionID
+        ? 'This address-specific MCP endpoint is authorized for one existing Agent Session. ' +
+          'Call agentAddressEnsureIdentity after OAuth to attach its original Session; never create or select a different identity. ' +
+          'Use sendToAgent and relayReplyThread without from, and read your own Inbox. ' +
+          'Preserve existing direct Wake. To leave a former shared office connection, use the owner-approved management workflow. ' +
+          'Never disclose private Runtime, Resume, OAuth or Wake credentials.'
+        : this.work
         ? 'Nuwa gives each native work Session its own canonical address under the established Agent. ' +
           'Before beginning any new user work, even without messaging, call agentAddressStartWork with a meaningful kebab-case ' +
           'sessionName and sessionDisplayName, based on the user task. On native resume call it without names. ' +
@@ -72,7 +79,7 @@ export class NuwaMCPServer {
           'Agent startup are separate steps.',
     });
 
-    const bindings = new SessionBindings(this.env, this.address, this.work);
+    const bindings = new SessionBindings(this.env, this.address, this.work, this.targetSessionID);
     const relay = new RelayAPIClient(this.env, this.authorization,
       () => bindings.authorize(), this.tasks);
     const prepareMailbox = (session: BoundSession) =>

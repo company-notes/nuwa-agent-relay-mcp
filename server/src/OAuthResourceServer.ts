@@ -1,30 +1,32 @@
 import type { Env } from './Env';
 import { Logger } from './Logger';
+import { MCPResource } from './MCPResource';
 
 export type AuthenticatedRequest = {
   authorization: string;
   status: Response;
+  targetSessionID?: string;
 };
 
 export class OAuthResourceServer {
   private static readonly logger = Logger.forModule('mcp');
-  private static readonly RESOURCE_PATH = '/mcp';
+  private static readonly SESSION_ID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 
   constructor(
     private readonly env: Env,
     private readonly requester: typeof fetch = (input, init) => env.ADDRESS_WORKER.fetch(input, init),
   ) {}
 
-  metadata(origin: string): Record<string, unknown> {
+  metadata(origin: string, resourcePath = MCPResource.root): Record<string, unknown> {
     return {
-      resource: origin + OAuthResourceServer.RESOURCE_PATH,
+      resource: origin + resourcePath,
       authorization_servers: [this.env.ADDRESS_API_URL],
       bearer_methods_supported: ['header'],
     };
   }
 
-  private challenge(origin: string, invalid = false): Response {
-    const metadataURL = origin + '/.well-known/oauth-protected-resource/mcp';
+  private challenge(origin: string, resourcePath: string, invalid = false): Response {
+    const metadataURL = origin + MCPResource.metadataPrefix + resourcePath;
     const reason = invalid ? ', error="invalid_token"' : '';
 
     return new Response(null, {
@@ -36,12 +38,12 @@ export class OAuthResourceServer {
     });
   }
 
-  async authenticate(request: Request): Promise<AuthenticatedRequest | Response> {
+  async authenticate(request: Request, resourcePath = MCPResource.root): Promise<AuthenticatedRequest | Response> {
     const origin = new URL(request.url).origin;
     const authorization = request.headers.get('authorization');
 
     if (!authorization || !/^Bearer\s+\S+$/.test(authorization)) {
-      return this.challenge(origin);
+      return this.challenge(origin, resourcePath);
     }
 
     // The backend is the single source of truth for OAuth account validity.
@@ -68,7 +70,7 @@ export class OAuthResourceServer {
     }
 
     if (status.status === 401 || status.status === 403) {
-      return this.challenge(origin, true);
+      return this.challenge(origin, resourcePath, true);
     }
 
     if (!status.ok) {
@@ -82,6 +84,22 @@ export class OAuthResourceServer {
       return Response.json({ error: 'oauth_upstream_unavailable' }, { status: 502 });
     }
 
-    return { authorization, status };
+    const envelope = await status.clone().json() as {
+      ok?: boolean; data?: { relayResource?: { resource?: string; sessionID?: string } };
+    };
+    const grant = envelope.data?.relayResource;
+    const targeted = resourcePath !== MCPResource.root;
+
+    if (envelope.ok !== true || !envelope.data) {
+      return Response.json({ error: 'oauth_upstream_invalid' }, { status: 502 });
+    }
+
+    if (targeted && (!grant || grant.resource !== origin + resourcePath ||
+        !OAuthResourceServer.SESSION_ID.test(grant.sessionID ?? '')) ||
+        !targeted && grant !== undefined) {
+      return this.challenge(origin, resourcePath, true);
+    }
+
+    return { authorization, status, ...(targeted ? { targetSessionID: grant!.sessionID } : {}) };
   }
 }

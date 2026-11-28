@@ -184,29 +184,36 @@ export class RelayTools extends MCPToolSet {
 
   private registerWakeTools(): void {
     const { verificationId, challenge } = RelayTools.schemas;
+    const recipientBotID = z.string().regex(/^[A-Za-z0-9._:-]{1,192}$/).optional()
+      .describe('Raw registered native Bot ID for a platform-mode coworker of the bound Gateway. Omit for the bound Session itself.');
 
     this.register('relayBeginWakePairing',
       'Create an OAuth-protected private browser link for the human user to open and complete ' +
-      'with their webhook HTTPS URL and key in the secure form. Return the link to the user.',
-      {},
-      () => this.client.call('POST', '/v2/wake-pairings'));
+      'with their webhook HTTPS URL and key in the secure form. Return the link to the user. ' +
+      'For an explicit owner request to give an enrolled platform-mode coworker a direct Wake, ' +
+      'supply its trusted recipientBotID. Keep the shared OAuth and Gateway binding unchanged.',
+      { recipientBotID },
+      ({ recipientBotID }) => this.client.call('POST', '/v2/wake-pairings',
+        recipientBotID ? { recipientBotID } : undefined));
 
     this.register('relayVerifyWake',
-      'Confirm ONE unexpired Wake challenge delivered to this Session\'s own trusted ' +
-      'Webhook. Use only the verificationId and challenge from the genuine ' +
-      'nuwa.wake.verification event, never the Webhook URL or sender key. ' +
-      'A received HTTP 2xx does not activate Wake without this confirmation. ' +
-      'Do not call on behalf of another Agent or attempt to guess a proof.',
-      { verificationId, challenge },
-      ({ verificationId, challenge }) =>
+      'Confirm ONE unexpired Wake challenge delivered to the trusted receiver. ' +
+      'Use only the verificationId and challenge from the genuine nuwa.wake.verification event, ' +
+      'never the Webhook URL or sender key. A received HTTP 2xx does not activate Wake without confirmation. ' +
+      'For an owner-approved direct coworker receiver on a shared office connection, supply its fixed ' +
+      'registered recipientBotID; otherwise omit it. Never guess a proof or confirm for another coworker.',
+      { verificationId, challenge, recipientBotID },
+      ({ verificationId, challenge, recipientBotID }) =>
         this.client.call('POST', '/v2/wake-subscription/verification', {
-          verificationId, challenge,
+          verificationId, challenge, ...(recipientBotID ? { recipientBotID } : {}),
         }));
 
     this.register('relayWakeSubscription',
-      'Inspect the bound Session Wake without disclosing secrets.',
-      {},
-      () => this.client.call('GET', '/v2/wake-subscription'));
+      'Inspect Wake status without disclosing secrets. Omit recipientBotID for the bound Session; ' +
+      'supply the registered Bot ID to inspect an active platform-mode coworker of its Gateway.',
+      { recipientBotID },
+      ({ recipientBotID }) => this.client.call('GET', '/v2/wake-subscription', undefined,
+        recipientBotID ? { recipient_bot_id: String(recipientBotID) } : undefined));
 
     this.register('relayRemoveWake',
       'Remove the bound Session Wake subscription and queued notifications.',

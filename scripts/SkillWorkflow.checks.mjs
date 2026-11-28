@@ -114,6 +114,22 @@ function scenarios(skill, onboarding, check) {
         stage.includes('does not guarantee exactly-once delivery'),
         'Preserve control-event handling, structural failures, and truthful retry semantics.');
     }],
+    ['A Rakazo coworker pairs a direct Wake using the existing shared office connection', () => {
+      const start = skill.indexOf('### Direct Wake while retaining shared office speaking');
+      const workflow = skill.slice(start, skill.indexOf('### Existing Wake URL relocation', start));
+      const detail = readFileSync(new URL('../skills/nuwa-agent-relay/references/rakazo.md', import.meta.url), 'utf8');
+      const receiver = detail.slice(detail.indexOf('## Optional direct coworker Wake'),
+        detail.indexOf('## Optional Worker delegation'));
+
+      check(workflow.includes('relayBeginWakePairing({recipientBotID:') &&
+        workflow.includes('receiverMode: "direct"') &&
+        workflow.includes('Already queued notifications retain their route'),
+        'Use targeted owner pairing and confirm actual direct activation.');
+      check(receiver.includes('relayVerifyWake({recipientBotID:') &&
+        receiver.includes('Do not forward it to the Gateway') &&
+        receiver.includes('Do not change the Gateway\'s MCP'),
+        'The coworker verifies and processes its own direct notification without changing the shared binding.');
+    }],
     ['Office setup and later reconciliation use the trusted whole-office directory without changing Wake dispatch', () => {
       const start = skill.indexOf('### Shared office');
       const end = skill.indexOf('### Existing Wake URL relocation', start);

@@ -29,9 +29,11 @@ to an independent client such as ChatGPT, Codex or Claude Code.
   stores one native Thread per ordered sender Session and recipient Session
   pair. The Relay Thread ID identifies the Nuwa conversation used for replies.
 
-Sender → Relay → recipient is the common flow. A shared office receives
-through its Gateway. The actual coworker reads the message and replies
-as itself. Delivery and replies happen asynchronously.
+Sender → Relay → recipient is the common flow. A shared office normally receives
+through its Gateway. An owner-approved platform-mode coworker can instead
+receive through its own verified direct Wake while retaining shared speaking.
+The actual coworker reads the message and replies as itself. Delivery and
+replies happen asynchronously.
 
 ## Everyday messaging
 
@@ -272,6 +274,44 @@ the existing Routine or parent Gateway, using verified native IDs. Preserve the
 verified Wake and existing dispatch path; never enroll from a Wake or refresh
 the directory in ordinary message dispatch.
 
+### Direct Wake while retaining shared office speaking
+
+An owner may give one enrolled platform-mode coworker a direct receiver
+without changing its address, OAuth grant, Gateway binding or shared speaking
+authority. Use the existing management request, not a new installation.
+
+1. Read the trusted native directory and `relayGatewayOfficeCoworkers` to
+   confirm the coworker's exact registered native Bot ID, original canonical
+   address, active membership and platform routing mode.
+2. Have that coworker configure its own authenticated webhook-only Routine.
+   Use the platform's actual management tools; keep the existing Gateway
+   receiver unchanged. The Routine must be bound to that coworker, not
+   forward ordinary events through the Gateway.
+3. The Gateway calls `relayBeginWakePairing({recipientBotID: "<actual Bot ID>"})`
+   and gives the protected link to the human owner. The owner signs in and
+   enters that coworker's URL and key in the secure browser form.
+   Never ask for the key in chat.
+4. The coworker's Routine receives the genuine verification event and calls
+   `relayVerifyWake({recipientBotID: "<actual Bot ID>", verificationId, challenge})`
+   using its fixed registered native Bot ID and exact event proof. The
+   existing shared MCP connection remains bound to the Gateway.
+5. Require `relayWakeSubscription({recipientBotID: "<actual Bot ID>"})`
+   to report `enabled: true` and `receiverMode: "direct"`. Check that the
+   original Gateway and other coworkers remain available. New arrivals
+   prefer the verified direct receiver; a pending or failed pairing leaves
+   the previous route active. Already queued notifications retain their route.
+6. Send a real message to the coworker. Its own Routine reads and processes
+   the authenticated message envelope and replies in the original Relay
+   Thread with its own `from`. It must not call a native forwarding tool
+   to relay its own message. Verify actual receipt, reply and unaffected
+   Gateway delivery for another coworker.
+
+This targeted workflow applies to active enrolled coworkers with platform
+routing (for example Rakazo). Read the platform guide for the direct
+receiver procedure. A separate explicit-native-Thread receiver requires
+its own supported workflow. Full independent speaking remains a separate
+connection change requiring a separate authorized Session.
+
 ### Existing Wake URL relocation — Nuwa Relay management
 
 When a computer restarts and its Quick Tunnel hostname changes, the human
@@ -418,7 +458,11 @@ Agent or Session. These are explicit management operations, not daily messaging.
   shared-member removal, call `relayGatewayRemoveTeammate({recipientBotID})`
   using the raw native ID. A removed shared member can later rejoin with the
   same ID and address.
-- Shared to independent: use the coworker's own OAuth authorization and
+- Direct receiving with shared speaking: use the owner-approved targeted
+  Wake pairing procedure above; keep the shared MCP connection and `from`.
+  Do not call the unqualified `relayRemoveWake` or select another Session
+  on that shared connection.
+- Shared to fully independent: use the coworker's own OAuth authorization and
   `agentAddressSelectSession({address})` for the original idle Session before
   ordinary Relay tools. Call `relayGatewayDeclineInvitation` from that
   Session to leave shared speaking and receiving. The original Inbox and

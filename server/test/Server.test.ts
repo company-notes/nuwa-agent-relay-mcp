@@ -882,6 +882,43 @@ test('model-facing Wake pairing forwards no credential values', async () => {
   }
 });
 
+test('Gateway pairs and verifies one coworker Wake without selecting another Session', async () => {
+  const scenario = new RemoteMCPScenario();
+  scenario.install();
+
+  try {
+    await scenario.bind();
+    const recipientBotID = 'native-ava';
+    const verificationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const challenge = 'a'.repeat(64);
+
+    const pairing = await scenario.tool('relayBeginWakePairing', { recipientBotID });
+    assert.equal(pairing.result.isError, undefined);
+    assert.equal(scenario.calls.at(-1)?.url.pathname, '/v2/wake-pairings');
+    assert.deepEqual(scenario.calls.at(-1)?.body, { recipientBotID });
+
+    const confirmation = await scenario.tool('relayVerifyWake', { recipientBotID, verificationId, challenge });
+    assert.equal(confirmation.result.isError, undefined);
+    assert.equal(scenario.calls.at(-1)?.url.pathname, '/v2/wake-subscription/verification');
+    assert.deepEqual(scenario.calls.at(-1)?.body, { recipientBotID, verificationId, challenge });
+
+    const status = await scenario.tool('relayWakeSubscription', { recipientBotID });
+    assert.equal(status.result.isError, undefined);
+    assert.equal(scenario.calls.at(-1)?.url.searchParams.get('recipient_bot_id'), recipientBotID);
+
+    for (const call of scenario.calls) {
+      assert.equal(call.url.searchParams.get('session_id'), SESSION_A);
+      assert.equal(call.headers.get('x-nuwa-runtime-token'), RUNTIME_SECRET);
+    }
+
+    const invalid = await scenario.tool('relayBeginWakePairing', { recipientBotID: 'invalid ID' });
+    assert.equal(invalid.result.isError, true);
+    assert.equal(scenario.calls.length, 3);
+  } finally {
+    scenario.restore();
+  }
+});
+
 test('HTTP transport rejects redirects and escaped cross-origin paths', async () => {
   const requests: Array<URL> = [];
   const client = new HTTPAPIClient('https://relay.example.com', 'Bearer oauth', async (url) => {

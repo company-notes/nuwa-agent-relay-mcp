@@ -2,6 +2,7 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 
 import type { BackgroundTasks, Env } from './Env';
 import { NuwaMCPServer } from './MCPServer';
+import { MCPResource } from './MCPResource';
 import { AGENT_SKILL_MD } from './SkillDocument';
 import { SESSION_ROUTER_SKILL_MD } from './SessionRouterSkillDocument';
 import { AGENT_SKILL_REFERENCES } from './SkillReferences';
@@ -83,10 +84,11 @@ export class HTTPMCPApplication {
     }
 
     const oauth = new OAuthResourceServer(this.env);
+    const resource = MCPResource.path(url.pathname);
+    const metadataPath = MCPResource.metadataPath(url.pathname);
 
-    if (url.pathname === '/.well-known/oauth-protected-resource/mcp' &&
-      request.method === 'GET') {
-      return Response.json(oauth.metadata(url.origin));
+    if (metadataPath && request.method === 'GET') {
+      return Response.json(oauth.metadata(url.origin, metadataPath));
     }
 
     const resetMatch = url.pathname.match(
@@ -97,14 +99,14 @@ export class HTTPMCPApplication {
 
     const studio = WorkerBridge.handles(url.pathname);
 
-    if (url.pathname !== '/mcp' && url.pathname !== '/session-bindings' && !resetMatch && !inbox && !studio) {
+    if (!resource && url.pathname !== '/session-bindings' && !resetMatch && !inbox && !studio) {
       return new Response('Not found', { status: 404 });
     }
 
     let result: AuthenticatedRequest | Response;
 
     try {
-      result = await oauth.authenticate(request);
+      result = await oauth.authenticate(request, resource ?? MCPResource.root);
     } catch (error) {
       // Never log Bearer tokens, request bodies or upstream response payloads.
       HTTPMCPApplication.logger.exception('oauth_validation_failed', error);
@@ -187,6 +189,10 @@ export class HTTPMCPApplication {
 
     try {
       work = WorkContext.fromHeaders(request.headers);
+
+      if (result.targetSessionID && work) {
+        throw new APIError(403, 'fixed_resource_work_forbidden', 'An address-specific MCP endpoint represents an existing fixed Session.');
+      }
     } catch (error) {
       if (error instanceof APIError) {
         return Response.json({ error: error.code }, { status: error.status });
@@ -207,10 +213,10 @@ export class HTTPMCPApplication {
 
       stage = 'register_tools';
       const server = new NuwaMCPServer(
-        this.env, result.authorization, address, this.tasks, work,
+        this.env, result.authorization, address, this.tasks, work, result.targetSessionID,
       ).createServer();
 
-      if (this.env.WORKER_BRIDGE && !work) {
+      if (this.env.WORKER_BRIDGE && !work && !result.targetSessionID) {
         await new WorkerBridgeTools(server, new WorkerBridge(this.env.WORKER_BRIDGE, address))
           .install(request.clone());
       }

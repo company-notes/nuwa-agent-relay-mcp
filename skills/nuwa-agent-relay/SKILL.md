@@ -462,9 +462,9 @@ Agent or Session. These are explicit management operations, not daily messaging.
   Wake pairing procedure above; keep the shared MCP connection and `from`.
   Do not call the unqualified `relayRemoveWake` or select another Session
   on that shared connection.
-- Shared to fully independent: use the coworker's own OAuth authorization and
-  `agentAddressSelectSession({address})` for the original idle Session before
-  ordinary Relay tools. Call `relayGatewayDeclineInvitation` from that
+- Shared to fully independent: prefer the address-specific MCP connection
+  described below. On clients using a separate general-purpose OAuth grant,
+  `agentAddressSelectSession({address})` restores the original idle Session. Call `relayGatewayDeclineInvitation` from that
   Session to leave shared speaking and receiving. The original Inbox and
   native Bot mapping remain available; pair a direct Wake only if supported.
   Messages already stored in Relay remain in the Inbox during the change.
@@ -481,6 +481,41 @@ Agent or Session. These are explicit management operations, not daily messaging.
 - Verify the new mode, original address and one round trip in the original
   Thread before concluding setup. Management waits for an in-flight Wake to
   finish; ordinary notification retries and platform execution are unchanged.
+
+### Address-specific MCP connection
+
+An existing Session can have a dedicated MCP endpoint:
+`https://mcp.agent-relay.company-notes.com/mcp/organization/agent/session`.
+The OAuth resource must be that exact endpoint. It is pinned by Agent Address
+to the original Session ID, not a newly created identity.
+
+1. Keep the office MCP and existing verified Wake intact. Add a separate
+   connector for the intended coworker only.
+2. The owner authorizes the dedicated resource in the browser. Verify the
+   authorization page identifies the intended address before approving.
+   If the host does not send the resource or cannot maintain separate OAuth
+   grants, stop; do not reauthorize or disconnect the shared connector.
+3. On the dedicated connector, call `agentAddressEnsureIdentity` and confirm
+   the original Session ID and address. If its Runtime is occupied, stop.
+   The endpoint cannot select another Session or speak using a delegated
+   `from`; it does not grant office or Worker administration.
+4. Confirm `relayWakeSubscription()` retains the existing direct Wake.
+   Update that coworker's Routine to use the dedicated connection:
+   `relayMessage({messageID})`, `relayReplyThread` with the original message
+   and Thread IDs and no `from`, and `relayVerifyWake({verificationId, challenge})`
+   for a genuine future verification event. No targeted recipientBotID is
+   needed on that Session's own connection.
+5. After the owner confirms the dedicated connection works, call
+   `relayGatewayDeclineInvitation` from it to revoke the former shared speaking
+   permission. Preserve the verified direct Wake and original mailbox.
+   Remove only this coworker's access to the shared connector if the host
+   supports per-Bot access. Never disconnect the whole office grant.
+6. Verify an incoming direct notification, a reply in the original Thread,
+   receipt status, and continued shared messaging for another coworker.
+
+The ordinary `/mcp` endpoint remains available for shared offices and
+general-purpose clients. Dedicated endpoints require a host that correctly
+supports OAuth resource indicators and separate connector authorizations.
 
 ## Identity recovery — preserve the installed address
 

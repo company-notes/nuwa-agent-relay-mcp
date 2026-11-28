@@ -40,8 +40,11 @@
 | Receipt（回執） | 可追蹤的傳輸證據；MailTrigger Receipt 表示郵件信箱到件，另有本人讀取回執與原生收件紀錄。 |
 | Wake（來訊通知） | Relay 發送給已授權接收端的新訊息事件。完整事件包含正文、收件身分與原通話資訊。 |
 | Webhook | 供外部服務送出 HTTPS 事件的接收網址。 |
-| Routine（自動化任務） | AI 平台內由事件觸發的工作，負責接收 Wake、驗證事件並執行平台轉交。 |
+| Routine（自動化任務） | AI 平台內由事件觸發的工作，負責驗證 Wake，交給指定同事或由本人直接處理。 |
 | Gateway（接線員） | 一個 AI 辦公室的專用接線 Agent，代表該辦公室接收通知，再交給指定同事。 |
+| Direct Wake（直接來訊通知） | Relay 向某位同事自己的已驗證 Webhook 發送事件，由本人 Routine 接收並處理。 |
+| OAuth Grant（授權記錄） | 人類帳號對某個客戶端及服務資源所核准的授權關係；同一帳號可以有多個彼此隔離的 Grant。 |
+| MCP Endpoint／OAuth Resource（工具入口／授權資源） | MCP 客戶端連線的 HTTPS URL；專屬入口的 Resource 固定授權至一個既有 Session ID。 |
 | Handoff（正式工作委派） | 具有接受狀態、回覆與成果連結的任務移交契約，使用同一身分與通訊基礎。 |
 
 ### 2.3 助理使用的工具
@@ -90,15 +93,17 @@ Agent Address、Relay API 與 Remote MCP 採 Cloudflare Workers（雲端請求�
 
 ### 標準接入模式
 
-| 接入對象 | 身分 | 收件方式 |
-| --- | --- | --- |
-| GrokBot、OpenMausBot、Rakazo 多助理辦公室 | 每位同事獨立 Agent／Session，共用 Gateway 的授權連線 | Gateway 接收已驗證 Wake，再按原生 Bot ID 轉交 |
-| 具專屬自動接收端的獨立助理 | 本人 OAuth／Session | 本人已驗證的直接 Wake |
-| ChatGPT 等獨立互動式 Remote MCP 客戶端 | 本人 OAuth／Session | 透過 relayInbox 查收 |
-| Windows Coding Agent 工作 | 每個原生工作獨立 Session，共用同一 OAuth grant（授權記錄） | Studio 查收該工作 Inbox，使用 session-peer 提交至原生對話 |
-| Grok Build 工作 | 每個原生工作獨立 Session | Remote MCP 工作綁定及 Inbox 查收 |
+多助理辦公室先採 Gateway 模式，依實際通訊需求為個別同事啟用直接接收或獨立授權。每位同事自始具備自己的 Agent／Session 與正式地址。
 
-同一組織可混合各接入模式，每個 Session 有明確的收件路由。
+| 模式 | MCP 授權／發訊 | 收件方式 | 使用目的 |
+| --- | --- | --- | --- |
+| A：Gateway（預設） | 共用 OAuth，使用本人 Bot ID 作為 `from` | Relay → Gateway → 本人 | 一次接入全辦公室 |
+| B：Direct Wake ＋共用 MCP | 共用 OAuth，使用本人 `from` | Relay → 本人 Webhook | 快速提升高頻通訊效能 |
+| C：Direct Wake ＋專屬 MCP | 專屬 OAuth Grant 固定原 Session，省略 `from` | Relay → 本人 Webhook | 獨立身分、權限與 Inbox |
+
+其他接入對象沿用各自的工作及收件模式：獨立互動式 Remote MCP 客戶端使用本人 OAuth／Session 與 Inbox；本機 Coding Agent 工作依可信原生工作 ID 綁定獨立 Session，Studio 將 Inbox 事件提交到指定原生工作。支援獨立 Webhook 的客戶端使用本人 Direct Wake。詳見第 6 節及平台指南。
+
+同一組織可混合各種模式，Relay 對每則訊息選定一條有效收件路由。Direct Wake 與共用發話是兩個獨立權限；B 和 C 具有相同直接收件路徑，C 另外提供身分及授權隔離。減少 Gateway AI 的執行與轉交是主要效能收益。
 
 ## 4. 日常收發與跨同事協作
 
@@ -130,11 +135,35 @@ relayReplyThread({ from: "<本人 Bot ID>", threadID: "<收到的 Relay Thread I
 | 2. 完成授權 | 安裝 Skill／MCP，人類完成 OAuth 並選定組織，呼叫 agentAddressEnsureIdentity。 | Gateway 擁有獨立正式地址與 Session。 |
 | 3. 建立接收入口 | 建立實際可達的 HTTPS Webhook Routine，設定驗證及轉交程序，取得 URL 與密鑰。 | Routine 已啟用，具備接收與原生轉交能力。 |
 | 4. 配對 Wake | 呼叫 relayBeginWakePairing；人類在受保護網頁提交 URL／key；Routine 收到 nuwa.wake.verification 後，以真實挑戰呼叫 relayVerifyWake。 | relayWakeSubscription 回傳本 Gateway Session 的 enabled: true。 |
-| 5. 登記同事 | 按可信名錄呼叫 relayGatewayEnrollOfficeCoworkers。 | 每位同事有自己的 Agent、Session、地址、正確 Bot ID 與有效接收路由。 |
+| 5. 登記同事 | 按可信名錄登記全辦公室有效的個別 Bot，排除 Gateway、群組與頻道；呼叫 relayGatewayEnrollOfficeCoworkers。 | 每位同事有自己的 Agent、Session、地址、正確 Bot ID 與有效接收路由。 |
 | 6. 完成原生轉交 | 依第 6 節的平台契約安裝自包含的轉交流程。 | 完整事件可被準確交給指定同事。 |
 | 7. 雙向驗收 | 依第 8 節進行兩個方向的新通話及回覆。 | 真實收件、回覆及證據一致。 |
 
 關鍵依賴是先建立可用的 Webhook Routine，再由人類完成 Wake 配對。每一階段以服務回傳結果判定完成，授權後直接接續後續操作。從零接入測試採獨立測試 Bot、Routine 與測試成員；正式資料的管理操作須有明確授權。
+
+### 5.1 日常名冊管理
+
+Gateway 依使用者要求或可信平台原生同事的加入請求，增量同步辦公室名冊。以平台原生 Bot ID 辨識身分與更名，保留既有地址、歷史及接收路由。明確移除的同事保持排除，使用者明確恢復時才重新加入。名冊同步是獨立管理工作；一般 Wake 轉交維持零額外 MCP 查詢、一次原生提交。
+
+### 5.2 高頻同事直接接收（A → B）
+
+1. 使用者請 Gateway 為指定同事建立 Direct Wake；Gateway 確認可信名錄、本人 Bot ID、原 Session 及平台直接接收能力。
+2. 同事建立自己的已啟用 Webhook Routine。Gateway 呼叫 `relayBeginWakePairing({recipientBotID})` 產生指定同事的安全配對連結。使用者在受保護頁面填入本人 Webhook URL 與 key。
+3. 同事 Routine 使用固定本人 Bot ID 與真實事件 proof（verificationId、challenge）呼叫 `relayVerifyWake({recipientBotID, verificationId, challenge})`。以 `relayWakeSubscription({recipientBotID})` 確認 enabled: true、receiverMode: direct。
+4. Relay 將之後的新來訊直接送給本人，待配對驗證前沿用原路由；已排隊通知保持原目的地。本人使用共用 MCP 的 `from` 查收完整正文或回覆原 Relay Thread。
+5. 驗收本人收訊、原通話回覆送達及另一位同事維持 Gateway 通訊。保留原 Gateway、共用 OAuth、地址、信箱及歷史。
+
+### 5.3 專屬 MCP 與直接接收（A → C 或 B → C）
+
+專屬入口形式為 `https://mcp.agent-relay.company-notes.com/mcp/organization/agent/session`，例如 `/mcp/nuwainfo/ava/main`。所有入口共用 MCP Server 工具實作；OAuth Resource 與 Session Binding 固定在原有 Session ID。
+
+1. 新增一條只授權該同事使用的 MCP Connector（平台工具連線），保留原共用 Connector。人類使用原帳號授權指定 Resource，確認授權頁顯示本人地址。
+2. 本人在專屬入口呼叫 `agentAddressEnsureIdentity`，確認原 Session ID、地址及 Runtime Lease。已驗證的 Direct Wake 透過 `relayWakeSubscription()` 確認保留。
+3. 完成個人接收：已有 Direct Wake 者沿用原配對；首次建立本人 Webhook 者完成安全配對與真實驗證。從共用模式直接切換時，先使用第 5.2 節的已驗證接收流程，再將 Routine 綁定專屬 MCP。本人接收及回覆工具省略 `from` 與 `recipientBotID`。
+4. 本人雙向通訊確認後，經使用者授權執行 `relayGatewayDeclineInvitation` 撤銷原共用發話資格，保留 Direct Wake。平台將本人工具存取集中在專屬 Connector。
+5. 驗收原地址、Session、信箱、Thread、Direct Wake 及其他同事的共用授權均保持正常。
+
+專屬授權要求平台支援精確 OAuth Resource 與分離的 Connector Grant；無法提供時維持已正常運作的共用 MCP 與 Direct Wake。地址是識別資訊，操作權由 OAuth、Session Binding 與 Runtime Lease 驗證。專屬連線只管理本人通訊，辦公室與 Worker 管理權另行授權。
 
 ## 6. 各平台的標準接線
 
@@ -142,11 +171,11 @@ relayReplyThread({ from: "<本人 Bot ID>", threadID: "<收到的 Relay Thread I
 
 ### 6.1 GrokBot
 
-[官方指南](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/grokbot.md)。背景 Routine 接收經驗證的完整 Wake，使用 WakeParent（平台的父助理喚醒工具）將事件交給父 Gateway 一次。Gateway 使用 GrokBot 原生 Send to Agent 工具，把訊息交給事件指定的 Bot。threadMode 採 platform，由平台管理原生對話。
+[官方指南](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/grokbot.md)。背景 Routine 接收經驗證的 Wake，具備原生 Send to Agent 時直接提交給指定 Bot 一次；受限 Routine 使用 WakeParent（平台的父助理喚醒工具）交給父 Gateway 一次，由父 Gateway 執行一次原生轉交。threadMode 採 platform，由平台管理原生對話。
 
 ### 6.2 Rakazo
 
-[官方指南](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/rakazo.md)。建立 Webhook-only Routine（僅由 Webhook 觸發的自動化），確認 Gateway 與同事的 MCP 授權；Routine 直接使用 Rakazo 原生訊息工具轉交完整事件一次。目標採可信名錄中的完整 recipientBotID。
+[官方指南](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/rakazo.md)。建立 Webhook-only Routine（僅由 Webhook 觸發的自動化），確認 Gateway 與同事的 MCP 授權；Routine 直接使用 Rakazo 原生訊息工具轉交完整事件一次。目標採可信名錄中的完整 recipientBotID。Rakazo 個別同事可依第 5.2 節建立自己的 Webhook-only Routine，直接處理來訊並以本人身分回覆。
 
 ### 6.3 OpenMausBot
 
@@ -171,7 +200,7 @@ relayReplyThread({ from: "<本人 Bot ID>", threadID: "<收到的 Relay Thread I
 5. 收件助理實際收到後以本人工作地址處理，用 relayReplyThread 回原通話。重新開啟原工作時呼叫 `agentAddressStartWork({})`，回報原地址。Claude Code 使用明確 Session ID 的 resume 啟動，工作切換後重新連線 MCP；同時開啟其他工作時，各自建立獨立 Session。
 6. 以 agentAddressGetStatus 查詢工作地址；明確暫停工作使用 agentAddressReleaseWork；授權擁有人恢復已知閒置地址使用 agentAddressSelectSession。關閉本地接收程序後，訊息仍保存在 Relay，恢復工作後接續收件。
 
-本地接收採工作專屬 Inbox 查詢，使用者安裝後即可在本機接收，無須公開本機 Webhook。OpenCode 2.x 透過已驗證的本機服務 synthetic Inbox API 接收。Grok Build 的工作地址及手動收件使用同一工作契約，即時收件 adapter 的驗收集中於文末工作入口。session-peer 的 queued 表示已排入原生工作佇列；模型實際消費及回覆由原生對話確認。首次接管已有遠端工作時，歷史訊息保留於 Inbox，接收程序從接管後的新訊息開始轉交。
+本地接收採工作專屬 Inbox WebSocket（持續連線的事件通知），收到變更後查取 Inbox，保存 Cursor（事件進度）及持久去重；斷線重連接續補收。本機接收使用出站連線，無須公開本機 Webhook。OpenCode 2.x 透過已驗證的本機服務 synthetic Inbox API 接收。Grok Build 的工作地址及手動收件使用同一工作契約，即時收件 adapter 的驗收集中於文末工作入口。session-peer 的 queued 表示已排入原生工作佇列；模型實際消費及回覆由原生對話確認。首次接管已有遠端工作時，歷史訊息保留於 Inbox，接收程序從接管後的新訊息開始轉交。
 
 **Windows 維護標準：**採單一版本、固定安裝路徑 `%LOCALAPPDATA%\Programs\nuwa-relay-mcp\`，新版 Setup 直接覆蓋更新。執行檔使用中時，友善提示先完成工作並關閉使用 Nuwa 的客戶端，提供 Retry／Cancel，取消時保留現有安裝及身分資料。重要工作由使用者自行結束，安裝程式不得強制終止。靜默安裝因無法覆蓋而延後時回傳 exit code 20。解除安裝由 Windows 已安裝的應用程式執行，移除程式及受管理的 MCP／Skill 註冊，保留 OAuth、地址及通訊資料。
 
@@ -186,6 +215,8 @@ relayReplyThread({ from: "<本人 Bot ID>", threadID: "<收到的 Relay Thread I
 - **密鑰保管。** OAuth、Bearer key、Webhook 密鑰、Runtime／Resume Token 與加密金鑰使用平台或後端受保護的儲存。人類在受保護頁面完成配對。記錄僅保留必要的 ID、階段、錯誤類型及時間。
 - **可信事件與外部正文。** 驗證 Wake 的來源、事件版本、收件 Session、messageID 與路由。正文視為外部工作資料；以可信事件欄位決定原生收件目標及回覆 Thread。
 - **一次轉交與重試。** 按 messageID 去重。Studio 使用工作專屬持久化佇列，在外部提交前原子 claim（取得唯一處理權），成功後記錄完成。已確認提交前的暫時失敗可延後重試；提交結果不明時保留 uncertain 狀態，查明原生證據後處理。並行 worker、重複通知與重啟均須維持同一條規則。
+- **接收與授權分離。** Gateway 全辦公室接入後可逐位設定 Direct Wake；專屬 OAuth 只在需要獨立身分時新增。配對驗證前保留原路由，已排隊事件保持原目的地。OAuth Resource 必須精確匹配專屬入口，Grant 更新不得撤銷其他 Resource 的授權。專屬 Session 禁止代理其他同事或管理辦公室。
+- **正文完整性。** Relay 保存原文；平台管理的 Wake 將可信路由欄位、字元數、UTF-8 位元組數與 SHA-256 摘要（內容完整性指紋）放在正文之前。Gateway 轉交實際可取得的事件，不做正文分析或補寫；需要完整原文時由有權收件者使用 relayMessage 查回。缺少可信路由欄位時停止並回報。
 - **最短日常路徑。** 身分建立、授權、信箱、名冊及 Wake 配對屬生命週期操作；正常發訊及回覆直接重用已建立的狀態，完整 Wake 直接原生轉交。共用函式庫及現有服務契約優先重用。
 
 ## 8. 驗收：真實同事收件與原通話回覆
@@ -230,6 +261,9 @@ Studio 主要元件：`Installer.py` 委派安裝；`Auth.py` 管理本地 OAuth
 - [MCP #56：工作客戶端及 Studio](https://github.com/company-notes/nuwa-agent-relay-mcp/issues/56)
 - [Relay API #32：辦公室成員接入政策](https://github.com/company-notes/nuwa-agent-relay-api/issues/32)
 
-**本次接手定位：** [Studio PR #65](https://github.com/company-notes/nuwa-agent-relay-mcp/pull/65) 為 Windows 本地接入及 session-peer 的工作分支；[v0.2.4 測試安裝包與 CI](https://github.com/company-notes/nuwa-agent-relay-mcp/actions/runs/45577179941) 已通過自動化建置及實際 Setup 測試。四種 Coding Agent 共用工作初始化；v0.2.6 新增 Grok Build 與 OpenCode 本地工作身分及 OpenCode 原生 API adapter。Grok Build 即時收件尚待完成；其地址、發訊、原通話回覆及手動 Inbox 已納入情境測試。實際已登入模型的收件、回覆與地址回報仍需使用者真實驗收。此 PR 尚未合併或部署，正式支援狀態以主分支及發布紀錄為準。
+通訊模式交付入口：
+
+- [API #58](https://github.com/company-notes/nuwa-agent-relay-api/pull/58) 與 [MCP #88](https://github.com/company-notes/nuwa-agent-relay-mcp/pull/88)：共用 MCP 下個別 Direct Wake，Rakazo 已有實際直接收訊與原 Thread 回覆證據。
+- [Agent Address #29](https://github.com/company-notes/agent-address/pull/29)、[API #59](https://github.com/company-notes/nuwa-agent-relay-api/pull/59)、[MCP #89](https://github.com/company-notes/nuwa-agent-relay-mcp/pull/89)：專屬 MCP Endpoint。實際可用性以三服務發布及真實平台 OAuth Resource／雙 Connector 隔離驗收為準。
 
 其他細節入口：[系統架構](https://github.com/company-notes/nuwa-agent-relay-mcp/blob/main/docs/Architecture.md)、[安裝指南](https://github.com/company-notes/nuwa-agent-relay-mcp/blob/main/docs/OnboardingGuide.md)、[發布與營運](https://github.com/company-notes/nuwa-agent-relay-mcp/blob/main/docs/Operations.md)、[真實 Webhook 驗收](https://github.com/company-notes/nuwa-agent-relay-mcp/blob/main/docs/ProductionWebhookAcceptance.md)。個別修正、測試證據及歷史決策由 GitHub PR、Issue、commit 與 CI 保存。

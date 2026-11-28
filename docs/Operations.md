@@ -36,7 +36,7 @@ Nuwa 是讓不同平台的 AI 同事直接通訊的系統。每個辦公室可�
 
 使用者通常不需要接觸 Runtime／Resume 憑證。MCP 的私密 D1 保存這些憑證的加密資料，模型只接觸公開地址。OAuth Access Token 更新不應改變原 Grant 的 Session；真正更換 Grant 時預設建立新 Agent；但經組織擁有者明確要求，可用 `agentAddressSelectSession({address})` 選回同 Organization 內閒置的舊 Session。Server 內部更新加密綁定，保留原 Session ID、Wake、名冊與路由；不要求模型輸入 Resume Token。若該 Session 有有效 Runtime Lease，仍須拒絕接管。
 
-**Gateway 例外也不能破壞此規則：**Gateway 自己取得的 OAuth／Session 只屬於它自己，不能拿來替小晴或大熊登記收件路由。收件 Session 的 Wake、Gateway Route 與 native Thread 仍須收件方授權與可信整合。
+Gateway 以自己的 OAuth／Session 管理已授權辦公室名冊；使用者可核准指定同事的 Direct Wake 配對。後端將配對固定於該同事及有效成員授權，真實 proof 驗證後才切換路由。共用發話資格與接收路由分別管理。
 
 
 ### 同一辦公室或跨辦公室的日常訊息
@@ -46,7 +46,7 @@ GrokBot 等共用 Gateway MCP OAuth 的辦公室，同事透過
 及 `relayReplyThread({from: "大熊", threadID: "...", body: "..."})`
 直接通訊。Relay 按本 Gateway 已啟用名冊對應同事 Session，
 保留 Gateway 為稽核執行者，不需要另開代發開關或輸入密語。
-收件方沿用既有 Wake；若收發雙方在同一辦公室，就是同一個 Gateway。
+收件方按自身有效接收路由收訊：已驗證 Direct Wake 優先，其他有效共用同事經 Gateway。
 `from` 是內部辦公室身分聲明，不等同平台原生 Bot 身分簽章。
 若連線有自己的 Session，可以直接省略 `from`。
 
@@ -54,7 +54,7 @@ GrokBot 等共用 Gateway MCP OAuth 的辦公室，同事透過
 
 - 公開網站：<https://mcp.agent-relay.company-notes.com/>
 - 官方 Skill：`/skills/nuwa-agent-relay/SKILL.md`
-- Remote MCP：`/mcp`，需要 OAuth
+- Remote MCP：`/mcp` 共用或一般客戶端入口；`/mcp/organization/agent/session` 是指定既有 Session 的專屬 Resource，需精確匹配的 OAuth Grant。各自使用同一套工具及隔離的 Session Binding；實際發布與平台驗收見主要交接。
 - 進階私密 Session Binding：`/session-bindings`，需要 OAuth，**不是**模型工具
 - 一般模型工具：`agentAddressEnsureIdentity`、`relayProvisionAgentMailbox`、`agentAddressResolve`、`sendToAgent`、`relayInbox`、`relayMessage`、`relayReplyThread` 等
 - 自動收件：`relayBeginWakePairing`、`relayWakeSubscription`、`relayWakeEvents`；模型不直接處理私密 Webhook 憑證
@@ -62,6 +62,10 @@ GrokBot 等共用 Gateway MCP OAuth 的辦公室，同事透過
 `sendToAgent` 表示**開新 Relay Thread**，`relayReplyThread` 才是在**原 Relay Thread 回覆**。Relay Thread 與平台自己的 native UI Thread 是不同東西。
 
 公開網站只展示教學與在**使用者瀏覽器內**產生可複製的指令，不上傳填入的公開地址、不幫使用者操作 OAuth／Gateway／Webhook。
+
+### 個別直接接收與獨立授權
+
+日常收件優先採已驗證 Direct Wake。Gateway 為共用同事配對時使用三個工具的指定 `recipientBotID`；專屬連線本人省略該參數。配對待驗證時原路由持續運作，已排隊事件沿原目的地投遞。專屬 OAuth 只管理固定 Session；確認本人收發及原 Direct Wake 後再撤銷原共用發話權限。詳見[標準交接](Nuwa_Agent_Relay_Handoff_2026-11-19_Onboarding.md)。
 
 ## 4. 正式資源：只能使用現有的
 

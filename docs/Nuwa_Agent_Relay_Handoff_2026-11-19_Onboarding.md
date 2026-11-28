@@ -192,9 +192,9 @@ relayReplyThread({ from: "<本人 Bot ID>", threadID: "<收到的 Relay Thread I
 
 Nuwa Agent Relay Bridge 是獨立的背景程式，透過 LINEJS 連接公司一般 LINE 帳號，使用 Remote MCP 取得自己的正式 Nuwa 地址並提交訊息。公司指定一位已接入 Nuwa 的 AI 助理處理 LINE 來訊；Relay 按助理地址選擇既有辦公室 Gateway 或本人 Direct Wake（直接通知）路由。
 
-標準操作：管理者在 Linux 主機上部署 Bridge、完成 OAuth 與 LINE 登入、選定接線助理及私人／群組存取政策。人類使用原 LINE 對話聊天，Bridge 維護各聊天的 Relay Thread，查收本人 Inbox 並送回原聊天。群組成員名單與 Thread 的原始受眾綁定，成員變動建立新的通話。平台原生 AI 上下文與工具權限另行驗證，確保不同使用者及群組之間的隔離。
+標準操作：管理者在 Linux 主機上部署 Bridge、完成 OAuth 與 LINE 登入、選定接線助理及私人／群組存取政策。人類使用原 LINE 對話聊天，Bridge 維護各聊天的 Relay Thread，查收本人 Inbox 並送回原聊天。群組存取政策獨立於私人好友政策；經授權且驗證的兩人群組可直接聊天，多人群組以原生 @Mention、@All 或引用助理回覆觸發。群組成員名單與 Thread 的原始受眾綁定，受眾變動建立新的通話。管理者使用 Bridge 的 assistant 指令切換指定助理，保留 Bridge 身分、授權與歷史紀錄，新助理使用新的 Relay Thread。平台原生 AI 上下文與工具權限另行驗證，確保不同使用者及群組之間的隔離。
 
-Bridge 的 [產品說明](https://github.com/company-notes/nuwa-agent-relay-bridge/blob/main/README.md)、[操作指南](https://github.com/company-notes/nuwa-agent-relay-bridge/blob/main/docs/Pilot.md) 與 [工程交接](https://github.com/company-notes/nuwa-agent-relay-bridge/blob/main/docs/Handoff.md) 是該服務的權威文件。助理切換、兩人群組自動觸發及多人群組指定觸發的設計集中在 Bridge 工程交接；功能可用性以發布及驗收紀錄為準。
+Bridge 的 [產品說明](https://github.com/company-notes/nuwa-agent-relay-bridge/blob/main/README.md)、[操作指南](https://github.com/company-notes/nuwa-agent-relay-bridge/blob/main/docs/Pilot.md) 與 [工程交接](https://github.com/company-notes/nuwa-agent-relay-bridge/blob/main/docs/Handoff.md) 是該服務的權威文件。助理切換、群組觸發及受眾隔離的技術契約集中在 Bridge 工程交接；功能可用性以發布及驗收紀錄為準。
 
 ## 7. 必須守住的技術契約
 

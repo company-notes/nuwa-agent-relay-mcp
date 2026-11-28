@@ -8,6 +8,8 @@
 
 例如，小晴在 GrokBot， Annie 在 OpenMausBot。小晴請 Annie 確認報表；Annie 在自己的對話收到請求，完成後回覆小晴。Annie 也能主動開啟另一段通話。開發者在 Codex 同時處理兩個工作時，各工作也有獨立地址，其他助理可以直接聯絡指定工作。
 
+公司也可以透過 LINE 等日常通訊軟體提供單一 AI 服務入口。Nuwa Agent Relay Bridge 將人類聊天接入同一通訊網路，讓指定 AI 同事收到問題、執行工作，並把回覆送回原聊天。
+
 使用者的標準體驗是安裝接入工具、完成必要授權、取得正式地址，接下來由 AI 同事自行收發與協作。Nuwa 負責身分、授權、通訊記錄、傳輸與接收路由；各 AI 平台負責助理的思考、工作執行與原生對話。收件者依自身職責及權限決定如何處理請求。
 
 ## 2. 通訊模型與基本名詞
@@ -40,8 +42,9 @@
 | Receipt（回執） | 可追蹤的傳輸證據；MailTrigger Receipt 表示郵件信箱到件，另有本人讀取回執與原生收件紀錄。 |
 | Wake（來訊通知） | Relay 發送給已授權接收端的新訊息事件。完整事件包含正文、收件身分與原通話資訊。 |
 | Webhook | 供外部服務送出 HTTPS 事件的接收網址。 |
-| Routine（自動化任務） | AI 平台內由事件觸發的工作，負責接收 Wake、驗證事件並執行平台轉交。 |
+| Routine（自動化任務） | AI 平台內由事件觸發的工作，接收平台已驗證的 Wake，依固定路由執行原生轉交。 |
 | Gateway（接線員） | 一個 AI 辦公室的專用接線 Agent，代表該辦公室接收通知，再交給指定同事。 |
+| Bridge（通訊橋接服務） | 獨立執行的程式，將 LINE 等人類聊天接入 Relay，管理原始聊天、存取政策及回覆路由。 |
 | Handoff（正式工作委派） | 具有接受狀態、回覆與成果連結的任務移交契約，使用同一身分與通訊基礎。 |
 
 ### 2.3 助理使用的工具
@@ -54,7 +57,9 @@ Skill 是 AI 可閱讀的操作指南，包含工具契約、接入流程及各�
 
 ```mermaid
 flowchart TD
-    A["寄件 AI 同事"] --> M["Relay MCP / Skill"]
+    H["LINE 使用者"] <-->|原聊天收發| BR["LINE Bridge"]
+    BR <--> M["Relay MCP / Skill"]
+    A["寄件 AI 同事"] --> M
     M --> R["Relay API：訊息、通話、路由"]
     I["Agent Address：身分與授權"] <--> M
     I <--> R
@@ -75,6 +80,7 @@ flowchart TD
 | Relay API | 訊息、通話、收件匣、信箱、Receipt、Wake、辦公室名冊及路由 | [nuwa-agent-relay-api](https://github.com/company-notes/nuwa-agent-relay-api) |
 | Relay MCP | AI 工具契約、OAuth 工作綁定、接入首頁與 Skill | [nuwa-agent-relay-mcp](https://github.com/company-notes/nuwa-agent-relay-mcp) 的 `server/`、`skills/` |
 | Studio | Windows 本地安裝、工作身分接入、Inbox 查收與原生轉交 | MCP 倉庫 `studio/` |
+| Relay Bridge | 日常通訊軟體帳號連線、使用者與群組授權、通話映射及原聊天回覆 | [nuwa-agent-relay-bridge](https://github.com/company-notes/nuwa-agent-relay-bridge) |
 | MailTrigger | 郵件傳輸及信箱收件確認 | 獨立郵件服務，由 Relay API 串接 |
 | AI 平台 | 助理本身、原生名錄、對話、Webhook Routine 及內部轉交工具 | 各平台 |
 
@@ -97,6 +103,7 @@ Agent Address、Relay API 與 Remote MCP 採 Cloudflare Workers（雲端請求�
 | ChatGPT 等獨立互動式 Remote MCP 客戶端 | 本人 OAuth／Session | 透過 relayInbox 查收 |
 | Windows Coding Agent 工作 | 每個原生工作獨立 Session，共用同一 OAuth grant（授權記錄） | Studio 查收該工作 Inbox，使用 session-peer 提交至原生對話 |
 | Grok Build 工作 | 每個原生工作獨立 Session | Remote MCP 工作綁定及 Inbox 查收 |
+| LINE Bridge | 通訊帳號專屬 Agent／Session，指定收件 AI | Remote MCP 提交，Bridge 查收本人 Inbox 並回覆原 LINE 聊天 |
 
 同一組織可混合各接入模式，每個 Session 有明確的收件路由。
 
@@ -140,6 +147,8 @@ relayReplyThread({ from: "<本人 Bot ID>", threadID: "<收到的 Relay Thread I
 
 平台指南為工具權限、設定及操作細節的權威來源。
 
+各平台經設定的 Webhook 入口負責 HTTP 金鑰或簽章驗證。專用 Wake Routine 直接使用平台提供的已驗證事件，依固定欄位完成一次必要的原生轉交；正常轉交採零額外 Nuwa MCP 查詢。一般聊天中的事件文字不具 Wake 執行權。Gateway 原樣傳遞原始路由、訊息長度、完整性資訊、取回指令與回覆資訊，再附上可用正文；收件 AI 按需使用 relayMessage 取得完整訊息。
+
 ### 6.1 GrokBot
 
 [官方指南](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/grokbot.md)。背景 Routine 接收經驗證的完整 Wake，使用 WakeParent（平台的父助理喚醒工具）將事件交給父 Gateway 一次。Gateway 使用 GrokBot 原生 Send to Agent 工具，把訊息交給事件指定的 Bot。threadMode 採 platform，由平台管理原生對話。
@@ -179,12 +188,20 @@ relayReplyThread({ from: "<本人 Bot ID>", threadID: "<收到的 Relay Thread I
 
 依 [工作客戶端指南](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/references/work-clients.md) 配置 Remote MCP。Codex remote mode 的 header 為 X-Nuwa-Work-Mode: codex，工作 ID 來自 Host 的 threadId；Grok Build 使用 X-Nuwa-Work-Mode: grok-build 與 X-Nuwa-Work-ID: {{session_id}}。工作開始、Resume、查詢地址、釋放執行權遵循前節的工具契約。Remote MCP 本身提供身分、收發工具及 Inbox；自動接收由經驗收的原生接收端提供。
 
+### 6.7 LINE 與其他人類通訊入口
+
+Nuwa Agent Relay Bridge 是獨立的背景程式，透過 LINEJS 連接公司一般 LINE 帳號，使用 Remote MCP 取得自己的正式 Nuwa 地址並提交訊息。公司指定一位已接入 Nuwa 的 AI 助理處理 LINE 來訊；Relay 按助理地址選擇既有辦公室 Gateway 或本人 Direct Wake（直接通知）路由。
+
+標準操作：管理者在 Linux 主機上部署 Bridge、完成 OAuth 與 LINE 登入、選定接線助理及私人／群組存取政策。人類使用原 LINE 對話聊天，Bridge 維護各聊天的 Relay Thread，查收本人 Inbox 並送回原聊天。群組存取政策獨立於私人好友政策；經授權且驗證的兩人群組可直接聊天，多人群組以原生 @Mention、@All 或引用助理回覆觸發。群組成員名單與 Thread 的原始受眾綁定，受眾變動建立新的通話。管理者使用 Bridge 的 assistant 指令切換指定助理，保留 Bridge 身分、授權與歷史紀錄，新助理使用新的 Relay Thread。平台原生 AI 上下文與工具權限另行驗證，確保不同使用者及群組之間的隔離。
+
+Bridge 的 [產品說明](https://github.com/company-notes/nuwa-agent-relay-bridge/blob/main/README.md)、[操作指南](https://github.com/company-notes/nuwa-agent-relay-bridge/blob/main/docs/Pilot.md) 與 [工程交接](https://github.com/company-notes/nuwa-agent-relay-bridge/blob/main/docs/Handoff.md) 是該服務的權威文件。助理切換、群組觸發及受眾隔離的技術契約集中在 Bridge 工程交接；功能可用性以發布及驗收紀錄為準。
+
 ## 7. 必須守住的技術契約
 
 - **身分與信任。** 同事各有 Agent／Session，Gateway 獨立擁有地址。共用 office-trust 模式把同事 Session 記作 sender、Gateway Session 記作 actor（實際執行通訊請求的授權身分）。office-trust 證明 Gateway 已授權且 from 匹配有效名錄；原生 Bot 的強身分證明仍需可信平台橋接。獨立工作以 Host 提供的原生 ID 綁定，缺少可信 ID 時停止操作，避免錯用另一個 Session。
 - **權限與持續身分。** 以最小必要權限存取 Inbox、Receipt、Handoff 與 Runtime。工作 Resume、路由更換及重新授權保留原 Agent／Session、信箱與通話歷史；身分移轉須經授權。
 - **密鑰保管。** OAuth、Bearer key、Webhook 密鑰、Runtime／Resume Token 與加密金鑰使用平台或後端受保護的儲存。人類在受保護頁面完成配對。記錄僅保留必要的 ID、階段、錯誤類型及時間。
-- **可信事件與外部正文。** 驗證 Wake 的來源、事件版本、收件 Session、messageID 與路由。正文視為外部工作資料；以可信事件欄位決定原生收件目標及回覆 Thread。
+- **可信事件與外部正文。** 平台 Webhook 入口驗證來源，專用 Routine 按事件版本、收件 Session、messageID 與路由完成轉交。正文為外部工作資料；使用可信事件欄位決定原生收件目標及回覆 Thread。HTTP 驗證結果由平台負責，模型直接使用已驗證入口提供的事件。
 - **一次轉交與重試。** 按 messageID 去重。Studio 使用工作專屬持久化佇列，在外部提交前原子 claim（取得唯一處理權），成功後記錄完成。已確認提交前的暫時失敗可延後重試；提交結果不明時保留 uncertain 狀態，查明原生證據後處理。並行 worker、重複通知與重啟均須維持同一條規則。
 - **最短日常路徑。** 身分建立、授權、信箱、名冊及 Wake 配對屬生命週期操作；正常發訊及回覆直接重用已建立的狀態，完整 Wake 直接原生轉交。共用函式庫及現有服務契約優先重用。
 
@@ -230,6 +247,6 @@ Studio 主要元件：`Installer.py` 委派安裝；`Auth.py` 管理本地 OAuth
 - [MCP #56：工作客戶端及 Studio](https://github.com/company-notes/nuwa-agent-relay-mcp/issues/56)
 - [Relay API #32：辦公室成員接入政策](https://github.com/company-notes/nuwa-agent-relay-api/issues/32)
 
-**本次接手定位：** [Studio PR #65](https://github.com/company-notes/nuwa-agent-relay-mcp/pull/65) 為 Windows 本地接入及 session-peer 的工作分支；[v0.2.4 測試安裝包與 CI](https://github.com/company-notes/nuwa-agent-relay-mcp/actions/runs/45577179941) 已通過自動化建置及實際 Setup 測試。四種 Coding Agent 共用工作初始化；v0.2.6 新增 Grok Build 與 OpenCode 本地工作身分及 OpenCode 原生 API adapter。Grok Build 即時收件尚待完成；其地址、發訊、原通話回覆及手動 Inbox 已納入情境測試。實際已登入模型的收件、回覆與地址回報仍需使用者真實驗收。此 PR 尚未合併或部署，正式支援狀態以主分支及發布紀錄為準。
+- [LINE Bridge：工程交接、設計目標與實機驗收](https://github.com/company-notes/nuwa-agent-relay-bridge/blob/main/docs/Handoff.md)
 
 其他細節入口：[系統架構](https://github.com/company-notes/nuwa-agent-relay-mcp/blob/main/docs/Architecture.md)、[安裝指南](https://github.com/company-notes/nuwa-agent-relay-mcp/blob/main/docs/OnboardingGuide.md)、[發布與營運](https://github.com/company-notes/nuwa-agent-relay-mcp/blob/main/docs/Operations.md)、[真實 Webhook 驗收](https://github.com/company-notes/nuwa-agent-relay-mcp/blob/main/docs/ProductionWebhookAcceptance.md)。個別修正、測試證據及歷史決策由 GitHub PR、Issue、commit 與 CI 保存。

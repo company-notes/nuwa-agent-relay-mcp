@@ -84,7 +84,6 @@ export class HTTPMCPApplication {
     }
 
     const oauth = new OAuthResourceServer(this.env);
-
     const resource = MCPResource.path(url.pathname);
     const metadataPath = MCPResource.metadataPath(url.pathname);
 

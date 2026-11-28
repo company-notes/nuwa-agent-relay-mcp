@@ -365,6 +365,7 @@ test('an independently authorized address endpoint preserves the shared office c
     const gateway = await scenario.tool('agentAddressEnsureIdentity', {});
     assert.equal(gateway.result.isError, undefined);
     const rootBefore = scenario.database.rows.get('a'.repeat(64))!;
+
     const independent = await scenario.tool('agentAddressEnsureIdentity', {}, 'oauth-target', true, undefined, endpoint);
     assert.equal(independent.result.isError, undefined);
     assert.equal(JSON.parse(independent.result.content[0].text).sessionID, SESSION_B);
@@ -375,6 +376,7 @@ test('an independently authorized address endpoint preserves the shared office c
       address: 'nuwa/reviewer-a/main',
     }, 'oauth-target', true, undefined, endpoint);
     assert.equal(selectOther.result.isError, true);
+
     const sent = await scenario.tool('sendToAgent', {
       to: 'nuwa/reviewer-a/main', message: 'An independent message',
     }, 'oauth-target', true, undefined, endpoint);

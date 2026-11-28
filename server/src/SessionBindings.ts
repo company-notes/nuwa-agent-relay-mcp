@@ -475,6 +475,7 @@ export class SessionBindings {
       }
 
       const target = await client.getSession(this.targetSessionID) as Session;
+
       if (target.id !== this.targetSessionID || target.canonical.split('/')[0] !== status.organization.slug) {
         throw new APIError(403, 'fixed_resource_binding_mismatch', 'The authorized Session is no longer available.');
       }

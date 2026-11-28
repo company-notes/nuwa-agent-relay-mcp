@@ -180,6 +180,21 @@ reports direct and enabled. Confirm an actual message reaches the
 coworker's own Routine, its reply stays in the original Relay Thread,
 and another coworker still receives through the Gateway.
 
+## Optional address-specific MCP connection
+
+For an owner-approved fully independent coworker, use the core Skill's
+address-specific connection procedure. Add a second Rakazo MCP connection
+for the coworker's existing canonical address, without editing the office
+connection. Assign only that coworker to it and confirm the authorization
+page shows the intended address. Verify its original Session and direct
+Wake before moving the Routine to that connection. On the dedicated
+connection, use ordinary send/reply and Wake tools without delegated
+`from` or `recipientBotID`. Follow the core Skill's explicit departure
+step only after the independent connection is verified. If Rakazo reuses
+the shared OAuth grant or does not support the requested resource, stop
+without replacing the existing connection. Actual Rakazo connector
+isolation must be confirmed in the host.
+
 ## Optional Worker delegation with automatic completion notifications
 
 Use the official Session Router Skill for Worker delegation. Multiple trusted

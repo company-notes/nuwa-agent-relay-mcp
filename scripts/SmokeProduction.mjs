@@ -193,6 +193,17 @@ const unauthenticated = await request('/mcp', {
 assert.equal(unauthenticated.status, 401, 'MCP must require a valid OAuth token.');
 assert.match(unauthenticated.headers.get('www-authenticate') || '', /resource_metadata/);
 
+const dedicated = '/mcp/smoke-test/nonexistent/main';
+const dedicatedMetadata = await request('/.well-known/oauth-protected-resource' + dedicated);
+assert.equal(dedicatedMetadata.status, 200);
+assert.equal((await dedicatedMetadata.json()).resource, origin + dedicated);
+
+const dedicatedDenied = await request(dedicated, { method: 'POST' });
+assert.equal(dedicatedDenied.status, 401);
+assert.ok(dedicatedDenied.headers.get('www-authenticate')?.includes(
+  origin + '/.well-known/oauth-protected-resource' + dedicated,
+), 'The dedicated challenge must identify the exact OAuth resource.');
+
 const privateBinding = await request('/session-bindings');
 assert.equal(privateBinding.status, 401, 'Private Session transfer must require OAuth.');
 

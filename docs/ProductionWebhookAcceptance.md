@@ -11,6 +11,13 @@
 
 將以上四步的寄件 Session、收件 Session、Gateway actor、Receipt、Wake、原生 Bot 送達／回覆與 Relay Thread 一一對應。跨平台驗收的 A 與 B 分屬不同 Gateway；同平台驗收用於確認各平台各自的接線路徑。
 
+## 辦公室模式切換驗收
+
+1. A 模式：一次設定 Gateway，登記所有有效個別 Bot；新增、移除及明確恢復成員時保留原身分與其他路由。
+2. A → B：指定同事建立本人 Webhook，使用者完成配對。未驗證時原路由有效；驗證後新訊息直接通知本人，原先排隊事件沿原路由。核對本人用共用 MCP 回覆原 Thread、寄件者收到，以及另一同事仍經 Gateway。
+3. A → C、B → C：使用同一帳號與實際平台新增獨立 MCP Connector；確認精確 OAuth Resource、原 Session、本人無 `from` 發訊及 Inbox。經授權解除共用發話資格，驗證首次自行配對前 Inbox 保存來訊、本人配對後直接收訊；已有 Direct Wake 則保持原配對。再驗收本人原 Thread 回覆及其他同事。測試 Token 更新、跨 Resource 拒絕及不影響 Gateway。
+4. 效能比較使用相同環境、相近工作內容與足量樣本，分別量測訊息建立至 MailTrigger 到件、到件至 Wake 接收、Wake 至本人原生收件／回覆、完整往返。以 p50／p95（中位數及第 95 百分位）與樣本數呈現，區分通知接收與 AI 處理。
+
 ## 三人跨辦公室工作接力驗收
 
 這是建立在基本兩人通訊之上的協作情境。選擇分屬三個平台的真實同事 A、B、C，使用實際存在、已授權的 Gateway：

@@ -2,7 +2,7 @@
 
 Nuwa 讓同一家公司的 AI 同事在 GrokBot、OpenMausBot、Rakazo、ChatGPT、Codex 等不同環境間主動發訊、真正收到訊息，並在原通話回覆。Nuwa 管理身分、地址、訊息、收件路由與通知；各平台管理助理的工作、原生聊天及內部轉交。
 
-**新接手者先讀：[專案架構與標準交接](docs/Nuwa_Agent_Relay_Handoff_2026-11-19_Onboarding.md)。** 這份文件依產品目的、名詞、架構、七階段安裝、三平台路徑、實測證據、權限與工程規則排列。安裝時使用正式的 [Nuwa 接入首頁](https://agent-relay.company-notes.com/start) 與 [共用 Skill](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md)。
+**新接手者先讀：[專案架構與標準交接](docs/Nuwa_Agent_Relay_Handoff_2026-11-19_Onboarding.md)。** 這份文件依產品目的、名詞、架構、Gateway 預設接入、兩種個別升級流程、平台路徑、驗收、權限與工程規則排列。安裝時使用正式的 [Nuwa 接入首頁](https://agent-relay.company-notes.com/start) 與 [共用 Skill](https://mcp.agent-relay.company-notes.com/skills/nuwa-agent-relay/SKILL.md)。
 
 ## 系統如何分工
 
@@ -19,8 +19,20 @@ Agent Address 確認「誰有權操作」；Relay 記錄「誰和誰聊了什麼
 ## 最短使用流程
 
 1. 在接入首頁選平台，給指定 Gateway 安裝指示；獨立助理直接使用本人 Remote MCP。
-2. 共用 Gateway 依七階段完成：可信 Bot 名錄及能力 → OAuth 與 Gateway 身分 → **建立可用 Webhook Routine** → 人類完成 Wake 配對 → 同事登記 → 原生轉交 → 雙向驗收。
+2. 共用 Gateway 依七階段完成：可信 Bot 名錄及能力 → OAuth 與 Gateway 身分 → **建立可用 Webhook Routine** → 人類完成 Wake 配對 → 全辦公室同事登記 → 原生轉交 → 雙向驗收。
 3. 同事 A 使用 sendToAgent 找 B；B 真實收到後用 relayReplyThread 回覆原 Relay Thread。再讓 B 發起一段新通話，由 A 回覆。
+
+## 辦公室通訊模式
+
+先讓全辦公室取得正式地址與通訊能力，再依通訊頻率及獨立權限需求為個別同事升級。Direct Wake 是將 Relay 來訊直接送至本人已驗證的 Webhook（HTTPS 事件接收網址）；MCP Endpoint 是 AI 工具連線的服務網址。
+
+| 模式 | MCP 授權／發訊 | 收件方式 | 使用目的 |
+| --- | --- | --- | --- |
+| A：Gateway（預設） | 共用 OAuth，使用本人 Bot ID 作為 `from` | Relay → Gateway → 本人 | 一次接入全辦公室 |
+| B：Direct Wake ＋共用 MCP | 共用 OAuth，使用本人 `from` | Relay → 本人 Webhook | 快速提升高頻通訊效能 |
+| C：Direct Wake ＋專屬 MCP | 專屬 OAuth Grant 固定原 Session，省略 `from` | Relay → 本人 Webhook | 獨立身分、權限與 Inbox |
+
+使用者可請 Gateway 協助配對 Direct Wake，或請指定助理新增自己的 `/mcp/organization/agent/session` 專屬 MCP。兩種升級路徑保留地址、Session 與通話歷史；已驗證的直接接收設定可直接沿用。完整標準流程與發布驗收入口見[主要交接](docs/Nuwa_Agent_Relay_Handoff_2026-11-19_Onboarding.md)。
 
 各平台使用 [GrokBot 指南](skills/nuwa-agent-relay/references/grokbot.md)、[OpenMausBot 指南](skills/nuwa-agent-relay/references/openmausbot.md) 或 [Rakazo 指南](skills/nuwa-agent-relay/references/rakazo.md)。三平台的原生交接方式各自固定，收發工具與身分契約相同。
 

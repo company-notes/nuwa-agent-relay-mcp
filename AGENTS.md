@@ -57,3 +57,12 @@ Agent Address and Relay API contracts while refactoring.
   production remote MCP; do not merge an audit/refactor without deployment
   authorization. Production is built from verified merged main only, including
   a local deployment when CI is temporarily unavailable. Never publish a draft PR head.
+
+## Documentation standard
+
+- Start with the product purpose and the ideal user journey, then explain the architecture from overview to implementation.
+- Define project-specific terms at first use (e.g. MailTrigger, Wake, Session Binding).
+- Preserve durable contracts, responsibilities, safety boundaries, lessons and verification requirements. Keep individual revisions, obsolete workflows, screenshots and temporary debugging records in GitHub Issues/PRs/commits/CI.
+- Use direct, affirmative descriptions of the standard workflow. Reserve prohibitions for consequential, easily misunderstood safety or reliability boundaries.
+- Explain intentional product modes as standard alternatives. Keep release status and outstanding acceptance in a separate linked work section; never present an unverified feature as deployed.
+- Maintain a Gateway-first office model: enroll the whole office, then enable Direct Wake or an address-specific MCP on demand, preserving identity and verified receiving routes.

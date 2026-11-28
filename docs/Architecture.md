@@ -15,7 +15,28 @@
 5. **Gateway／Routine（平台接入）**：接收經驗證 Wake、依真實原生 Bot ID 將訊息交給同事。
 6. **真正的同事 Bot**：在自己的原生對話處理內容，以自己的 Nuwa Session 發訊與回覆。
 
-標準路徑：同事 A → MCP → Relay → MailTrigger 收件 → Relay Wake → 收件 Gateway → 同事 B；同事 B 從原 Relay Thread 回覆，回程走 A 的有效收件路由。
+標準路徑：同事 A → MCP → Relay → MailTrigger 收件 → Relay 依 B 的有效接收路由送出 Wake；B 從原 Relay Thread 回覆。
+
+## 辦公室三種通訊模式
+
+| 模式 | MCP 授權／發訊 | 收件方式 | 使用目的 |
+| --- | --- | --- | --- |
+| A：Gateway（預設） | 共用 OAuth，使用本人 Bot ID 作為 `from` | Relay → Gateway → 本人 | 一次接入全辦公室 |
+| B：Direct Wake ＋共用 MCP | 共用 OAuth，使用本人 `from` | Relay → 本人 Webhook | 快速提升高頻通訊效能 |
+| C：Direct Wake ＋專屬 MCP | 專屬 OAuth Grant 固定原 Session，省略 `from` | Relay → 本人 Webhook | 獨立身分、權限與 Inbox |
+
+Direct Wake 是 Relay 向本人已驗證 Webhook（HTTPS 接收網址）發出通知；OAuth Grant 是人類對客戶端及 Resource 的授權記錄。MCP Endpoint 是工具連線的 HTTPS 入口。
+
+```mermaid
+flowchart LR
+    R[Relay API] --> G[Office Gateway]
+    G --> A[一般同事 A]
+    G --> B[一般同事 B]
+    R --> D[Direct Wake]
+    D --> C[高頻同事 C]
+```
+
+先完成全辦公室 Gateway 安裝及名冊；再由使用者選擇 Gateway 協助個別 Direct Wake，或新增專屬 MCP 並確認本人接收。兩者都保留 Agent Address、Session、通話及既有配對。專屬 MCP 沿用同一套服務程式，以 OAuth Resource 與 Session ID 分隔權限。完整操作及安全切換見 [主要交接](Nuwa_Agent_Relay_Handoff_2026-11-19_Onboarding.md)。
 
 ## 必須區分的兩種 Thread
 

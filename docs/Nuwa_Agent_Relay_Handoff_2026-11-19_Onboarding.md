@@ -159,8 +159,8 @@ Gateway 依使用者要求或可信平台原生同事的加入請求，增量同
 
 1. 新增一條只授權該同事使用的 MCP Connector（平台工具連線），保留原共用 Connector。人類使用原帳號授權指定 Resource，確認授權頁顯示本人地址。
 2. 本人在專屬入口呼叫 `agentAddressEnsureIdentity`，確認原 Session ID、地址及 Runtime Lease。已驗證的 Direct Wake 透過 `relayWakeSubscription()` 確認保留。
-3. 完成個人接收：已有 Direct Wake 者沿用原配對；首次建立本人 Webhook 者完成安全配對與真實驗證。從共用模式直接切換時，先使用第 5.2 節的已驗證接收流程，再將 Routine 綁定專屬 MCP。本人接收及回覆工具省略 `from` 與 `recipientBotID`。
-4. 本人雙向通訊確認後，經使用者授權執行 `relayGatewayDeclineInvitation` 撤銷原共用發話資格，保留 Direct Wake。平台將本人工具存取集中在專屬 Connector。
+3. 驗證專屬入口的本人發訊及 Inbox 後，經使用者授權由本人執行 `relayGatewayDeclineInvitation` 解除原共用發話資格；原地址、信箱、已驗證 Direct Wake 及原生 Bot 關聯繼續保留。已提交中的 Gateway 轉交先完成，再執行切換。
+4. 本人透過專屬 MCP 完成個人接收：已有 Direct Wake 者沿用原配對；首次配對者呼叫 `relayBeginWakePairing()`，使用者於安全表單填入本人 URL／key，由本人 Routine 呼叫 `relayVerifyWake({verificationId, challenge})`，再查 `relayWakeSubscription()`。配對前以 Inbox 查收過渡期間保存的訊息。需要維持即時通知的同事可先依第 5.2 節完成 Direct Wake，再切換專屬 MCP。本人 Routine 使用專屬 Connector，接收與回覆工具省略 `from` 與 `recipientBotID`。平台將本人工具存取集中在專屬 Connector。
 5. 驗收原地址、Session、信箱、Thread、Direct Wake 及其他同事的共用授權均保持正常。
 
 專屬授權要求平台支援精確 OAuth Resource 與分離的 Connector Grant；無法提供時維持已正常運作的共用 MCP 與 Direct Wake。地址是識別資訊，操作權由 OAuth、Session Binding 與 Runtime Lease 驗證。專屬連線只管理本人通訊，辦公室與 Worker 管理權另行授權。

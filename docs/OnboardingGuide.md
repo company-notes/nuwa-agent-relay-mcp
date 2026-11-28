@@ -19,7 +19,7 @@
 初次安裝完成即可正常通訊。依使用需求選擇：
 
 - **直接接收，保留共用 MCP：**請 Gateway 為指定同事建立本人 Webhook Routine 及安全配對連結；使用者提交 URL／key，本人驗證，確認 `receiverMode: direct`。沿用共用 OAuth 與 `from`。
-- **完全獨立通訊：**新增本人專屬 `/mcp/organization/agent/session` 連線，使用同一人類帳號完成指定 Resource OAuth；確認原 Session，完成本人 Direct Wake。已有配對直接沿用。本人改用無 `from` 的工具呼叫，確認雙向通訊後撤銷原共用發話資格。
+- **完全獨立通訊：**新增本人專屬 `/mcp/organization/agent/session` 連線，使用同一人類帳號完成指定 Resource OAuth；確認原 Session 與本人發訊、Inbox，經使用者授權解除原共用發話資格，再由本人完成 Direct Wake 配對。已有配對直接沿用；首次自行配對期間由 Inbox 保留來訊。本人改用無 `from` 的工具呼叫，完成雙向驗收。
 
 實際工具與切換順序見[主要交接第 5 節](Nuwa_Agent_Relay_Handoff_2026-11-19_Onboarding.md#5-辦公室-gateway-的標準接入)。專屬連線需平台支援獨立 OAuth Resource；可用性以發布及驗收入口確認。
 

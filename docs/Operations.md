@@ -65,7 +65,7 @@ GrokBot 等共用 Gateway MCP OAuth 的辦公室，同事透過
 
 ### 個別直接接收與獨立授權
 
-日常收件優先採已驗證 Direct Wake。Gateway 為共用同事配對時使用三個工具的指定 `recipientBotID`；專屬連線本人省略該參數。配對待驗證時原路由持續運作，已排隊事件沿原目的地投遞。專屬 OAuth 只管理固定 Session；確認本人收發及原 Direct Wake 後再撤銷原共用發話權限。詳見[標準交接](Nuwa_Agent_Relay_Handoff_2026-11-19_Onboarding.md)。
+日常收件優先採已驗證 Direct Wake。Gateway 為共用同事配對時使用三個工具的指定 `recipientBotID`；專屬連線本人省略該參數。配對待驗證時原路由持續運作，已排隊事件沿原目的地投遞。專屬 OAuth 只管理固定 Session；確認本人專屬發訊及 Inbox 後，經使用者授權撤銷原共用發話權限；既有 Direct Wake 保留，首次自行配對者在啟用前透過 Inbox 查收。詳見[標準交接](Nuwa_Agent_Relay_Handoff_2026-11-19_Onboarding.md)。
 
 ## 4. 正式資源：只能使用現有的
 
